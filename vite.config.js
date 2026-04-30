@@ -32,7 +32,7 @@ function versionInjectionPlugin() {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const proxyTarget = env.VITE_API_PROXY_TARGET || env.VITE_API_URL || "https://products-api.quickstark.com";
+  const proxyTarget = env.VITE_API_PROXY_TARGET || env.VITE_API_URL || "https://sterling-hollis-be.quickstark.com";
 
   return {
     plugins: [versionInjectionPlugin(), react({ jsxRuntime: "automatic" })],

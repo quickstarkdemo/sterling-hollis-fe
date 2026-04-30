@@ -63,6 +63,9 @@ jobs:
           echo "$CHANGED_FILES"
           if echo "$CHANGED_FILES" | grep -Eq '^(src/|public/|docker/|deploy/|Dockerfile$|index\.html$|package(-lock)?\.json$|vite\.config\.js$|\.github/workflows/)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif ! docker container inspect sterling-hollis-fe >/dev/null 2>&1; then
+            echo "No existing storefront container found; forcing image build."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
@@ -85,15 +88,19 @@ jobs:
           if [[ "${{ steps.image_changes.outputs.changed }}" == "true" ]]; then
             DEPLOY_IMAGE="${DOCKERHUB_IMAGE}:${{ steps.version.outputs.version }}"
           else
-            DEPLOY_IMAGE="${DOCKERHUB_IMAGE}:latest"
+            DEPLOY_IMAGE="$(docker container inspect sterling-hollis-fe --format '{{.Config.Image}}' 2>/dev/null || true)"
+            if [[ -z "$DEPLOY_IMAGE" ]]; then
+              DEPLOY_IMAGE="${DOCKERHUB_IMAGE}:latest"
+            fi
           fi
+          echo "Resolved deploy image: $DEPLOY_IMAGE"
           echo "ref=$DEPLOY_IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Write runtime env file
         run: |
           cat > deploy/runtime.env <<EOF
           VITE_API_URL=${{ secrets.VITE_API_URL }}
-          VITE_API_PROXY_TARGET=${{ secrets.VITE_API_PROXY_TARGET || 'https://products-api.quickstark.com' }}
+          VITE_API_PROXY_TARGET=${{ secrets.VITE_API_PROXY_TARGET || 'https://sterling-hollis-be.quickstark.com' }}
           VITE_DEFAULT_STORE_ID=${{ secrets.VITE_DEFAULT_STORE_ID }}
           VITE_ENVIRONMENT=${{ secrets.VITE_ENVIRONMENT || 'production' }}
           VITE_DATADOG_APPLICATION_ID=${{ secrets.VITE_DATADOG_APPLICATION_ID }}

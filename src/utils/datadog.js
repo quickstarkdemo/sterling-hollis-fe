@@ -12,7 +12,7 @@ export function initDatadog() {
   const service = import.meta.env.VITE_DATADOG_SERVICE || "sterling-hollis-fe";
   const env = import.meta.env.VITE_ENVIRONMENT || "development";
   const version = import.meta.env.VITE_RELEASE || "local";
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
 
   if (!applicationId || !clientToken) {
     initialized = true;

@@ -22,7 +22,7 @@ http://localhost:8000
 To use the deployed product API through the dev proxy:
 
 ```bash
-VITE_API_URL= VITE_API_PROXY_TARGET=https://products-api.quickstark.com npm run dev
+VITE_API_URL= VITE_API_PROXY_TARGET=https://sterling-hollis-be.quickstark.com npm run dev
 ```
 
 Leave `VITE_API_URL` empty for same-origin `/api` requests. This avoids browser

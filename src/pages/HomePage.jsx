@@ -85,7 +85,7 @@ export default function HomePage() {
       <Container maxW="1100px" py={16}>
         <ErrorState
           onRetry={load}
-          message={`Check VITE_API_URL. Current browser target: ${import.meta.env.VITE_API_URL || "http://localhost:8000"}`}
+          message={`Check VITE_API_URL. Current browser target: ${import.meta.env.VITE_API_URL || "same-origin /api"}`}
         />
       </Container>
     );
