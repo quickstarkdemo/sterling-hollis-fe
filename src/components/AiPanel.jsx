@@ -1,7 +1,13 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { FiCpu, FiLayers, FiRadio } from "react-icons/fi";
 
-export default function AiPanel({ title = "AI recommendation signal", strategy, reasons = [], children }) {
+export default function AiPanel({
+  title = "AI recommendation signal",
+  strategy,
+  reasons = [],
+  showDefaultTrace = true,
+  children,
+}) {
   return (
     <Box className="ai-panel">
       <HStack justify="space-between" align="start" gap={4}>
@@ -25,12 +31,12 @@ export default function AiPanel({ title = "AI recommendation signal", strategy, 
             </HStack>
           ))}
         </VStack>
-      ) : (
+      ) : showDefaultTrace ? (
         <HStack className="trace-row" mt={5}>
           <FiLayers />
           <Text>Recommendations are resolved by the product API.</Text>
         </HStack>
-      )}
+      ) : null}
       {children}
     </Box>
   );

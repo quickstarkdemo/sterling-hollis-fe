@@ -22,6 +22,28 @@ import { DEFAULT_STORE_ID, getProduct, getProductRecommendations, getRelatedProd
 import { detailImages, money, titleize } from "../utils/format";
 import { trackAction } from "../utils/datadog";
 
+function variantTitle(variant, fallbackTitle) {
+  const attributes = Object.entries(variant.attributes || {})
+    .filter(([key, value]) => value && ["color", "material"].includes(key))
+    .map(([, value]) => titleize(value));
+  if (attributes.length) return attributes.join(" / ");
+
+  const sizes = (variant.sizes || []).filter(Boolean).map(titleize);
+  if (sizes.length) return sizes.join(" / ");
+
+  return fallbackTitle;
+}
+
+function variantStockBadges(variant) {
+  const totals = (variant.inventory || []).reduce((summary, row) => {
+    const label = titleize(row.stock_state || row.availability || "available");
+    summary[label] = (summary[label] || 0) + Number(row.inventory_qty || 0);
+    return summary;
+  }, {});
+
+  return Object.entries(totals).map(([label, quantity]) => `${quantity} ${label.toLowerCase()}`);
+}
+
 export default function ProductPage() {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
@@ -132,11 +154,7 @@ export default function ProductPage() {
           <AiPanel
             title="Ask about this item"
             strategy={strategy}
-            reasons={[
-              "Product context loaded from catalog detail.",
-              "Chat requests include the current product and route.",
-              "Customer-specific tools only run after backend auth links the Clerk session.",
-            ]}
+            showDefaultTrace={false}
           >
             <ChatWidget
               title="Ask about this item"
@@ -158,17 +176,23 @@ export default function ProductPage() {
             <Text className="section-title">Variants and inventory</Text>
           </HStack>
           <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
-            {product.variants.map((variant) => (
-              <Box key={variant.id} className="variant-card">
-                <Text className="variant-title">{variant.id}</Text>
-                <Text className="muted-text">{money(variant.price_min)} - {money(variant.price_max)}</Text>
-                <HStack mt={3} gap={2} flexWrap="wrap">
-                  {(variant.sizes || []).map((size) => (
-                    <Badge key={size} className="soft-badge">{size}</Badge>
-                  ))}
-                </HStack>
-              </Box>
-            ))}
+            {product.variants.map((variant) => {
+              const stockBadges = variantStockBadges(variant);
+              return (
+                <Box key={variant.id} className="variant-card">
+                  <Text className="variant-title">{variantTitle(variant, product.title)}</Text>
+                  <Text className="muted-text">{money(variant.price_min)} - {money(variant.price_max)}</Text>
+                  <HStack mt={3} gap={2} flexWrap="wrap">
+                    {stockBadges.map((badge) => (
+                      <Badge key={badge} className="soft-badge">{badge}</Badge>
+                    ))}
+                    {(variant.sizes || []).map((size) => (
+                      <Badge key={size} className="soft-badge">{titleize(size)}</Badge>
+                    ))}
+                  </HStack>
+                </Box>
+              );
+            })}
           </SimpleGrid>
         </Box>
       ) : null}

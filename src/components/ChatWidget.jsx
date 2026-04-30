@@ -14,6 +14,18 @@ const starterPrompts = [
   "What would you recommend for me?",
 ];
 
+const currentItemTerms = /\b(this|that|it|item|product|piece|available|availability|stock|inventory|size|sizes|color|material|price|cost|pair|pairs|match|matches|similar)\b/i;
+
+function withoutCurrentProductContext(context) {
+  const shoppingContext = { ...context };
+  delete shoppingContext.product_id;
+  return shoppingContext;
+}
+
+function shouldUseCurrentProductContext(message) {
+  return currentItemTerms.test(message);
+}
+
 function ChatActionButton({ action }) {
   if (action.type === "sign_in" && CLERK_ENABLED) {
     return (
@@ -64,14 +76,7 @@ function ChatProductCard({ product }) {
 export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "Ask about the current item, category, or your account.",
-      cards: [],
-      actions: [],
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -100,10 +105,13 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
     setMessages((current) => [...current, { role: "user", content: message, cards: [], actions: [] }]);
     setLoading(true);
     try {
+      const requestContext = shouldUseCurrentProductContext(message)
+        ? chatContext
+        : withoutCurrentProductContext(chatContext);
       const response = await sendChat({
         message,
         conversation_id: conversationId || undefined,
-        context: chatContext,
+        context: requestContext,
       });
       setConversationId(response.conversation_id);
       setMessages((current) => [
@@ -130,7 +138,6 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
           <HStack className="chat-header" justify="space-between">
             <Box>
               <Text className="assistant-title">{title}</Text>
-              <Text className="muted-mini">Context-aware</Text>
             </Box>
             <Button size="sm" variant="ghost" className="icon-button" onClick={() => setOpen(false)}>
               <FiChevronDown />
