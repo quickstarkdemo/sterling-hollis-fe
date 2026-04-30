@@ -71,6 +71,10 @@ Useful runtime secrets:
 `FRONTEND_PORT` defaults to `45173`. It must be a free host port and must not
 overlap the backend `API_PORT` or another container's published port.
 
+For production, leave `VITE_API_URL` unset/empty so the browser uses same-origin
+`/api` requests through the frontend Nginx proxy. Set `VITE_API_PROXY_TARGET` to
+the backend origin.
+
 Deploy helper:
 
 ```bash
