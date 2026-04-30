@@ -68,6 +68,9 @@ Useful runtime secrets:
 - `VITE_DATADOG_SERVICE`
 - `FRONTEND_PORT`
 
+`FRONTEND_PORT` must be a free host port and must not overlap the backend
+`API_PORT`.
+
 Deploy helper:
 
 ```bash
