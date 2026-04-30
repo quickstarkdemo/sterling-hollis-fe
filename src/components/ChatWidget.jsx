@@ -4,9 +4,9 @@ import { Link as RouterLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiExternalLink, FiLock, FiMessageCircle, FiSend } from "react-icons/fi";
 
-import { sendChat } from "../utils/apiClient";
+import { getProducts, searchProducts, sendChat } from "../utils/apiClient";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
-import { imageFor, money } from "../utils/format";
+import { imageFor, money, titleize } from "../utils/format";
 
 const starterPrompts = [
   "What goes with this?",
@@ -15,6 +15,27 @@ const starterPrompts = [
 ];
 
 const currentItemTerms = /\b(this|that|it|item|product|piece|available|availability|stock|inventory|size|sizes|color|material|price|cost|pair|pairs|match|matches|similar)\b/i;
+const searchIntentTerms = /\b(find|show|search|looking for|look for|do you have|have any|need|recommend|suggest)\b/i;
+const pairingTerms = /\b(go(?:es)? with|pair(?:s|ing)?|match(?:es|ing)?|complement(?:s|ary)?)\b/i;
+const budgetMaxPattern = /\b(?:under|below|less than|max(?:imum)?|up to)\s*\$?\s*(\d+(?:\.\d{1,2})?)\b/i;
+
+const searchableProductTerms = [
+  { pattern: /\b(blouses?|tops?|shirts?|dresses?|skirts?|pants|trousers?|coats?|jackets?|blazers?|sweaters?|cardigans?|jeans)\b/i, category: "womens_apparel" },
+  { pattern: /\b(moisturizers?|serums?|palettes?|lip colors?|lipstick|fragrances?|perfumes?|skincare|makeup)\b/i, category: "beauty" },
+  { pattern: /\b(purses?|handbags?|bags?|totes?|clutches?)\b/i, category: "handbags" },
+  { pattern: /\b(shoes?|heels?|pumps?|boots?|sandals?|sneakers?)\b/i, category: "shoes" },
+  { pattern: /\b(earrings?|necklaces?|bracelets?|rings?|jewelry|accessories)\b/i, category: "jewelry_accessories" },
+  { pattern: /\b(dinnerware|chair|chairs|vases?|home|decor)\b/i, category: "home" },
+];
+
+const complementaryCategories = {
+  handbags: "womens_apparel",
+  shoes: "womens_apparel",
+  jewelry_accessories: "womens_apparel",
+  womens_apparel: "shoes",
+  mens_apparel: "shoes",
+  beauty: "jewelry_accessories",
+};
 
 function withoutCurrentProductContext(context) {
   const shoppingContext = { ...context };
@@ -24,6 +45,64 @@ function withoutCurrentProductContext(context) {
 
 function shouldUseCurrentProductContext(message) {
   return currentItemTerms.test(message);
+}
+
+function singularizeTerm(term) {
+  return term.toLowerCase().replace(/\s+/g, " ").replace(/s\b/, "");
+}
+
+function findSearchTerm(message) {
+  for (const term of searchableProductTerms) {
+    const match = message.match(term.pattern);
+    if (match) {
+      return {
+        category: term.category,
+        query: singularizeTerm(match[0]),
+      };
+    }
+  }
+  return null;
+}
+
+function buildLocalSearchPlan(message, context) {
+  const trimmed = message.trim();
+  const hasPairingIntent = pairingTerms.test(trimmed);
+  const hasSearchIntent = searchIntentTerms.test(trimmed);
+  const explicitTerm = findSearchTerm(trimmed);
+
+  if (!explicitTerm && !hasPairingIntent) return null;
+  if (!explicitTerm && !hasSearchIntent && !hasPairingIntent) return null;
+
+  const color = context.attributes?.color;
+  const queryParts = [];
+  if (hasPairingIntent && color) queryParts.push(color);
+  if (explicitTerm?.query) queryParts.push(explicitTerm.query);
+  if (!explicitTerm?.query && color) queryParts.push(color);
+
+  const maxPriceMatch = trimmed.match(budgetMaxPattern);
+  const category = explicitTerm?.category || complementaryCategories[context.category];
+
+  return {
+    query: queryParts.join(" ").trim(),
+    params: {
+      category,
+      max_price: maxPriceMatch ? maxPriceMatch[1] : undefined,
+      limit: 3,
+    },
+    label: explicitTerm?.query || "matching pieces",
+    pairing: hasPairingIntent,
+    fallbackToCategory: !explicitTerm,
+  };
+}
+
+function localSearchMessage(plan, products) {
+  if (!products.length) {
+    return `I couldn't find ${plan.label} in the catalog for that request.`;
+  }
+  if (plan.pairing) {
+    return `I found ${plan.label} options that should work with this item.`;
+  }
+  return `I found ${plan.label} options in the catalog.`;
 }
 
 function ChatActionButton({ action }) {
@@ -105,6 +184,29 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
     setMessages((current) => [...current, { role: "user", content: message, cards: [], actions: [] }]);
     setLoading(true);
     try {
+      const localSearchPlan = buildLocalSearchPlan(message, chatContext);
+      if (localSearchPlan) {
+        const result = await searchProducts(localSearchPlan.query, localSearchPlan.params);
+        let cards = result.items || [];
+        if (!cards.length && localSearchPlan.fallbackToCategory && localSearchPlan.params.category) {
+          const fallbackResult = await getProducts(localSearchPlan.params);
+          cards = fallbackResult.items || [];
+        }
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content: localSearchMessage(localSearchPlan, cards),
+            cards,
+            actions: cards.map((product) => ({
+              type: "view_product",
+              label: `View ${titleize(product.title)}`,
+              href: `/product/${product.id}`,
+            })),
+          },
+        ]);
+        return;
+      }
       const requestContext = shouldUseCurrentProductContext(message)
         ? chatContext
         : withoutCurrentProductContext(chatContext);

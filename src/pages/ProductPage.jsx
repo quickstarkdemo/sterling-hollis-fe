@@ -161,7 +161,9 @@ export default function ProductPage() {
               context={{
                 page_type: "product",
                 product_id: product.id,
+                product_title: product.title,
                 category: product.category,
+                attributes: product.attributes || {},
                 store_id: DEFAULT_STORE_ID || undefined,
               }}
             />
