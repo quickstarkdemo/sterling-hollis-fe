@@ -10,7 +10,7 @@ jobs:
     runs-on: self-hosted
     env:
       DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
-      FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3000' }}
+      FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || '3001' }}
       COMPOSE_PROJECT_NAME: sterling-hollis-fe
 
     steps:
@@ -109,7 +109,7 @@ jobs:
           VITE_DATADOG_SITE=${{ secrets.VITE_DATADOG_SITE || 'datadoghq.com' }}
           VITE_DATADOG_SERVICE=${{ secrets.VITE_DATADOG_SERVICE || 'sterling-hollis-fe' }}
           VITE_RELEASE=${{ steps.version.outputs.version }}
-          FRONTEND_PORT=${{ secrets.FRONTEND_PORT || '3000' }}
+          FRONTEND_PORT=${{ secrets.FRONTEND_PORT || '3001' }}
           EOF
 
       - name: Deploy compose stack

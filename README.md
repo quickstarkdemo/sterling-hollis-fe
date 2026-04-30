@@ -68,8 +68,8 @@ Useful runtime secrets:
 - `VITE_DATADOG_SERVICE`
 - `FRONTEND_PORT`
 
-`FRONTEND_PORT` must be a free host port and must not overlap the backend
-`API_PORT`.
+`FRONTEND_PORT` defaults to `3001`. It must be a free host port and must not
+overlap the backend `API_PORT` or another container's published port.
 
 Deploy helper:
 

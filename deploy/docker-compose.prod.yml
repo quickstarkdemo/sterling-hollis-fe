@@ -8,7 +8,7 @@ services:
     env_file:
       - ./runtime.env
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-3001}:80"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/frontend-health"]
       interval: 30s
