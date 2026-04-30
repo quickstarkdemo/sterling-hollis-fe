@@ -160,11 +160,15 @@ export default function ProductPage() {
               title="Ask about this item"
               context={{
                 page_type: "product",
-                product_id: product.id,
-                product_title: product.title,
                 category: product.category,
-                attributes: product.attributes || {},
                 store_id: DEFAULT_STORE_ID || undefined,
+                current_product: {
+                  id: product.id,
+                  title: product.title,
+                  category: product.category,
+                  brand: product.brand,
+                  attributes: product.attributes || {},
+                },
               }}
             />
           </AiPanel>
