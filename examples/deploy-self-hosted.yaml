@@ -1,0 +1,217 @@
+name: Product API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    env:
+      DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
+      API_PORT: ${{ secrets.API_PORT || '8000' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Read version
+        id: version
+        run: |
+          BASE_VERSION=$(tr -d '[:space:]' < VERSION)
+          SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="${BASE_VERSION}-${SHORT_SHA}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Verify docker access
+        run: |
+          docker version
+          docker compose version
+
+      - name: Detect image-affecting changes
+        id: image_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch: forcing image rebuild."
+            exit 0
+          fi
+
+          BEFORE_SHA="${{ github.event.before }}"
+          AFTER_SHA="${GITHUB_SHA}"
+
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "No usable before SHA: forcing image rebuild."
+            exit 0
+          fi
+
+          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null || ! git cat-file -e "${AFTER_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --prune --depth=100 origin "${GITHUB_REF#refs/heads/}" || true
+          fi
+
+          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null || ! git cat-file -e "${AFTER_SHA}^{commit}" 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Unable to resolve push commit range (likely rewritten/reverted history). Forcing image rebuild."
+            exit 0
+          fi
+
+          if ! CHANGED_FILES="$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Unable to diff commit range. Forcing image rebuild."
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -Eq '^(app/|alembic/|scripts/|Dockerfile$|pyproject\.toml$|requirements[^/]*\.txt$|uv\.lock$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Runtime image inputs changed."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No runtime image inputs changed; reusing latest image."
+          fi
+
+      - name: Build and push API image
+        if: steps.image_changes.outputs.changed == 'true'
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+          docker build \
+            -t "${DOCKERHUB_IMAGE}:latest" \
+            -t "${DOCKERHUB_IMAGE}:${{ steps.version.outputs.version }}" \
+            .
+          docker push "${DOCKERHUB_IMAGE}:latest"
+          docker push "${DOCKERHUB_IMAGE}:${{ steps.version.outputs.version }}"
+
+      - name: Resolve deploy image
+        id: deploy_image
+        shell: bash
+        run: |
+          if [[ "${{ steps.image_changes.outputs.changed }}" == "true" ]]; then
+            DEPLOY_IMAGE="${DOCKERHUB_IMAGE}:${{ steps.version.outputs.version }}"
+          else
+            DEPLOY_IMAGE="${DOCKERHUB_IMAGE}:latest"
+          fi
+
+          echo "ref=$DEPLOY_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "Deploy image: $DEPLOY_IMAGE"
+
+      - name: Write runtime env file
+        run: |
+          cat > deploy/runtime.env <<EOF
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          PGHOST=${{ secrets.PGHOST }}
+          PGPORT=${{ secrets.PGPORT }}
+          PGDATABASE=${{ secrets.PGDATABASE }}
+          PGUSER=${{ secrets.PGUSER }}
+          PGPASSWORD=${{ secrets.PGPASSWORD }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX_NAME=${{ secrets.PINECONE_INDEX_NAME || 'fashion-products-v1' }}
+          PINECONE_CLOUD=${{ secrets.PINECONE_CLOUD || 'aws' }}
+          PINECONE_REGION=${{ secrets.PINECONE_REGION || 'us-east-1' }}
+          EMBEDDING_MODEL=${{ secrets.EMBEDDING_MODEL || 'text-embedding-3-small' }}
+          EMBEDDING_DIMENSION=${{ secrets.EMBEDDING_DIMENSION || '1536' }}
+          DATA_DIR=/app/data/runs
+          STORE_SOURCE_INDEX_URL=${{ secrets.STORE_SOURCE_INDEX_URL }}
+          STORE_SOURCE_DETAIL_URL_TEMPLATE=${{ secrets.STORE_SOURCE_DETAIL_URL_TEMPLATE }}
+          STORE_SOURCE_CACHE_PATH=${{ secrets.STORE_SOURCE_CACHE_PATH || '/app/data/store_source_snapshot.json' }}
+          MCP_ALLOWED_HOSTS=${{ secrets.MCP_ALLOWED_HOSTS || '127.0.0.1:*,localhost:*,[::1]:*' }}
+          MCP_ALLOWED_ORIGINS=${{ secrets.MCP_ALLOWED_ORIGINS || 'http://127.0.0.1:*,http://localhost:*,http://[::1]:*' }}
+          PUBLIC_BASE_URL=${{ secrets.PUBLIC_BASE_URL || 'http://localhost:8000' }}
+          APP_BUILD_VERSION=${{ steps.version.outputs.version }}
+          SES_REGION=${{ secrets.SES_REGION }}
+          SES_FROM_EMAIL=${{ secrets.SES_FROM_EMAIL }}
+          AMAZON_KEY_ID=${{ secrets.AMAZON_KEY_ID }}
+          AMAZON_KEY_SECRET=${{ secrets.AMAZON_KEY_SECRET }}
+          TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_API_KEY_SID=${{ secrets.TWILIO_API_KEY_SID }}
+          TWILIO_API_KEY_SECRET=${{ secrets.TWILIO_API_KEY_SECRET }}
+          TWILIO_SENDER_NUMBER=${{ secrets.TWILIO_SENDER_NUMBER }}
+          TWILIO_TEST_TO_NUMBER=${{ secrets.TWILIO_TEST_TO_NUMBER }}
+          EXEC_AUTO_OPTIMIZE_ENABLED=${{ secrets.EXEC_AUTO_OPTIMIZE_ENABLED || 'false' }}
+          STRATEGY_PACKET_ENABLED=${{ secrets.STRATEGY_PACKET_ENABLED || 'false' }}
+          MERCH_STRATEGY_CONTEXT_ENABLED=${{ secrets.MERCH_STRATEGY_CONTEXT_ENABLED || 'false' }}
+          ASSOCIATE_PRIORITY_TAGS_ENABLED=${{ secrets.ASSOCIATE_PRIORITY_TAGS_ENABLED || 'false' }}
+          UVICORN_RELOAD=false
+          EOF
+
+      - name: Deploy compose stack
+        env:
+          PRODUCT_API_IMAGE: ${{ steps.deploy_image.outputs.ref }}
+        run: |
+          docker image inspect "${PRODUCT_API_IMAGE}" >/dev/null 2>&1 || docker pull "${PRODUCT_API_IMAGE}"
+
+          if [[ "${{ steps.image_changes.outputs.changed }}" == "true" ]]; then
+            docker compose -f deploy/docker-compose.prod.yml up -d --remove-orphans
+          else
+            docker compose -f deploy/docker-compose.prod.yml up -d --force-recreate --remove-orphans
+          fi
+
+          docker compose -f deploy/docker-compose.prod.yml ps
+
+      - name: Health check
+        env:
+          PRODUCT_API_IMAGE: ${{ steps.deploy_image.outputs.ref }}
+        run: |
+          ATTEMPTS=24
+          SLEEP_SECONDS=5
+          SUCCESS=0
+          CONTAINER_ID=""
+
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            echo "Health check attempt ${attempt}/${ATTEMPTS}"
+
+            CONTAINER_ID="$(docker compose -f deploy/docker-compose.prod.yml ps -q api || true)"
+
+            if [ -n "$CONTAINER_ID" ]; then
+              HEALTH_STATUS="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$CONTAINER_ID" 2>/dev/null || true)"
+              echo "Container health status: ${HEALTH_STATUS:-unknown}"
+
+              if [ "$HEALTH_STATUS" = "healthy" ]; then
+                docker exec "$CONTAINER_ID" python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read().decode())"
+                echo "Application is healthy."
+                SUCCESS=1
+                break
+              fi
+            fi
+
+            if curl -fsS "http://localhost:${API_PORT}/health"; then
+              echo ""
+              echo "Application is healthy."
+              SUCCESS=1
+              break
+            fi
+
+            echo "Health endpoint not ready yet. Current container state:"
+            docker compose -f deploy/docker-compose.prod.yml ps || true
+            docker ps --filter "name=products-api" || true
+            sleep "$SLEEP_SECONDS"
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "Health check failed after $((ATTEMPTS * SLEEP_SECONDS)) seconds."
+            echo ""
+            echo "Compose status:"
+            docker compose -f deploy/docker-compose.prod.yml ps || true
+            echo ""
+            echo "Container inspect:"
+            docker inspect products-api --format '{{json .State}}' 2>/dev/null || true
+            echo ""
+            echo "Recent container logs:"
+            docker logs --tail 200 products-api 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Show running container
+        if: always()
+        run: |
+          docker ps --filter "name=products-api"
