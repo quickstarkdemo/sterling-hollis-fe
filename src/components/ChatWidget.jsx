@@ -15,6 +15,8 @@ const starterPrompts = [
 ];
 
 const greetingPattern = /^(hi|hello|hey|good morning|good afternoon|good evening)[.!?]*$/i;
+const legacyContextFreePattern =
+  /\b(go(?:es)? with|pair|pairs|pairing|match|matches|matching|complement|wear with|outfit|look|find|search|show me|looking for|look for|do you have|have any|need)\b/i;
 
 function ChatActionButton({ action }) {
   if (action.type === "sign_in" && CLERK_ENABLED) {
@@ -90,9 +92,15 @@ function isCurrentProductSchemaError(err) {
   });
 }
 
-function legacyChatContext(context) {
+function legacyChatContext(context, message) {
   if (!context.current_product) return context;
   const { current_product: currentProduct, ...legacyContext } = context;
+  if (legacyContextFreePattern.test(message)) {
+    const contextFree = { ...legacyContext };
+    delete contextFree.product_id;
+    delete contextFree.category;
+    return contextFree;
+  }
   return {
     ...legacyContext,
     product_id: legacyContext.product_id || currentProduct.id,
@@ -158,7 +166,7 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
           response = await sendChat({
             message,
             conversation_id: conversationId || undefined,
-            context: legacyChatContext(chatContext),
+            context: legacyChatContext(chatContext, message),
           });
         }
       }
