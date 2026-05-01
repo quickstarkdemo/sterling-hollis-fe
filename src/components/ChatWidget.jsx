@@ -61,6 +61,24 @@ function ChatProductCard({ product }) {
   );
 }
 
+function formatChatError(err) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return String(item || "");
+        const location = Array.isArray(item.loc) ? item.loc.join(".") : "";
+        return [location, item.msg].filter(Boolean).join(": ");
+      })
+      .filter(Boolean);
+    return messages.length ? `Chat request was rejected: ${messages.join("; ")}` : "Chat request was rejected.";
+  }
+  if (detail && typeof detail === "object") {
+    return detail.msg || "Chat request was rejected.";
+  }
+  return detail || "Chat is unavailable right now.";
+}
+
 export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -111,7 +129,7 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
         },
       ]);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Chat is unavailable right now.");
+      setError(formatChatError(err));
     } finally {
       setLoading(false);
     }
