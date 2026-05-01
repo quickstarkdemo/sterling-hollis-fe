@@ -79,6 +79,24 @@ function formatChatError(err) {
   return detail || "Chat is unavailable right now.";
 }
 
+function isCurrentProductSchemaError(err) {
+  const detail = err?.response?.data?.detail;
+  if (!Array.isArray(detail)) return false;
+  return detail.some((item) => {
+    const location = Array.isArray(item?.loc) ? item.loc.join(".") : "";
+    return item?.type === "extra_forbidden" && location === "body.context.current_product";
+  });
+}
+
+function legacyChatContext(context) {
+  if (!context.current_product) return context;
+  const { current_product: currentProduct, ...legacyContext } = context;
+  return {
+    ...legacyContext,
+    product_id: legacyContext.product_id || currentProduct.id,
+  };
+}
+
 export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -111,11 +129,21 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
     setMessages((current) => [...current, { role: "user", content: message, cards: [], actions: [] }]);
     setLoading(true);
     try {
-      const response = await sendChat({
-        message,
-        conversation_id: conversationId || undefined,
-        context: chatContext,
-      });
+      let response;
+      try {
+        response = await sendChat({
+          message,
+          conversation_id: conversationId || undefined,
+          context: chatContext,
+        });
+      } catch (err) {
+        if (!isCurrentProductSchemaError(err)) throw err;
+        response = await sendChat({
+          message,
+          conversation_id: conversationId || undefined,
+          context: legacyChatContext(chatContext),
+        });
+      }
       setConversationId(response.conversation_id);
       setMessages((current) => [
         ...current,
