@@ -10,14 +10,15 @@ import {
 } from "@chakra-ui/react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiCamera, FiSearch, FiStar } from "react-icons/fi";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import AiPanel from "../components/AiPanel";
 import CategoryRail from "../components/CategoryRail";
+import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
 import ProductGrid from "../components/ProductGrid";
 import { EmptyState, ErrorState, LoadingState } from "../components/StatusState";
-import { getCatalog, getProductRecommendations, searchProducts } from "../utils/apiClient";
+import { DEFAULT_STORE_ID, getCatalog, getProductRecommendations, searchProducts } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
 
 const searchSuggestions = ["satin", "camel", "silk", "shoes", "mens_apparel"];
@@ -32,6 +33,15 @@ export default function HomePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const chatContext = useMemo(
+    () => ({
+      page_type: "home",
+      store_id: DEFAULT_STORE_ID || undefined,
+    }),
+    [],
+  );
+  usePageChatContext(chatContext);
 
   const load = async () => {
     setLoading(true);

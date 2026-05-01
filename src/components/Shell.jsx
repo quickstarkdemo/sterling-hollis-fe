@@ -3,6 +3,7 @@ import { NavLink, Link as RouterLink } from "react-router-dom";
 import { FiCamera, FiSearch, FiShoppingBag } from "react-icons/fi";
 
 import AuthControls from "./AuthControls";
+import ChatWidget from "./ChatWidget";
 
 const navItems = [
   { to: "/", label: "Shop" },
@@ -48,6 +49,7 @@ export default function Shell({ children }) {
       </Box>
 
       <Box as="main">{children}</Box>
+      <ChatWidget />
     </Box>
   );
 }

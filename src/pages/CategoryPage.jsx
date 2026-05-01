@@ -1,9 +1,9 @@
 import { Box, Button, Container, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
 import { FiArrowLeft, FiRefreshCw } from "react-icons/fi";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import ChatWidget from "../components/ChatWidget";
+import { usePageChatContext } from "../components/ChatContext";
 import ProductGrid from "../components/ProductGrid";
 import { ErrorState, LoadingState } from "../components/StatusState";
 import { DEFAULT_STORE_ID, getCategoryProducts } from "../utils/apiClient";
@@ -24,6 +24,16 @@ export default function CategoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const sort = searchParams.get("sort") || "relevance";
+
+  const chatContext = useMemo(
+    () => ({
+      page_type: "category",
+      category,
+      store_id: DEFAULT_STORE_ID || undefined,
+    }),
+    [category],
+  );
+  usePageChatContext(chatContext);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,17 +88,6 @@ export default function CategoryPage() {
           </Button>
         </HStack>
       </HStack>
-
-      <Box mb={7}>
-        <ChatWidget
-          title={`Ask about ${titleize(category)}`}
-          context={{
-            page_type: "category",
-            category,
-            store_id: DEFAULT_STORE_ID || undefined,
-          }}
-        />
-      </Box>
 
       {error ? <ErrorState onRetry={load} /> : <ProductGrid products={payload?.items || []} />}
     </Container>

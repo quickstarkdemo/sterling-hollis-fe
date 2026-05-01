@@ -12,8 +12,7 @@ import { Link as RouterLink, useParams } from "react-router-dom";
 import { FiArrowLeft, FiHeart, FiMail, FiPackage } from "react-icons/fi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import AiPanel from "../components/AiPanel";
-import ChatWidget from "../components/ChatWidget";
+import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
 import ProductImage from "../components/ProductImage";
 import ProductGrid from "../components/ProductGrid";
@@ -49,10 +48,32 @@ export default function ProductPage() {
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [strategy, setStrategy] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState("");
+
+  const chatContext = useMemo(() => {
+    const baseContext = {
+      page_type: "product",
+      product_id: product?.id || productId,
+      category: product?.category,
+      store_id: DEFAULT_STORE_ID || undefined,
+    };
+
+    if (!product) return baseContext;
+
+    return {
+      ...baseContext,
+      current_product: {
+        id: product.id,
+        title: product.title,
+        category: product.category,
+        brand: product.brand,
+        attributes: product.attributes || {},
+      },
+    };
+  }, [product, productId]);
+  usePageChatContext(chatContext);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,7 +87,6 @@ export default function ProductPage() {
       setProduct(detail);
       setRelated(relatedData.items || []);
       setRecommendations(recData.recommendations || []);
-      setStrategy(recData.strategy || "");
     } catch (err) {
       setError(err);
     } finally {
@@ -150,22 +170,6 @@ export default function ProductPage() {
             </Button>
           </HStack>
           {notice ? <Text className="notice-text">{notice}</Text> : null}
-
-          <AiPanel
-            title="Ask about this item"
-            strategy={strategy}
-            showDefaultTrace={false}
-          >
-            <ChatWidget
-              title="Ask about this item"
-              context={{
-                page_type: "product",
-                category: product.category,
-                product_id: product.id,
-                store_id: DEFAULT_STORE_ID || undefined,
-              }}
-            />
-          </AiPanel>
         </VStack>
       </SimpleGrid>
 

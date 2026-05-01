@@ -3,8 +3,9 @@ import { FiCamera, FiCheckCircle, FiCpu, FiImage, FiLoader, FiUploadCloud } from
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import AiPanel from "../components/AiPanel";
+import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
-import { getImageRecommendations } from "../utils/apiClient";
+import { DEFAULT_STORE_ID, getImageRecommendations } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
 
 const categoryOptions = [
@@ -29,6 +30,15 @@ export default function StyleFinderPage() {
   const [strategy, setStrategy] = useState("");
   const [isFinding, setIsFinding] = useState(false);
   const [error, setError] = useState("");
+
+  const chatContext = useMemo(
+    () => ({
+      page_type: "style_finder",
+      store_id: DEFAULT_STORE_ID || undefined,
+    }),
+    [],
+  );
+  usePageChatContext(chatContext);
 
   const fileName = useMemo(() => file?.name || "No image selected", [file]);
   const hasConstraints = Boolean(category || budgetMax || context);

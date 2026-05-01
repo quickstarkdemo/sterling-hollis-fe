@@ -3,5 +3,6 @@ dist
 .env
 .env.local
 .DS_Store
+.deploy/deploy-notes-latest.md
 .deploy/*.sha256
 deploy/runtime.env

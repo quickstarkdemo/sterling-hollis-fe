@@ -1,22 +1,19 @@
 import { Box, Button, HStack, Input, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { SignInButton } from "@clerk/clerk-react";
-import { Link as RouterLink, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { FiChevronDown, FiExternalLink, FiLock, FiMessageCircle, FiSend } from "react-icons/fi";
 
+import { useChatContext } from "./ChatContext";
 import { sendChat } from "../utils/apiClient";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
 import { imageFor, money } from "../utils/format";
 
 const starterPrompts = [
+  "Find satin evening pieces",
   "What goes with this?",
-  "Is this available?",
-  "What would you recommend for me?",
+  "Can you check my order status?",
 ];
-
-const greetingPattern = /^(hi|hello|hey|good morning|good afternoon|good evening)[.!?]*$/i;
-const legacyContextFreePattern =
-  /\b(go(?:es)? with|pair|pairs|pairing|match|matches|matching|complement|wear with|outfit|look|find|search|show me|looking for|look for|do you have|have any|need)\b/i;
 
 function ChatActionButton({ action }) {
   if (action.type === "sign_in" && CLERK_ENABLED) {
@@ -38,6 +35,15 @@ function ChatActionButton({ action }) {
     );
   }
   if (action.href) {
+    if (/^https?:\/\//i.test(action.href)) {
+      return (
+        <Button as="a" href={action.href} size="sm" className="secondary-button">
+          <FiExternalLink />
+          {action.label}
+        </Button>
+      );
+    }
+
     return (
       <Button as={RouterLink} to={action.href} size="sm" className="secondary-button">
         <FiExternalLink />
@@ -83,43 +89,8 @@ function formatChatError(err) {
   return detail || "Chat is unavailable right now.";
 }
 
-function isCurrentProductSchemaError(err) {
-  const detail = err?.response?.data?.detail;
-  if (!Array.isArray(detail)) return false;
-  return detail.some((item) => {
-    const location = Array.isArray(item?.loc) ? item.loc.join(".") : "";
-    return item?.type === "extra_forbidden" && location === "body.context.current_product";
-  });
-}
-
-function legacyChatContext(context, message) {
-  if (!context.current_product) return context;
-  const { current_product: currentProduct, ...legacyContext } = context;
-  if (legacyContextFreePattern.test(message)) {
-    const contextFree = { ...legacyContext };
-    delete contextFree.product_id;
-    delete contextFree.category;
-    return contextFree;
-  }
-  return {
-    ...legacyContext,
-    product_id: legacyContext.product_id || currentProduct.id,
-  };
-}
-
-function fallbackGreetingResponse(message) {
-  if (!greetingPattern.test(message.trim())) return null;
-  return {
-    conversation_id: null,
-    message: "Hello. I can help find products, compare options, or answer questions about this item.",
-    cards: [],
-    actions: [],
-    tool_trace: [{ name: "triage", decision: "local compatibility greeting" }],
-  };
-}
-
-export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
-  const location = useLocation();
+export default function ChatWidget({ title = "Storefront chat", showDiagnostics = false }) {
+  const chatContext = useChatContext();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -127,14 +98,6 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const threadRef = useRef(null);
-
-  const chatContext = useMemo(
-    () => ({
-      route: location.pathname,
-      ...context,
-    }),
-    [context, location.pathname],
-  );
 
   useEffect(() => {
     if (threadRef.current) {
@@ -150,32 +113,20 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
     setMessages((current) => [...current, { role: "user", content: message, cards: [], actions: [] }]);
     setLoading(true);
     try {
-      let response;
-      try {
-        response = await sendChat({
-          message,
-          conversation_id: conversationId || undefined,
-          context: chatContext,
-        });
-      } catch (err) {
-        if (!isCurrentProductSchemaError(err)) throw err;
-        const greetingResponse = fallbackGreetingResponse(message);
-        if (greetingResponse) {
-          response = greetingResponse;
-        } else {
-          response = await sendChat({
-            message,
-            conversation_id: conversationId || undefined,
-            context: legacyChatContext(chatContext, message),
-          });
-        }
-      }
+      const response = await sendChat({
+        message,
+        conversation_id: conversationId || undefined,
+        context: chatContext,
+      });
+      const assistantText =
+        response.requires_followup && response.clarifying_question ? response.clarifying_question : response.message;
+
       if (response.conversation_id) setConversationId(response.conversation_id);
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content: response.message,
+          content: assistantText,
           cards: response.cards || [],
           actions: response.actions || [],
           toolTrace: response.tool_trace || [],
@@ -207,7 +158,7 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
               <Box key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
                 <Text>{message.content}</Text>
                 {message.cards?.length ? (
-                  <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} mt={3}>
+                  <SimpleGrid columns={1} gap={2} mt={3}>
                     {message.cards.slice(0, 3).map((product) => (
                       <ChatProductCard key={product.id} product={product} />
                     ))}
@@ -220,7 +171,7 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
                     ))}
                   </HStack>
                 ) : null}
-                {message.toolTrace?.length ? (
+                {showDiagnostics && message.toolTrace?.length ? (
                   <VStack align="stretch" gap={1} mt={3} className="chat-tool-trace">
                     {message.toolTrace.map((trace) => (
                       <Text key={`${trace.name}-${trace.decision}`} className="muted-mini">
