@@ -121,10 +121,10 @@ jobs:
         run: |
           mkdir -p deploy
           cat > deploy/runtime.env <<EOF
-FRONTEND_PORT=${{ secrets.FRONTEND_PORT || '45173' }}
-APP_CONTAINER_NAME=sterling-hollis-fe
-APP_BUILD_VERSION=${{ steps.version.outputs.version }}
-EOF
+          FRONTEND_PORT=${{ secrets.FRONTEND_PORT || '45173' }}
+          APP_CONTAINER_NAME=sterling-hollis-fe
+          APP_BUILD_VERSION=${{ steps.version.outputs.version }}
+          EOF
 
       - name: Deploy compose stack
         env:
