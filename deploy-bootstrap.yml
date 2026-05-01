@@ -1,0 +1,22 @@
+app_name: sterling-hollis-fe
+app_type: frontend
+dockerhub_image: quickstark/sterling-hollis-fe
+workflow_file: deploy-self-hosted.yaml
+compose_file: deploy/docker-compose.prod.yml
+service_name: storefront
+container_name: sterling-hollis-fe
+host_port_env: FRONTEND_PORT
+host_port: 45173
+container_port: 80
+health_path: /frontend-health
+runtime_env_keys:
+  - FRONTEND_PORT
+  - APP_CONTAINER_NAME
+secret_keys:
+  - DOCKERHUB_USER
+  - DOCKERHUB_TOKEN
+  - DOCKERHUB_IMAGE
+  - FRONTEND_PORT
+  - APP_CONTAINER_NAME
+variable_keys:
+  []
