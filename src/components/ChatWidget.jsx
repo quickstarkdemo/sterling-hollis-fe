@@ -14,6 +14,8 @@ const starterPrompts = [
   "What would you recommend for me?",
 ];
 
+const greetingPattern = /^(hi|hello|hey|good morning|good afternoon|good evening)[.!?]*$/i;
+
 function ChatActionButton({ action }) {
   if (action.type === "sign_in" && CLERK_ENABLED) {
     return (
@@ -97,6 +99,17 @@ function legacyChatContext(context) {
   };
 }
 
+function fallbackGreetingResponse(message) {
+  if (!greetingPattern.test(message.trim())) return null;
+  return {
+    conversation_id: null,
+    message: "Hello. I can help find products, compare options, or answer questions about this item.",
+    cards: [],
+    actions: [],
+    tool_trace: [{ name: "triage", decision: "local compatibility greeting" }],
+  };
+}
+
 export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -138,13 +151,18 @@ export default function ChatWidget({ context = {}, title = "Atelier chat" }) {
         });
       } catch (err) {
         if (!isCurrentProductSchemaError(err)) throw err;
-        response = await sendChat({
-          message,
-          conversation_id: conversationId || undefined,
-          context: legacyChatContext(chatContext),
-        });
+        const greetingResponse = fallbackGreetingResponse(message);
+        if (greetingResponse) {
+          response = greetingResponse;
+        } else {
+          response = await sendChat({
+            message,
+            conversation_id: conversationId || undefined,
+            context: legacyChatContext(chatContext),
+          });
+        }
       }
-      setConversationId(response.conversation_id);
+      if (response.conversation_id) setConversationId(response.conversation_id);
       setMessages((current) => [
         ...current,
         {
