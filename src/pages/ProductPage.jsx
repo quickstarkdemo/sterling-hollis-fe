@@ -161,14 +161,8 @@ export default function ProductPage() {
               context={{
                 page_type: "product",
                 category: product.category,
+                product_id: product.id,
                 store_id: DEFAULT_STORE_ID || undefined,
-                current_product: {
-                  id: product.id,
-                  title: product.title,
-                  category: product.category,
-                  brand: product.brand,
-                  attributes: product.attributes || {},
-                },
               }}
             />
           </AiPanel>

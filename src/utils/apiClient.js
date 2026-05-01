@@ -92,8 +92,22 @@ export function getProductRecommendations(payload = {}) {
   });
 }
 
+function normalizeChatPayload(payload = {}) {
+  const context = payload.context;
+  if (!context?.current_product) return payload;
+
+  const { current_product: currentProduct, ...restContext } = context;
+  return {
+    ...payload,
+    context: {
+      ...restContext,
+      product_id: restContext.product_id || currentProduct.id,
+    },
+  };
+}
+
 export function sendChat(payload = {}) {
-  return post("/api/chat", payload);
+  return post("/api/chat", normalizeChatPayload(payload));
 }
 
 function appendCleanFields(formData, fields = {}) {
