@@ -1,18 +1,30 @@
 import { Box, Button, HStack, Input, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { SignInButton } from "@clerk/clerk-react";
 import { Link as RouterLink } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import { FiChevronDown, FiExternalLink, FiLock, FiMessageCircle, FiSend } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiChevronDown, FiExternalLink, FiLock, FiMessageCircle, FiRefreshCw, FiSend } from "react-icons/fi";
 
 import { useChatContext } from "./ChatContext";
 import { sendChat } from "../utils/apiClient";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
 import { imageFor, money } from "../utils/format";
 
-const starterPrompts = [
+const genericStarterPrompts = [
   "Find satin evening pieces",
+  "What phone number can I call?",
+  "What is your return policy?",
+];
+
+const categoryStarterPrompts = [
+  "Find satin pieces",
+  "What phone number can I call?",
+  "What is your return policy?",
+];
+
+const productStarterPrompts = [
   "What goes with this?",
-  "Can you check my order status?",
+  "Is this available?",
+  "What color is this?",
 ];
 
 function ChatActionButton({ action }) {
@@ -99,11 +111,25 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
   const [error, setError] = useState("");
   const threadRef = useRef(null);
 
+  const starterPrompts = useMemo(() => {
+    if (chatContext.current_product) return productStarterPrompts;
+    if (chatContext.page_type === "category" || chatContext.category) return categoryStarterPrompts;
+    return genericStarterPrompts;
+  }, [chatContext.category, chatContext.current_product, chatContext.page_type]);
+
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
   }, [messages, open]);
+
+  const resetChat = () => {
+    if (loading) return;
+    setMessages([]);
+    setInput("");
+    setConversationId(null);
+    setError("");
+  };
 
   const submit = async (text = input) => {
     const message = text.trim();
@@ -148,9 +174,16 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
             <Box>
               <Text className="assistant-title">{title}</Text>
             </Box>
-            <Button size="sm" variant="ghost" className="icon-button" onClick={() => setOpen(false)}>
-              <FiChevronDown />
-            </Button>
+            <HStack gap={1}>
+              {messages.length || conversationId ? (
+                <Button size="sm" variant="ghost" className="icon-button" onClick={resetChat} disabled={loading} aria-label="New chat">
+                  <FiRefreshCw />
+                </Button>
+              ) : null}
+              <Button size="sm" variant="ghost" className="icon-button" onClick={() => setOpen(false)} aria-label="Collapse chat">
+                <FiChevronDown />
+              </Button>
+            </HStack>
           </HStack>
 
           <VStack ref={threadRef} className="chat-thread" align="stretch" gap={3}>
