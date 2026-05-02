@@ -42,7 +42,7 @@ a {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  min-width: 304px;
+  min-width: 222px;
 }
 
 .ai-icon,
@@ -59,7 +59,7 @@ a {
 
 .brand-logo {
   display: block;
-  width: clamp(304px, 30vw, 382px);
+  width: clamp(210px, 24vw, 268px);
   height: 60px;
   object-fit: contain;
 }
@@ -716,7 +716,7 @@ a {
   }
 
   .brand-logo {
-    width: 216px;
+    width: 196px;
     height: 54px;
   }
 
