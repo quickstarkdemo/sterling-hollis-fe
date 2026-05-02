@@ -1,4 +1,4 @@
-import { Box, Button, Container, Flex, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, Container, Flex, HStack } from "@chakra-ui/react";
 import { NavLink, Link as RouterLink } from "react-router-dom";
 import { FiCamera, FiSearch } from "react-icons/fi";
 
@@ -18,13 +18,7 @@ export default function Shell({ children }) {
         <Container maxW="1280px">
           <Flex minH="72px" align="center" justify="space-between" gap={6}>
             <RouterLink to="/" className="brand-lockup">
-              <Box className="brand-mark">
-                <Box as="img" src={brandLogo} alt="" className="brand-logo" />
-              </Box>
-              <Box>
-                <Text className="brand-name">Sterling Hollis</Text>
-                <Text className="brand-subtitle">AI retail atelier</Text>
-              </Box>
+              <Box as="img" src={brandLogo} alt="Sterling Hollis" className="brand-logo" />
             </RouterLink>
 
             <HStack gap={2} className="desktop-nav">
@@ -35,7 +29,7 @@ export default function Shell({ children }) {
               ))}
             </HStack>
 
-            <HStack gap={2}>
+            <HStack gap={2} className="header-actions">
               <Button as={RouterLink} to="/" variant="ghost" size="sm" className="icon-button">
                 <FiSearch />
               </Button>
