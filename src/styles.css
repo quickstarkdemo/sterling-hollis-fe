@@ -453,6 +453,21 @@ a {
   min-height: 32px;
 }
 
+.auth-page {
+  display: grid;
+  justify-items: center;
+  gap: 24px;
+  padding: 24px 0 48px;
+}
+
+.auth-page-title {
+  margin-top: 6px !important;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  color: var(--ink);
+}
+
 .chat-widget {
   position: fixed;
   right: clamp(16px, 3vw, 28px);

@@ -16,7 +16,7 @@ function ClerkControls() {
         </SignInButton>
       </SignedOut>
       <SignedIn>
-        <UserButton afterSignOutUrl="/" />
+        <UserButton />
       </SignedIn>
     </HStack>
   );

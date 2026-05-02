@@ -14,6 +14,7 @@ replace_env_vars() {
       sed -i "s|__VITE_DATADOG_SITE__|${VITE_DATADOG_SITE:-datadoghq.com}|g" "$file"
       sed -i "s|__VITE_DATADOG_SERVICE__|${VITE_DATADOG_SERVICE:-sterling-hollis-fe}|g" "$file"
       sed -i "s|__VITE_RELEASE__|${VITE_RELEASE:-local}|g" "$file"
+      sed -i "s|__VITE_CLERK_PUBLISHABLE_KEY__|${VITE_CLERK_PUBLISHABLE_KEY:-}|g" "$file"
     fi
   done
 
@@ -26,7 +27,8 @@ cat > /usr/share/nginx/html/config.json <<EOF
   "apiProxyTarget": "${VITE_API_PROXY_TARGET:-https://sterling-hollis-be.quickstark.com}",
   "environment": "${VITE_ENVIRONMENT:-production}",
   "service": "${VITE_DATADOG_SERVICE:-sterling-hollis-fe}",
-  "release": "${VITE_RELEASE:-local}"
+  "release": "${VITE_RELEASE:-local}",
+  "clerkEnabled": $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo true || echo false)
 }
 EOF
 
@@ -35,6 +37,7 @@ echo "API URL: ${VITE_API_URL:-same-origin}"
 echo "API proxy target: ${VITE_API_PROXY_TARGET:-https://sterling-hollis-be.quickstark.com}"
 echo "Service: ${VITE_DATADOG_SERVICE:-sterling-hollis-fe}"
 echo "Release: ${VITE_RELEASE:-local}"
+echo "Clerk: $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo enabled || echo disabled)"
 
 replace_env_vars
 

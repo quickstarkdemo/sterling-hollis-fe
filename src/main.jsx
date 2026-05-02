@@ -2,11 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ChakraProvider, createSystem, defaultConfig } from "@chakra-ui/react";
-import { ClerkProvider } from "@clerk/clerk-react";
 
-import App from "./App";
-import AuthTokenBridge from "./components/AuthTokenBridge";
-import { CLERK_ENABLED, CLERK_PUBLISHABLE_KEY } from "./utils/clerkConfig";
+import ClerkBoundary from "./components/ClerkBoundary";
 import "./styles.css";
 
 const system = createSystem(defaultConfig, {
@@ -62,13 +59,10 @@ const app = (
   <React.StrictMode>
     <ChakraProvider value={system}>
       <BrowserRouter>
-        <AuthTokenBridge />
-        <App />
+        <ClerkBoundary />
       </BrowserRouter>
     </ChakraProvider>
   </React.StrictMode>
 );
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  CLERK_ENABLED ? <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>{app}</ClerkProvider> : app,
-);
+ReactDOM.createRoot(document.getElementById("root")).render(app);

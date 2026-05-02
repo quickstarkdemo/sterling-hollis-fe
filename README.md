@@ -34,6 +34,7 @@ production.
 - `/` - retail home, category navigation, search, featured products, AI rail
 - `/category/:category` - category product grid
 - `/product/:productId` - product detail, variants, inventory, related products
+- `/sign-in/*` - Clerk-hosted storefront sign-in/sign-up flow
 - `/style-finder` - image upload, backend visual analysis, and image recommendations
 
 ## Scripts
@@ -66,6 +67,7 @@ Useful runtime secrets:
 - `VITE_DATADOG_CLIENT_TOKEN`
 - `VITE_DATADOG_SITE`
 - `VITE_DATADOG_SERVICE`
+- `VITE_CLERK_PUBLISHABLE_KEY`
 - `FRONTEND_PORT`
 
 `FRONTEND_PORT` defaults to `45173`. It must be a free host port and must not
@@ -74,6 +76,10 @@ overlap the backend `API_PORT` or another container's published port.
 For production, leave `VITE_API_URL` unset/empty so the browser uses same-origin
 `/api` requests through the frontend Nginx proxy. Set `VITE_API_PROXY_TARGET` to
 the backend origin.
+
+Set `VITE_CLERK_PUBLISHABLE_KEY` to enable storefront login. Clerk controls
+which strategies appear in the prebuilt sign-in UI, so enable Google and email
+for this application in the Clerk Dashboard.
 
 Deploy helper:
 
