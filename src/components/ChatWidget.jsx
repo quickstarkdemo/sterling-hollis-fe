@@ -22,7 +22,7 @@ const categoryStarterPrompts = [
 ];
 
 const productStarterPrompts = [
-  "What goes with this?",
+  "Build an outfit around this",
   "Is this available?",
   "What color is this?",
 ];
@@ -235,7 +235,17 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
               submit();
             }}
           >
-            <Input value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask a shopping question" />
+            <Input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Ask a shopping question"
+            />
             <Button type="submit" className="primary-button" loading={loading}>
               <FiSend />
             </Button>

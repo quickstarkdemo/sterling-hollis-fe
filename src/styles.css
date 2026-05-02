@@ -45,7 +45,6 @@ a {
   min-width: 210px;
 }
 
-.brand-mark,
 .ai-icon,
 .status-icon,
 .upload-icon {
@@ -56,6 +55,25 @@ a {
   border-radius: 8px;
   color: #fff;
   background: #17130f;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.78);
+}
+
+.brand-logo {
+  display: block;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
 }
 
 .brand-name {

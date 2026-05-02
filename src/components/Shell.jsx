@@ -1,7 +1,8 @@
 import { Box, Button, Container, Flex, HStack, Text } from "@chakra-ui/react";
 import { NavLink, Link as RouterLink } from "react-router-dom";
-import { FiCamera, FiSearch, FiShoppingBag } from "react-icons/fi";
+import { FiCamera, FiSearch } from "react-icons/fi";
 
+import brandLogo from "../assets/sterling-hollis-logo.svg";
 import AuthControls from "./AuthControls";
 import ChatWidget from "./ChatWidget";
 
@@ -18,7 +19,7 @@ export default function Shell({ children }) {
           <Flex minH="72px" align="center" justify="space-between" gap={6}>
             <RouterLink to="/" className="brand-lockup">
               <Box className="brand-mark">
-                <FiShoppingBag />
+                <Box as="img" src={brandLogo} alt="" className="brand-logo" />
               </Box>
               <Box>
                 <Text className="brand-name">Sterling Hollis</Text>
