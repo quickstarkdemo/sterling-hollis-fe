@@ -8,6 +8,8 @@ import ProductCard from "../components/ProductCard";
 import { DEFAULT_STORE_ID, getImageRecommendations } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
 
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
 const categoryOptions = [
   ["", "Any category"],
   ["womens_apparel", "Women"],
@@ -17,6 +19,13 @@ const categoryOptions = [
   ["beauty", "Beauty"],
   ["jewelry_accessories", "Jewelry & Accessories"],
 ];
+
+function imageRecommendationErrorMessage(error) {
+  if (error?.response?.status === 413) {
+    return "Image is too large. Use a JPG, PNG, or WebP under 8 MB.";
+  }
+  return "Image recommendations are unavailable right now.";
+}
 
 export default function StyleFinderPage() {
   const fileInputRef = useRef(null);
@@ -74,6 +83,17 @@ export default function StyleFinderPage() {
   const handleFile = (event) => {
     const nextFile = event.target.files?.[0];
     if (!nextFile) return;
+    if (nextFile.size > MAX_IMAGE_BYTES) {
+      setFile(null);
+      setPreview("");
+      setAnalysis(null);
+      setRecommendations([]);
+      setStrategy("");
+      setError("Image is too large. Use a JPG, PNG, or WebP under 8 MB.");
+      event.target.value = "";
+      trackAction("style_finder_file_rejected", { name: nextFile.name, size: nextFile.size, reason: "too_large" });
+      return;
+    }
     setFile(nextFile);
     setPreview(URL.createObjectURL(nextFile));
     setAnalysis(null);
@@ -111,8 +131,8 @@ export default function StyleFinderPage() {
         has_constraints: hasConstraints,
       });
     } catch (err) {
-      setError("Image recommendations are unavailable right now.");
-      trackAction("style_finder_image_recommendations_error", { message: err.message });
+      setError(imageRecommendationErrorMessage(err));
+      trackAction("style_finder_image_recommendations_error", { message: err.message, status: err.response?.status });
     } finally {
       setIsFinding(false);
     }
