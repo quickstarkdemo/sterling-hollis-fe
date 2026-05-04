@@ -133,6 +133,9 @@ jobs:
           VITE_DATADOG_CLIENT_TOKEN=${{ secrets.VITE_DATADOG_CLIENT_TOKEN }}
           VITE_DATADOG_SITE=${{ secrets.VITE_DATADOG_SITE || 'datadoghq.com' }}
           VITE_DATADOG_SERVICE=${{ secrets.VITE_DATADOG_SERVICE || 'sterling-hollis-fe' }}
+          VITE_DATADOG_SESSION_SAMPLE_RATE=${{ secrets.VITE_DATADOG_SESSION_SAMPLE_RATE || '100' }}
+          VITE_DATADOG_REPLAY_SAMPLE_RATE=${{ secrets.VITE_DATADOG_REPLAY_SAMPLE_RATE || '100' }}
+          VITE_DATADOG_ENABLE_LOCAL=${{ secrets.VITE_DATADOG_ENABLE_LOCAL || 'false' }}
           EOF
 
       - name: Deploy compose stack

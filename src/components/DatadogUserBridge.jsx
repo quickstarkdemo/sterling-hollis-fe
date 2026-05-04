@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useEffect } from "react";
 
 import { clearDatadogUser, setDatadogUser } from "../utils/datadog";
@@ -13,24 +13,26 @@ function getClerkUserEmail(user) {
 }
 
 function ClerkDatadogUserBridge() {
-  const { isLoaded, user } = useUser();
+  const { isLoaded: authLoaded, sessionId, userId } = useAuth();
+  const { isLoaded: userLoaded, user } = useUser();
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!authLoaded) return;
 
-    if (!user) {
+    if (!userId) {
       clearDatadogUser();
       return;
     }
 
     setDatadogUser({
-      id: user.id,
-      name: getClerkUserName(user),
-      email: getClerkUserEmail(user),
-      username: user.username || undefined,
-      clerk_user_id: user.id,
+      id: userId,
+      name: userLoaded && user ? getClerkUserName(user) : undefined,
+      email: userLoaded && user ? getClerkUserEmail(user) : undefined,
+      username: userLoaded && user ? user.username || undefined : undefined,
+      clerk_user_id: userId,
+      clerk_session_id: sessionId || undefined,
     });
-  }, [isLoaded, user]);
+  }, [authLoaded, sessionId, user, userId, userLoaded]);
 
   return null;
 }

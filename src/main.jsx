@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { ChakraProvider, createSystem, defaultConfig } from "@chakra-ui/react";
 
 import ClerkBoundary from "./components/ClerkBoundary";
+import { initDatadog } from "./utils/datadog";
 import "./styles.css";
 
 const system = createSystem(defaultConfig, {
@@ -54,6 +55,8 @@ const system = createSystem(defaultConfig, {
     },
   },
 });
+
+initDatadog();
 
 const app = (
   <React.StrictMode>

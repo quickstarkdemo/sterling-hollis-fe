@@ -67,6 +67,9 @@ Useful runtime secrets:
 - `VITE_DATADOG_CLIENT_TOKEN`
 - `VITE_DATADOG_SITE`
 - `VITE_DATADOG_SERVICE`
+- `VITE_DATADOG_SESSION_SAMPLE_RATE`
+- `VITE_DATADOG_REPLAY_SAMPLE_RATE`
+- `VITE_DATADOG_ENABLE_LOCAL`
 - `VITE_CLERK_PUBLISHABLE_KEY`
 - `FRONTEND_PORT`
 
@@ -80,6 +83,11 @@ the backend origin.
 Set `VITE_CLERK_PUBLISHABLE_KEY` to enable storefront login. Clerk controls
 which strategies appear in the prebuilt sign-in UI, so enable Google and email
 for this application in the Clerk Dashboard.
+
+Datadog browser monitoring is disabled on `localhost` by default to avoid local
+dev reloads polluting RUM sessions. Set `VITE_DATADOG_ENABLE_LOCAL=true` only
+when intentionally testing RUM from a local browser. `VITE_DATADOG_REPLAY_SAMPLE_RATE`
+defaults to `100`, so every sampled RUM session is replay-eligible.
 
 Deploy helper:
 

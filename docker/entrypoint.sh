@@ -13,6 +13,9 @@ replace_env_vars() {
       sed -i "s|__VITE_DATADOG_CLIENT_TOKEN__|${VITE_DATADOG_CLIENT_TOKEN:-}|g" "$file"
       sed -i "s|__VITE_DATADOG_SITE__|${VITE_DATADOG_SITE:-datadoghq.com}|g" "$file"
       sed -i "s|__VITE_DATADOG_SERVICE__|${VITE_DATADOG_SERVICE:-sterling-hollis-fe}|g" "$file"
+      sed -i "s|__VITE_DATADOG_SESSION_SAMPLE_RATE__|${VITE_DATADOG_SESSION_SAMPLE_RATE:-100}|g" "$file"
+      sed -i "s|__VITE_DATADOG_REPLAY_SAMPLE_RATE__|${VITE_DATADOG_REPLAY_SAMPLE_RATE:-100}|g" "$file"
+      sed -i "s|__VITE_DATADOG_ENABLE_LOCAL__|${VITE_DATADOG_ENABLE_LOCAL:-false}|g" "$file"
       sed -i "s|__VITE_RELEASE__|${VITE_RELEASE:-local}|g" "$file"
       sed -i "s|__VITE_CLERK_PUBLISHABLE_KEY__|${VITE_CLERK_PUBLISHABLE_KEY:-}|g" "$file"
     fi
@@ -27,6 +30,9 @@ cat > /usr/share/nginx/html/config.json <<EOF
   "apiProxyTarget": "${VITE_API_PROXY_TARGET:-https://sterling-hollis-be.quickstark.com}",
   "environment": "${VITE_ENVIRONMENT:-production}",
   "service": "${VITE_DATADOG_SERVICE:-sterling-hollis-fe}",
+  "datadogSessionSampleRate": ${VITE_DATADOG_SESSION_SAMPLE_RATE:-100},
+  "datadogReplaySampleRate": ${VITE_DATADOG_REPLAY_SAMPLE_RATE:-100},
+  "datadogLocalEnabled": $([ "${VITE_DATADOG_ENABLE_LOCAL:-false}" = "true" ] && echo true || echo false),
   "release": "${VITE_RELEASE:-local}",
   "clerkEnabled": $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo true || echo false)
 }
@@ -36,6 +42,7 @@ echo "Starting Sterling Hollis frontend"
 echo "API URL: ${VITE_API_URL:-same-origin}"
 echo "API proxy target: ${VITE_API_PROXY_TARGET:-https://sterling-hollis-be.quickstark.com}"
 echo "Service: ${VITE_DATADOG_SERVICE:-sterling-hollis-fe}"
+echo "Datadog sample rates: session=${VITE_DATADOG_SESSION_SAMPLE_RATE:-100}, replay=${VITE_DATADOG_REPLAY_SAMPLE_RATE:-100}"
 echo "Release: ${VITE_RELEASE:-local}"
 echo "Clerk: $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo enabled || echo disabled)"
 

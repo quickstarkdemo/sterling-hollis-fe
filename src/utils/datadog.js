@@ -2,10 +2,13 @@ import { datadogLogs } from "@datadog/browser-logs";
 import { datadogRum } from "@datadog/browser-rum";
 import { reactPlugin } from "@datadog/browser-rum-react";
 
-let initialized = false;
-let enabled = false;
-
 const STERLING_HOLLIS_API_ORIGIN = "https://sterling-hollis-be.quickstark.com";
+const DATADOG_STATE_KEY = "__STERLING_HOLLIS_DATADOG__";
+const datadogState = (globalThis[DATADOG_STATE_KEY] ||= {
+  enabled: false,
+  initialized: false,
+  pendingUser: null,
+});
 
 function normalizeOrigin(value) {
   if (!value) return "";
@@ -20,10 +23,18 @@ function normalizeOrigin(value) {
 function isLocalDevelopmentUrl(value) {
   try {
     const { hostname } = new URL(value);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    return isLocalHostname(hostname);
   } catch {
     return false;
   }
+}
+
+function isLocalHostname(hostname) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function isLocalDatadogEnabled() {
+  return import.meta.env.VITE_DATADOG_ENABLE_LOCAL === "true";
 }
 
 function uniqueTruthy(values) {
@@ -45,8 +56,18 @@ function getAllowedTracingUrls() {
   ];
 }
 
+function getSampleRate(value, fallback) {
+  const sampleRate = Number(value);
+  if (!Number.isFinite(sampleRate) || sampleRate < 0 || sampleRate > 100) return fallback;
+  return sampleRate;
+}
+
+function applyPendingUser() {
+  if (datadogState.pendingUser) setDatadogUser(datadogState.pendingUser);
+}
+
 export function initDatadog() {
-  if (initialized) return;
+  if (datadogState.initialized) return;
 
   const applicationId = import.meta.env.VITE_DATADOG_APPLICATION_ID;
   const clientToken = import.meta.env.VITE_DATADOG_CLIENT_TOKEN;
@@ -54,9 +75,11 @@ export function initDatadog() {
   const service = import.meta.env.VITE_DATADOG_SERVICE || "sterling-hollis-fe";
   const env = import.meta.env.VITE_ENVIRONMENT || "development";
   const version = import.meta.env.VITE_RELEASE || "local";
+  const sessionSampleRate = getSampleRate(import.meta.env.VITE_DATADOG_SESSION_SAMPLE_RATE, 100);
+  const sessionReplaySampleRate = getSampleRate(import.meta.env.VITE_DATADOG_REPLAY_SAMPLE_RATE, 100);
 
-  if (!applicationId || !clientToken) {
-    initialized = true;
+  if (!applicationId || !clientToken || (isLocalHostname(window.location.hostname) && !isLocalDatadogEnabled())) {
+    datadogState.initialized = true;
     return;
   }
 
@@ -67,11 +90,14 @@ export function initDatadog() {
     service,
     env,
     version,
-    sessionSampleRate: 100,
-    sessionReplaySampleRate: 20,
+    sessionSampleRate,
+    sessionReplaySampleRate,
     trackUserInteractions: true,
     trackResources: true,
     trackLongTasks: true,
+    storeContextsAcrossPages: true,
+    trackSessionAcrossSubdomains: true,
+    silentMultipleInit: true,
     defaultPrivacyLevel: "mask-user-input",
     allowedTracingUrls: getAllowedTracingUrls(),
     plugins: [reactPlugin({ router: false })],
@@ -83,18 +109,25 @@ export function initDatadog() {
     service,
     env,
     version,
+    storeContextsAcrossPages: true,
+    trackSessionAcrossSubdomains: true,
+    silentMultipleInit: true,
     forwardErrorsToLogs: true,
-    sessionSampleRate: 100,
+    sessionSampleRate,
   });
 
   datadogRum.setGlobalContextProperty("storefront", "sterling-hollis");
   datadogLogs.logger.info("Sterling Hollis storefront initialized");
-  enabled = true;
-  initialized = true;
+  if (sessionReplaySampleRate > 0) datadogRum.startSessionReplayRecording();
+  datadogState.enabled = true;
+  datadogState.initialized = true;
+  applyPendingUser();
 }
 
 export function setDatadogUser(user) {
-  if (!enabled || !user?.id) return;
+  if (!user?.id) return;
+  datadogState.pendingUser = user;
+  if (!datadogState.enabled) return;
 
   try {
     datadogRum.setUser(user);
@@ -105,7 +138,8 @@ export function setDatadogUser(user) {
 }
 
 export function clearDatadogUser() {
-  if (!enabled) return;
+  datadogState.pendingUser = null;
+  if (!datadogState.enabled) return;
 
   try {
     datadogRum.clearUser();

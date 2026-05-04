@@ -1,6 +1,5 @@
 import { Route, Routes } from "react-router-dom";
 
-import { initDatadog } from "./utils/datadog";
 import CategoryPage from "./pages/CategoryPage";
 import HomePage from "./pages/HomePage";
 import ProductPage from "./pages/ProductPage";
@@ -8,8 +7,6 @@ import SignInPage from "./pages/SignInPage";
 import StyleFinderPage from "./pages/StyleFinderPage";
 import ChatContextProvider from "./components/ChatContextProvider";
 import Shell from "./components/Shell";
-
-initDatadog();
 
 export default function App() {
   return (
