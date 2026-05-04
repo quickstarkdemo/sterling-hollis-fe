@@ -5,6 +5,7 @@ import { reactPlugin } from "@datadog/browser-rum-react";
 const STERLING_HOLLIS_API_ORIGIN = "https://sterling-hollis-be.quickstark.com";
 const DATADOG_STATE_KEY = "__STERLING_HOLLIS_DATADOG__";
 const datadogState = (globalThis[DATADOG_STATE_KEY] ||= {
+  authContext: null,
   enabled: false,
   initialized: false,
   pendingUser: null,
@@ -64,6 +65,12 @@ function getSampleRate(value, fallback) {
 
 function applyPendingUser() {
   if (datadogState.pendingUser) setDatadogUser(datadogState.pendingUser);
+  if (datadogState.authContext) setDatadogAuthContext(datadogState.authContext);
+}
+
+function setContextProperty(name, value) {
+  datadogRum.setGlobalContextProperty(name, value);
+  datadogLogs.setGlobalContextProperty(name, value);
 }
 
 export function initDatadog() {
@@ -95,8 +102,6 @@ export function initDatadog() {
     trackUserInteractions: true,
     trackResources: true,
     trackLongTasks: true,
-    storeContextsAcrossPages: true,
-    trackSessionAcrossSubdomains: true,
     silentMultipleInit: true,
     defaultPrivacyLevel: "mask-user-input",
     allowedTracingUrls: getAllowedTracingUrls(),
@@ -109,8 +114,6 @@ export function initDatadog() {
     service,
     env,
     version,
-    storeContextsAcrossPages: true,
-    trackSessionAcrossSubdomains: true,
     silentMultipleInit: true,
     forwardErrorsToLogs: true,
     sessionSampleRate,
@@ -118,7 +121,7 @@ export function initDatadog() {
 
   datadogRum.setGlobalContextProperty("storefront", "sterling-hollis");
   datadogLogs.logger.info("Sterling Hollis storefront initialized");
-  if (sessionReplaySampleRate > 0) datadogRum.startSessionReplayRecording();
+  if (sessionReplaySampleRate > 0) datadogRum.startSessionReplayRecording({ force: true });
   datadogState.enabled = true;
   datadogState.initialized = true;
   applyPendingUser();
@@ -132,6 +135,32 @@ export function setDatadogUser(user) {
   try {
     datadogRum.setUser(user);
     datadogLogs.setUser(user);
+  } catch {
+    // Optional monitoring should never affect the storefront.
+  }
+}
+
+export function setDatadogAuthContext(authContext) {
+  datadogState.authContext = authContext;
+  if (!datadogState.enabled) return;
+
+  try {
+    setContextProperty("auth", authContext);
+    setContextProperty("auth_provider", authContext.provider);
+    setContextProperty("auth_status", authContext.status);
+  } catch {
+    // Optional monitoring should never affect the storefront.
+  }
+}
+
+export function clearDatadogAuthContext() {
+  datadogState.authContext = null;
+  if (!datadogState.enabled) return;
+
+  try {
+    setContextProperty("auth", { provider: "clerk", status: "anonymous" });
+    setContextProperty("auth_provider", "clerk");
+    setContextProperty("auth_status", "anonymous");
   } catch {
     // Optional monitoring should never affect the storefront.
   }
