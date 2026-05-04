@@ -20,8 +20,9 @@ import ProductGrid from "../components/ProductGrid";
 import { EmptyState, ErrorState, LoadingState } from "../components/StatusState";
 import { DEFAULT_STORE_ID, getCatalog, getProductRecommendations, searchProducts } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
+import { filterPlannedSearchResults, planProductSearch } from "../utils/searchQuery";
 
-const searchSuggestions = ["satin", "camel", "silk", "shoes", "mens_apparel"];
+const searchSuggestions = ["satin", "camel", "silk", "shoes", "men's shoes"];
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -73,10 +74,19 @@ export default function HomePage() {
     }
     setSearchTerm(query);
     setIsSearching(true);
-    trackAction("product_search", { query });
+    const searchPlan = planProductSearch(query, { limit: 12 });
+    trackAction("product_search", {
+      query,
+      planned_query: searchPlan.query,
+      category: searchPlan.category,
+      gender: searchPlan.gender,
+    });
     try {
-      const results = await searchProducts(query, { limit: 12 });
-      setSearchResults(results.items || []);
+      const results = await searchProducts(searchPlan.query, {
+        limit: searchPlan.limit,
+        category: searchPlan.category,
+      });
+      setSearchResults(filterPlannedSearchResults(results.items || [], searchPlan));
     } catch (err) {
       setError(err);
     } finally {
@@ -187,7 +197,7 @@ export default function HomePage() {
           </HStack>
           <ProductGrid
             products={searchResults}
-            emptyMessage="No exact matches came back from the product API. Try satin, camel, silk, shoes, or a category token."
+            emptyMessage="No products matched that search. Try satin, camel, silk, shoes, men's shoes, or a category."
           />
         </Container>
       ) : null}
