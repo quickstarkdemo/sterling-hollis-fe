@@ -105,7 +105,7 @@ export function initDatadog() {
     silentMultipleInit: true,
     defaultPrivacyLevel: "mask-user-input",
     allowedTracingUrls: getAllowedTracingUrls(),
-    plugins: [reactPlugin({ router: false })],
+    plugins: [reactPlugin({ router: true })],
   });
 
   datadogLogs.init({

@@ -1,4 +1,5 @@
-import { Route, Routes } from "react-router-dom";
+import { Route } from "react-router-dom";
+import { Routes } from "@datadog/browser-rum-react/react-router-v6";
 
 import CategoryPage from "./pages/CategoryPage";
 import HomePage from "./pages/HomePage";
