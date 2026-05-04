@@ -1,5 +1,6 @@
 import { datadogLogs } from "@datadog/browser-logs";
 import { datadogRum } from "@datadog/browser-rum";
+import { reactPlugin } from "@datadog/browser-rum-react";
 
 let initialized = false;
 let enabled = false;
@@ -73,6 +74,7 @@ export function initDatadog() {
     trackLongTasks: true,
     defaultPrivacyLevel: "mask-user-input",
     allowedTracingUrls: getAllowedTracingUrls(),
+    plugins: [reactPlugin({ router: false })],
   });
 
   datadogLogs.init({
