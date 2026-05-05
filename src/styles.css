@@ -240,6 +240,104 @@ a {
   text-overflow: ellipsis;
 }
 
+.category-browse-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.category-sidebar {
+  position: sticky;
+  top: 96px;
+  min-width: 0;
+}
+
+.filter-panel,
+.sidebar-category-link {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.82);
+}
+
+.filter-panel {
+  padding: 18px;
+}
+
+.filter-heading {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.filter-label {
+  margin-bottom: 7px !important;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.filter-input {
+  min-height: 42px !important;
+  border-radius: 6px !important;
+  background: #fffaf0 !important;
+}
+
+.sidebar-category-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 13px 14px;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.sidebar-category-link:hover,
+.sidebar-category-link.active {
+  border-color: rgba(23, 19, 15, 0.34);
+  background: #fff;
+  color: var(--ink);
+}
+
+.sidebar-category-label {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar-category-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.checkbox-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.checkbox-filter input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--sage);
+}
+
+.pagination-bar {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
 .product-card {
   display: flex;
   flex-direction: column;
@@ -803,6 +901,30 @@ a {
 
   .hero-showcase {
     grid-template-columns: 1fr;
+  }
+
+  .category-browse-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .category-sidebar {
+    position: static;
+  }
+
+  .sidebar-category-link {
+    min-height: 48px;
+  }
+
+  .pagination-bar {
+    align-items: stretch !important;
+  }
+
+  .pagination-bar > div {
+    width: 100%;
+  }
+
+  .pagination-bar button {
+    flex: 1 1 0;
   }
 
   .search-box {
