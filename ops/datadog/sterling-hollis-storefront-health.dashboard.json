@@ -1,0 +1,2036 @@
+{
+  "title": "Sterling-Hollis Storefront Health",
+  "description": "Sample dashboard for Sterling-Hollis storefront real-user health, AI workflows, backend behavior, LLM usage, logs, and network path. Modeled after the Shopist Chat dashboard, but scoped to Sterling-Hollis services and the retail/chat/style-finder journey.",
+  "layout_type": "ordered",
+  "is_read_only": false,
+  "notify_list": [],
+  "reflow_type": "fixed",
+  "tags": [
+    "team:enterprise-it-operations-endpoints",
+    "ai:sterling-hollis-storefront-health"
+  ],
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "default": "production"
+    },
+    {
+      "name": "fe_service",
+      "prefix": "service",
+      "default": "sterling-hollis-fe"
+    },
+    {
+      "name": "be_service",
+      "prefix": "service",
+      "default": "sterling-hollis-be"
+    },
+    {
+      "name": "ml_app",
+      "prefix": "ml_app",
+      "default": "sterling-hollis-be"
+    },
+    {
+      "name": "version",
+      "prefix": "version",
+      "default": "*"
+    },
+    {
+      "name": "view",
+      "prefix": "@view.url_path_group",
+      "default": "*"
+    },
+    {
+      "name": "endpoint",
+      "prefix": "@resource.url_path_group",
+      "default": "*"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "group",
+        "title": "Executive Health",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Active RUM Sessions",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "sessions",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:session"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "sessions"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Frontend Errors",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "errors",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:error"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "errors"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">",
+                      "value": 0,
+                      "palette": "white_on_red"
+                    },
+                    {
+                      "comparator": "=",
+                      "value": 0,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 2,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Backend Error Logs",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "errors",
+                      "data_source": "logs",
+                      "search": {
+                        "query": "env:$env service:$be_service status:error -\"GET /health\""
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "errors"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">",
+                      "value": 0,
+                      "palette": "white_on_yellow"
+                    },
+                    {
+                      "comparator": "=",
+                      "value": 0,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 4,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Chat P95 Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "s",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "p95",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/chat"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "p95 / 1000000000"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">=",
+                      "value": 5,
+                      "palette": "white_on_red"
+                    },
+                    {
+                      "comparator": ">",
+                      "value": 2,
+                      "palette": "white_on_yellow"
+                    },
+                    {
+                      "comparator": "<=",
+                      "value": 2,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Style Finder P95 Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "s",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "p95",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/recommendations/image"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "p95 / 1000000000"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">=",
+                      "value": 10,
+                      "palette": "white_on_red"
+                    },
+                    {
+                      "comparator": ">",
+                      "value": 5,
+                      "palette": "white_on_yellow"
+                    },
+                    {
+                      "comparator": "<=",
+                      "value": 5,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 8,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "LLM Calls",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "calls",
+                      "data_source": "metrics",
+                      "query": "sum:ml_obs.span{ml_app:$ml_app,span_kind:llm}.as_count()"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "calls"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "bars"
+              }
+            },
+            "layout": {
+              "x": 10,
+              "y": 0,
+              "width": 2,
+              "height": 3
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "LLM P95 Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "s",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "p95",
+                      "data_source": "metrics",
+                      "query": "p95:ml_obs.span.duration{ml_app:$ml_app,span_kind:llm}"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "p95"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">=",
+                      "value": 5,
+                      "palette": "white_on_red"
+                    },
+                    {
+                      "comparator": ">",
+                      "value": 2,
+                      "palette": "white_on_yellow"
+                    },
+                    {
+                      "comparator": "<=",
+                      "value": 2,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              }
+            },
+            "layout": {
+              "x": 0,
+              "y": 3,
+              "width": 2,
+              "height": 3
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 12,
+        "height": 7
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Real User Session Health",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Sessions by Auth Status",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "queries": [
+                    {
+                      "name": "sessions",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:session"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@auth_status",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "sessions"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Route Performance",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "views",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:view @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@view.url_path_group",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "p75",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:view @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "pc75",
+                        "metric": "@view.loading_time"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@view.url_path_group",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "pc75",
+                            "metric": "@view.loading_time",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "p95",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:view @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@view.loading_time"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@view.url_path_group",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "pc95",
+                            "metric": "@view.loading_time",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Views",
+                      "formula": "views",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "P75 Load (s)",
+                      "formula": "p75 / 1000000000",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "P95 Load (s)",
+                      "formula": "p95 / 1000000000",
+                      "cell_display_mode": "bar",
+                      "conditional_formats": [
+                        {
+                          "comparator": ">=",
+                          "value": 5,
+                          "palette": "black_on_light_red"
+                        },
+                        {
+                          "comparator": ">",
+                          "value": 2,
+                          "palette": "black_on_light_yellow"
+                        },
+                        {
+                          "comparator": "<=",
+                          "value": 2,
+                          "palette": "black_on_light_green"
+                        }
+                      ]
+                    }
+                  ],
+                  "sort": {
+                    "count": 25,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 2,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Core API Experience from RUM",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "calls",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:$endpoint @resource.url_path_group:/api/*"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@resource.url_path_group",
+                          "limit": 30,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        },
+                        {
+                          "facet": "@resource.status_code",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "avg",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:$endpoint @resource.url_path_group:/api/*"
+                      },
+                      "compute": {
+                        "aggregation": "avg",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@resource.url_path_group",
+                          "limit": 30,
+                          "sort": {
+                            "aggregation": "avg",
+                            "metric": "@resource.duration",
+                            "order": "desc"
+                          }
+                        },
+                        {
+                          "facet": "@resource.status_code",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "p95",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:$endpoint @resource.url_path_group:/api/*"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@resource.url_path_group",
+                          "limit": 30,
+                          "sort": {
+                            "aggregation": "pc95",
+                            "metric": "@resource.duration",
+                            "order": "desc"
+                          }
+                        },
+                        {
+                          "facet": "@resource.status_code",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Calls",
+                      "formula": "calls",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "Avg (s)",
+                      "formula": "avg / 1000000000",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "P95 (s)",
+                      "formula": "p95 / 1000000000",
+                      "cell_display_mode": "bar",
+                      "conditional_formats": [
+                        {
+                          "comparator": ">=",
+                          "value": 5,
+                          "palette": "black_on_light_red"
+                        },
+                        {
+                          "comparator": ">",
+                          "value": 2,
+                          "palette": "black_on_light_yellow"
+                        },
+                        {
+                          "comparator": "<=",
+                          "value": 2,
+                          "palette": "black_on_light_green"
+                        }
+                      ]
+                    }
+                  ],
+                  "sort": {
+                    "count": 30,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 2,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 4,
+              "width": 12,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Long Tasks by Route",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "queries": [
+                    {
+                      "name": "long_tasks",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:long_task @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@view.url_path_group",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "long_tasks"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 9,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Top User Actions",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "actions",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:action @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@action.name",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "avg_loading",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:action @view.url_path_group:$view"
+                      },
+                      "compute": {
+                        "aggregation": "avg",
+                        "metric": "@action.loading_time"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@action.name",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Actions",
+                      "formula": "actions",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "Avg Loading (s)",
+                      "formula": "avg_loading / 1000000000",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 25,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "layout": {
+              "x": 6,
+              "y": 9,
+              "width": 6,
+              "height": 4
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 7,
+        "width": 12,
+        "height": 14
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Conversational and AI Workflow",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "AI API Request Volume",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "queries": [
+                    {
+                      "name": "chat",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/chat"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "style_finder",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/recommendations/image"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "product_recs",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/recommendations/products"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Chat",
+                      "formula": "chat"
+                    },
+                    {
+                      "alias": "Style Finder",
+                      "formula": "style_finder"
+                    },
+                    {
+                      "alias": "Product Recommendations",
+                      "formula": "product_recs"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "AI API P95 Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "queries": [
+                    {
+                      "name": "chat",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/chat"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "style_finder",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/recommendations/image"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "product_recs",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_path_group:/api/recommendations/products"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Chat (s)",
+                      "formula": "chat / 1000000000"
+                    },
+                    {
+                      "alias": "Style Finder (s)",
+                      "formula": "style_finder / 1000000000"
+                    },
+                    {
+                      "alias": "Product Recs (s)",
+                      "formula": "product_recs / 1000000000"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16",
+                    "line_type": "solid",
+                    "line_width": "normal"
+                  },
+                  "display_type": "line"
+                }
+              ]
+            },
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "sunburst",
+              "title": "Model Usage",
+              "title_size": "16",
+              "title_align": "left",
+              "hide_total": false,
+              "legend": {
+                "type": "table"
+              },
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "calls",
+                      "data_source": "llm_observability",
+                      "search": {
+                        "query": "@event_type:span @meta.model_provider:* @meta.span.kind:llm @ml_app:$ml_app"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@meta.model_provider",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        },
+                        {
+                          "facet": "@meta.model_name",
+                          "limit": 20,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ]
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "calls"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16"
+                  },
+                  "sort": {
+                    "count": 500,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "View related LLM traces",
+                  "link": "/llm/traces?query=@event_type%3Aspan%20@meta.span.kind%3Allm%20@ml_app%3A{{$ml_app}}&start={{timestamp_widget_start}}&end={{timestamp_widget_end}}&paused=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 4,
+              "width": 4,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Tokens per LLM Call",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "prompt",
+                      "data_source": "metrics",
+                      "query": "avg:ml_obs.span.llm.input.tokens{ml_app:$ml_app} by {model_name,model_provider}"
+                    },
+                    {
+                      "name": "completion",
+                      "data_source": "metrics",
+                      "query": "avg:ml_obs.span.llm.output.tokens{ml_app:$ml_app} by {model_name,model_provider}"
+                    },
+                    {
+                      "name": "cache_read",
+                      "data_source": "metrics",
+                      "query": "avg:ml_obs.span.llm.input.cache_read.tokens{ml_app:$ml_app} by {model_name,model_provider}"
+                    },
+                    {
+                      "name": "cache_write",
+                      "data_source": "metrics",
+                      "query": "avg:ml_obs.span.llm.input.cache_write.tokens{ml_app:$ml_app} by {model_name,model_provider}"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Prompt Tokens",
+                      "formula": "prompt",
+                      "cell_display_mode": "trend",
+                      "cell_display_mode_options": {
+                        "trend_type": "area",
+                        "y_scale": "independent"
+                      }
+                    },
+                    {
+                      "alias": "Completion Tokens",
+                      "formula": "completion",
+                      "cell_display_mode": "trend",
+                      "cell_display_mode_options": {
+                        "trend_type": "area",
+                        "y_scale": "independent"
+                      }
+                    },
+                    {
+                      "alias": "Cache Read Tokens",
+                      "formula": "cache_read",
+                      "cell_display_mode": "trend",
+                      "cell_display_mode_options": {
+                        "trend_type": "area",
+                        "y_scale": "independent"
+                      }
+                    },
+                    {
+                      "alias": "Cache Write Tokens",
+                      "formula": "cache_write",
+                      "cell_display_mode": "trend",
+                      "cell_display_mode_options": {
+                        "trend_type": "area",
+                        "y_scale": "independent"
+                      }
+                    },
+                    {
+                      "alias": "Cache Hit %",
+                      "formula": "cache_read / prompt * 100",
+                      "number_format": {
+                        "unit": {
+                          "type": "canonical_unit",
+                          "unit_name": "percent"
+                        }
+                      }
+                    }
+                  ],
+                  "sort": {
+                    "count": 500,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "Open LLM Observability",
+                  "link": "/llm/traces?query=@ml_app%3A{{$ml_app}}&start={{timestamp_widget_start}}&end={{timestamp_widget_end}}&paused=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 4,
+              "y": 4,
+              "width": 8,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "LLM Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "p95",
+                      "data_source": "metrics",
+                      "query": "p95:ml_obs.span.duration{ml_app:$ml_app,span_kind:llm} by {model_name,model_provider}"
+                    },
+                    {
+                      "name": "p75",
+                      "data_source": "metrics",
+                      "query": "p75:ml_obs.span.duration{ml_app:$ml_app,span_kind:llm} by {model_name,model_provider}"
+                    },
+                    {
+                      "name": "p50",
+                      "data_source": "metrics",
+                      "query": "p50:ml_obs.span.duration{ml_app:$ml_app,span_kind:llm} by {model_name,model_provider}"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "P95 (s)",
+                      "formula": "p95",
+                      "cell_display_mode": "bar",
+                      "conditional_formats": [
+                        {
+                          "comparator": ">=",
+                          "value": 5,
+                          "palette": "black_on_light_red"
+                        },
+                        {
+                          "comparator": ">",
+                          "value": 2,
+                          "palette": "black_on_light_yellow"
+                        },
+                        {
+                          "comparator": "<=",
+                          "value": 2,
+                          "palette": "black_on_light_green"
+                        }
+                      ]
+                    },
+                    {
+                      "alias": "P75 (s)",
+                      "formula": "p75",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "P50 (s)",
+                      "formula": "p50",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 500,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 9,
+              "width": 7,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "sunburst",
+              "title": "Tool and Retrieval Usage",
+              "title_size": "16",
+              "title_align": "left",
+              "legend": {
+                "type": "inline"
+              },
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "tool_spans",
+                      "data_source": "llm_observability",
+                      "search": {
+                        "query": "@event_type:span (@meta.span.kind:tool OR @meta.span.kind:retrieval) @ml_app:$ml_app"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@meta.span.kind",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        },
+                        {
+                          "facet": "@name",
+                          "limit": 30,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ]
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "tool_spans"
+                    }
+                  ],
+                  "style": {
+                    "palette": "datadog16"
+                  },
+                  "sort": {
+                    "count": 100,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "View related tool/retrieval spans",
+                  "link": "/llm/traces?query=@event_type%3Aspan%20(@meta.span.kind%3Atool%20OR%20@meta.span.kind%3Aretrieval)%20@ml_app%3A{{$ml_app}}&start={{timestamp_widget_start}}&end={{timestamp_widget_end}}&paused=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 7,
+              "y": 9,
+              "width": 5,
+              "height": 5
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 21,
+        "width": 12,
+        "height": 15
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Backend and Dependency Health",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Backend Logs by Status",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "logs",
+                      "data_source": "logs",
+                      "search": {
+                        "query": "env:$env service:$be_service -\"GET /health\""
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "status",
+                          "limit": 10,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Logs",
+                      "formula": "logs",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 10,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "Open backend logs",
+                  "link": "/logs?query=service%3A{{$be_service}}%20-%22GET%20%2Fhealth%22&from_ts={{timestamp_widget_start}}&to_ts={{timestamp_widget_end}}&live=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 4,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Backend Error Patterns",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "errors",
+                      "data_source": "logs",
+                      "search": {
+                        "query": "env:$env service:$be_service status:error -\"GET /health\""
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "message",
+                          "limit": 25,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Occurrences",
+                      "formula": "errors",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 25,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "Open error logs",
+                  "link": "/logs?query=service%3A{{$be_service}}%20status%3Aerror%20-%22GET%20%2Fhealth%22&from_ts={{timestamp_widget_start}}&to_ts={{timestamp_widget_end}}&live=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 4,
+              "y": 0,
+              "width": 8,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "External Dependency Latency by Host",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "avg",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_host:*"
+                      },
+                      "compute": {
+                        "aggregation": "avg",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@resource.url_host",
+                          "limit": 20,
+                          "sort": {
+                            "aggregation": "avg",
+                            "metric": "@resource.duration",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    },
+                    {
+                      "name": "p95",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.url_host:*"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "@resource.duration"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "@resource.url_host",
+                          "limit": 20,
+                          "sort": {
+                            "aggregation": "pc95",
+                            "metric": "@resource.duration",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Avg (s)",
+                      "formula": "avg / 1000000000",
+                      "cell_display_mode": "bar"
+                    },
+                    {
+                      "alias": "P95 (s)",
+                      "formula": "p95 / 1000000000",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 20,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 1,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 4,
+              "width": 6,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Backend API Latency from APM Metrics",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "latency",
+                      "data_source": "apm_metrics",
+                      "service": "$be_service",
+                      "stat": "latency_avg",
+                      "group_by": [
+                        "resource_name"
+                      ]
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Avg Latency",
+                      "formula": "latency",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 50,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "Open backend service",
+                  "link": "/apm/service/{{$be_service}}?start={{timestamp_widget_start}}&end={{timestamp_widget_end}}"
+                }
+              ]
+            },
+            "layout": {
+              "x": 6,
+              "y": 4,
+              "width": 6,
+              "height": 5
+            }
+          },
+          {
+            "definition": {
+              "type": "manage_status",
+              "title": "Sterling-Hollis Monitors",
+              "query": "service:$fe_service OR service:$be_service OR ml_app:$ml_app",
+              "summary_type": "monitors",
+              "display_format": "countsAndList",
+              "count": 50,
+              "sort": "status,asc",
+              "hide_zero_counts": true,
+              "show_status": true,
+              "show_priority": true,
+              "show_last_triggered": false,
+              "start": 0
+            },
+            "layout": {
+              "x": 0,
+              "y": 9,
+              "width": 5,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "trace_service",
+              "title": "Backend Service",
+              "env": "$env",
+              "service": "$be_service",
+              "span_name": "fastapi.request",
+              "show_breakdown": true,
+              "show_distribution": true,
+              "show_errors": true,
+              "show_hits": true,
+              "show_latency": true,
+              "show_resource_list": false,
+              "size_format": "large",
+              "display_format": "one_column"
+            },
+            "layout": {
+              "x": 5,
+              "y": 9,
+              "width": 7,
+              "height": 4
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 36,
+        "width": 12,
+        "height": 14
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Network Path",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "Network Path widgets assume tests exist for sterling-hollis.quickstark.com, sterling-hollis-be.quickstark.com, OpenAI, and Pinecone. If topology is empty, create or attach the relevant Network Path test IDs.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "center",
+              "show_tick": false,
+              "tick_pos": "50%",
+              "tick_edge": "left"
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 2
+            }
+          },
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Round Trip Latency",
+              "title_size": "16",
+              "title_align": "left",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "rtt",
+                      "data_source": "network_path",
+                      "search": {
+                        "query": "destination.hostname:(sterling-hollis.quickstark.com OR sterling-hollis-be.quickstark.com OR api.openai.com OR *.pinecone.io)"
+                      },
+                      "compute": {
+                        "aggregation": "pc95",
+                        "metric": "destination.rtt"
+                      },
+                      "group_by": {
+                        "fields": [
+                          "destination.hostname",
+                          "destination.geoip.as.name"
+                        ],
+                        "limit": 10,
+                        "sort": {
+                          "aggregation": "pc95",
+                          "metric": "destination.rtt",
+                          "order": "desc"
+                        }
+                      },
+                      "indexes": [
+                        "netpath-hop"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "rtt"
+                    }
+                  ],
+                  "sort": {
+                    "count": 10,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "style": {
+                "display": {
+                  "type": "stacked",
+                  "legend": "automatic"
+                }
+              }
+            },
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Packet Loss",
+              "title_size": "16",
+              "title_align": "left",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "loss",
+                      "data_source": "network_path",
+                      "search": {
+                        "query": "destination.hostname:(sterling-hollis.quickstark.com OR sterling-hollis-be.quickstark.com OR api.openai.com OR *.pinecone.io)"
+                      },
+                      "compute": {
+                        "aggregation": "avg",
+                        "metric": "destination.packet_loss"
+                      },
+                      "group_by": {
+                        "fields": [
+                          "destination.hostname",
+                          "destination.geoip.as.name"
+                        ],
+                        "limit": 10,
+                        "sort": {
+                          "aggregation": "avg",
+                          "metric": "destination.packet_loss",
+                          "order": "desc"
+                        }
+                      },
+                      "indexes": [
+                        "netpath-hop"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "loss"
+                    }
+                  ],
+                  "sort": {
+                    "count": 10,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "style": {
+                "display": {
+                  "type": "stacked",
+                  "legend": "automatic"
+                }
+              }
+            },
+            "layout": {
+              "x": 6,
+              "y": 2,
+              "width": 6,
+              "height": 4
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 50,
+        "width": 12,
+        "height": 7
+      }
+    }
+  ]
+}

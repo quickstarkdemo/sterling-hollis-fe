@@ -584,6 +584,17 @@ a {
   padding-bottom: 2px;
 }
 
+.chat-starters .suggestion-chip {
+  background: var(--ink) !important;
+  color: #fffaf0 !important;
+  border-color: rgba(255, 250, 240, 0.22) !important;
+}
+
+.chat-starters .suggestion-chip:hover {
+  background: #33291e !important;
+  color: #fffaf0 !important;
+}
+
 .chat-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
