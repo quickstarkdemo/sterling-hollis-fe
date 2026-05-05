@@ -1,8 +1,8 @@
-import { Box, Button, HStack, Input, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, CloseButton, Drawer, HStack, IconButton, Portal, ScrollArea, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
 import { SignInButton } from "@clerk/clerk-react";
 import { Link as RouterLink } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiChevronDown, FiExternalLink, FiLock, FiMessageCircle, FiRefreshCw, FiSend } from "react-icons/fi";
+import { FiExternalLink, FiLock, FiMessageCircle, FiRefreshCw, FiSend } from "react-icons/fi";
 
 import { useChatContext } from "./ChatContext";
 import { sendChat } from "../utils/apiClient";
@@ -167,96 +167,128 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
   };
 
   return (
-    <Box className={`chat-widget ${open ? "open" : ""}`}>
-      {open ? (
-        <Box className="chat-panel">
-          <HStack className="chat-header" justify="space-between">
-            <Box>
-              <Text className="assistant-title">{title}</Text>
-            </Box>
-            <HStack gap={1}>
-              {messages.length || conversationId ? (
-                <Button size="sm" variant="ghost" className="icon-button" onClick={resetChat} disabled={loading} aria-label="New chat">
-                  <FiRefreshCw />
-                </Button>
-              ) : null}
-              <Button size="sm" variant="ghost" className="icon-button" onClick={() => setOpen(false)} aria-label="Collapse chat">
-                <FiChevronDown />
-              </Button>
-            </HStack>
-          </HStack>
-
-          <VStack ref={threadRef} className="chat-thread" align="stretch" gap={3}>
-            {messages.map((message, index) => (
-              <Box key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
-                <Text>{message.content}</Text>
-                {message.cards?.length ? (
-                  <SimpleGrid columns={1} gap={2} mt={3}>
-                    {message.cards.slice(0, 3).map((product) => (
-                      <ChatProductCard key={product.id} product={product} />
-                    ))}
-                  </SimpleGrid>
-                ) : null}
-                {message.actions?.length ? (
-                  <HStack mt={3} gap={2} flexWrap="wrap">
-                    {message.actions.map((action, actionIndex) => (
-                      <ChatActionButton key={`${action.type}-${actionIndex}`} action={action} />
-                    ))}
-                  </HStack>
-                ) : null}
-                {showDiagnostics && message.toolTrace?.length ? (
-                  <VStack align="stretch" gap={1} mt={3} className="chat-tool-trace">
-                    {message.toolTrace.map((trace) => (
-                      <Text key={`${trace.name}-${trace.decision}`} className="muted-mini">
-                        {trace.name}: {trace.decision}
-                      </Text>
-                    ))}
-                  </VStack>
-                ) : null}
-              </Box>
-            ))}
-            {loading ? <Text className="chat-loading">Working...</Text> : null}
-            {error ? <Text className="error-copy">{error}</Text> : null}
-          </VStack>
-
-          <HStack className="chat-starters" gap={2}>
-            {starterPrompts.map((prompt) => (
-              <Button key={prompt} size="xs" className="suggestion-chip" onClick={() => submit(prompt)}>
-                {prompt}
-              </Button>
-            ))}
-          </HStack>
-
-          <Box
-            as="form"
-            className="chat-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
-          >
-            <Input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder="Ask a shopping question"
-            />
-            <Button type="submit" className="primary-button" loading={loading}>
-              <FiSend />
-            </Button>
-          </Box>
+    <>
+      {!open ? (
+        <Box className="chat-widget">
+          <Button className="chat-launcher" onClick={() => setOpen(true)}>
+            <FiMessageCircle />
+            Chat
+          </Button>
         </Box>
-      ) : (
-        <Button className="chat-launcher" onClick={() => setOpen(true)}>
-          <FiMessageCircle />
-          Chat
-        </Button>
-      )}
-    </Box>
+      ) : null}
+
+      <Drawer.Root
+        open={open}
+        onOpenChange={(details) => setOpen(details.open)}
+        placement="end"
+        size="full"
+        modal={false}
+        trapFocus={false}
+        preventScroll={false}
+        restoreFocus={false}
+      >
+        <Portal>
+          <Drawer.Positioner pointerEvents="none">
+            <Drawer.Content className="chat-drawer-content" pointerEvents="auto">
+              <Drawer.Header className="chat-drawer-header">
+                <Box minW={0}>
+                  <Drawer.Title asChild>
+                    <Text className="assistant-title">{title}</Text>
+                  </Drawer.Title>
+                  <Drawer.Description className="muted-mini">Shopping assistant</Drawer.Description>
+                </Box>
+                <HStack gap={1}>
+                  {messages.length || conversationId ? (
+                    <IconButton size="sm" variant="ghost" className="icon-button" onClick={resetChat} disabled={loading} aria-label="New chat">
+                      <FiRefreshCw />
+                    </IconButton>
+                  ) : null}
+                  <Drawer.CloseTrigger asChild>
+                    <CloseButton size="sm" className="icon-button" aria-label="Close chat" />
+                  </Drawer.CloseTrigger>
+                </HStack>
+              </Drawer.Header>
+
+              <Drawer.Body className="chat-drawer-body">
+                <ScrollArea.Root className="chat-scroll-area" size="sm" variant="always">
+                  <ScrollArea.Viewport ref={threadRef} className="chat-thread">
+                    <VStack className="chat-thread-inner" align="stretch" gap={3}>
+                      {messages.map((message, index) => (
+                        <Box key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
+                          <Text>{message.content}</Text>
+                          {message.cards?.length ? (
+                            <SimpleGrid columns={{ base: 1, lg: 2 }} gap={2} mt={3}>
+                              {message.cards.slice(0, 3).map((product) => (
+                                <ChatProductCard key={product.id} product={product} />
+                              ))}
+                            </SimpleGrid>
+                          ) : null}
+                          {message.actions?.length ? (
+                            <HStack mt={3} gap={2} flexWrap="wrap">
+                              {message.actions.map((action, actionIndex) => (
+                                <ChatActionButton key={`${action.type}-${actionIndex}`} action={action} />
+                              ))}
+                            </HStack>
+                          ) : null}
+                          {showDiagnostics && message.toolTrace?.length ? (
+                            <VStack align="stretch" gap={1} mt={3} className="chat-tool-trace">
+                              {message.toolTrace.map((trace) => (
+                                <Text key={`${trace.name}-${trace.decision}`} className="muted-mini">
+                                  {trace.name}: {trace.decision}
+                                </Text>
+                              ))}
+                            </VStack>
+                          ) : null}
+                        </Box>
+                      ))}
+                      {loading ? <Text className="chat-loading">Working...</Text> : null}
+                      {error ? <Text className="error-copy">{error}</Text> : null}
+                    </VStack>
+                  </ScrollArea.Viewport>
+                  <ScrollArea.Scrollbar orientation="vertical">
+                    <ScrollArea.Thumb />
+                  </ScrollArea.Scrollbar>
+                </ScrollArea.Root>
+              </Drawer.Body>
+
+              <Drawer.Footer className="chat-drawer-footer">
+                <HStack className="chat-starters" gap={2}>
+                  {starterPrompts.map((prompt) => (
+                    <Button key={prompt} size="xs" className="suggestion-chip" onClick={() => submit(prompt)}>
+                      {prompt}
+                    </Button>
+                  ))}
+                </HStack>
+
+                <Box
+                  as="form"
+                  className="chat-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    submit();
+                  }}
+                >
+                  <Textarea
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        submit();
+                      }
+                    }}
+                    placeholder="Ask a shopping question"
+                    rows={2}
+                  />
+                  <IconButton type="submit" className="primary-button" loading={loading} aria-label="Send message">
+                    <FiSend />
+                  </IconButton>
+                </Box>
+              </Drawer.Footer>
+            </Drawer.Content>
+          </Drawer.Positioner>
+        </Portal>
+      </Drawer.Root>
+    </>
   );
 }
