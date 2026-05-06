@@ -3,12 +3,10 @@ import { Button, HStack } from "@chakra-ui/react";
 import { FiLogIn, FiSliders } from "react-icons/fi";
 
 import DemoObservabilityPanel from "./DemoObservabilityPanel";
-import { CLERK_ENABLED } from "../utils/clerkConfig";
-
-const DEMO_OBSERVABILITY_UI_ENABLED = import.meta.env.VITE_DEMO_OBSERVABILITY_UI === "true";
+import { CLERK_ENABLED, isDemoObservabilityUiEnabled } from "../utils/clerkConfig";
 
 function StorefrontUserButton() {
-  if (!DEMO_OBSERVABILITY_UI_ENABLED) return <UserButton />;
+  if (!isDemoObservabilityUiEnabled()) return <UserButton />;
 
   return (
     <UserButton>
