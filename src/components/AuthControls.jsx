@@ -1,8 +1,26 @@
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Button, HStack } from "@chakra-ui/react";
-import { FiLogIn } from "react-icons/fi";
+import { FiLogIn, FiSliders } from "react-icons/fi";
 
+import DemoObservabilityPanel from "./DemoObservabilityPanel";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
+
+const DEMO_OBSERVABILITY_UI_ENABLED = import.meta.env.VITE_DEMO_OBSERVABILITY_UI === "true";
+
+function StorefrontUserButton() {
+  if (!DEMO_OBSERVABILITY_UI_ENABLED) return <UserButton />;
+
+  return (
+    <UserButton>
+      <UserButton.MenuItems>
+        <UserButton.Action label="Demo controls" labelIcon={<FiSliders />} open="demo-controls" />
+      </UserButton.MenuItems>
+      <UserButton.UserProfilePage label="Demo controls" url="/demo-controls" labelIcon={<FiSliders />}>
+        <DemoObservabilityPanel />
+      </UserButton.UserProfilePage>
+    </UserButton>
+  );
+}
 
 function ClerkControls() {
   return (
@@ -16,7 +34,7 @@ function ClerkControls() {
         </SignInButton>
       </SignedOut>
       <SignedIn>
-        <UserButton />
+        <StorefrontUserButton />
       </SignedIn>
     </HStack>
   );

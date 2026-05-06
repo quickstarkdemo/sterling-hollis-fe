@@ -71,6 +71,7 @@ Useful runtime secrets:
 - `VITE_DATADOG_REPLAY_SAMPLE_RATE`
 - `VITE_DATADOG_ENABLE_LOCAL`
 - `VITE_CLERK_PUBLISHABLE_KEY`
+- `VITE_DEMO_OBSERVABILITY_UI`
 - `FRONTEND_PORT`
 
 `FRONTEND_PORT` defaults to `45173`. It must be a free host port and must not
@@ -83,6 +84,9 @@ the backend origin.
 Set `VITE_CLERK_PUBLISHABLE_KEY` to enable storefront login. Clerk controls
 which strategies appear in the prebuilt sign-in UI, so enable Google and email
 for this application in the Clerk Dashboard.
+
+Set `VITE_DEMO_OBSERVABILITY_UI=true` only for demo/operator environments that
+need the signed-in user menu control for backend latency and error injection.
 
 Datadog browser monitoring is disabled on `localhost` by default to avoid local
 dev reloads polluting RUM sessions. Set `VITE_DATADOG_ENABLE_LOCAL=true` only

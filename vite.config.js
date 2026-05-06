@@ -46,6 +46,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
         },
+        "/admin/demo/observability": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: true,
+        },
         "/health": {
           target: proxyTarget,
           changeOrigin: true,

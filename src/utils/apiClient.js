@@ -45,8 +45,8 @@ async function get(path, params) {
   return response.data;
 }
 
-async function post(path, data) {
-  const response = await apiClient.post(path, data);
+async function post(path, data, config) {
+  const response = await apiClient.post(path, data, config);
   return response.data;
 }
 
@@ -93,7 +93,19 @@ export function getProductRecommendations(payload = {}) {
 }
 
 export function sendChat(payload = {}) {
-  return post("/api/chat", payload);
+  return post("/api/chat", payload, { timeout: 90000 });
+}
+
+export function getDemoObservabilityState() {
+  return get("/admin/demo/observability");
+}
+
+export function updateDemoObservabilityState(payload = {}) {
+  return post("/admin/demo/observability", payload);
+}
+
+export function resetDemoObservabilityState() {
+  return post("/admin/demo/observability/reset");
 }
 
 function appendCleanFields(formData, fields = {}) {

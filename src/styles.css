@@ -124,6 +124,74 @@ a {
   color: var(--ink) !important;
 }
 
+.demo-observability-panel {
+  width: min(100%, 760px);
+  padding: 10px 2px;
+}
+
+.demo-panel-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  line-height: 1.08;
+}
+
+.demo-state-grid {
+  width: 100%;
+}
+
+.demo-state-tile,
+.demo-readout {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.demo-state-value {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.demo-state-value.active {
+  color: var(--oxblood);
+}
+
+.demo-field-label {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.demo-mode-option {
+  border: 1px solid var(--line) !important;
+  border-radius: 6px !important;
+  background: #fffaf0 !important;
+  color: var(--ink) !important;
+}
+
+.demo-mode-option.selected {
+  border-color: rgba(23, 19, 15, 0.55) !important;
+  background: var(--ink) !important;
+  color: #fff !important;
+}
+
+.demo-readout {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.success-copy {
+  color: var(--sage);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .hero-band {
   padding: 56px 0 38px;
   border-bottom: 1px solid var(--line);
