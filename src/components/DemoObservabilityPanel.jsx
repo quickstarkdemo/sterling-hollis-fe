@@ -8,7 +8,7 @@ import {
   resetDemoObservabilityState,
   updateDemoObservabilityState,
 } from "../utils/apiClient";
-import { trackAction } from "../utils/datadog";
+import { emitNetworkOutageTrapLog, trackAction } from "../utils/datadog";
 
 const DEFAULT_TARGET_STORE_ID = DEFAULT_STORE_ID || "1001";
 
@@ -17,6 +17,7 @@ const modeOptions = [
   { value: "latency", label: "Latency" },
   { value: "error", label: "Error" },
   { value: "latency_and_error", label: "Latency + Error" },
+  { value: "network_outage", label: "Network Outage" },
 ];
 
 function formatPanelError(err) {
@@ -78,6 +79,9 @@ export default function DemoObservabilityPanel() {
     setError("");
     setNotice("");
     try {
+      if (mode === "network_outage") {
+        emitNetworkOutageTrapLog(currentState?.snmp_trap_log);
+      }
       const state = await updateDemoObservabilityState(payload);
       setCurrentState(state);
       setForm(stateToForm(state));
@@ -87,6 +91,10 @@ export default function DemoObservabilityPanel() {
         latency_seconds: state.latency_seconds,
         target_store_id: state.target_store_id,
         incident_id: state.incident_id,
+        correlation_key: state.correlation_key,
+        network_device: state.network_device,
+        network_site: state.network_site,
+        outage_scope: state.outage_scope,
       });
     } catch (err) {
       setError(formatPanelError(err));
@@ -109,6 +117,7 @@ export default function DemoObservabilityPanel() {
         latency_seconds: state.latency_seconds,
         target_store_id: state.target_store_id,
         incident_id: state.incident_id,
+        correlation_key: state.correlation_key,
       });
     } catch (err) {
       setError(formatPanelError(err));
@@ -129,7 +138,7 @@ export default function DemoObservabilityPanel() {
           Backend fault controls
         </Text>
         <Text className="muted-text">
-          Toggle the chat-path Datadog harness for latency and unhandled backend error demos.
+          Toggle the chat-path Datadog harness for latency, backend errors, and network outage demos.
         </Text>
       </Box>
 
@@ -175,7 +184,7 @@ export default function DemoObservabilityPanel() {
             step={0.25}
             value={form.latencySeconds}
             onChange={(event) => updateForm("latencySeconds", event.target.value)}
-            disabled={loading || saving || resetting || form.mode === "off" || form.mode === "error"}
+            disabled={loading || saving || resetting || form.mode === "off" || form.mode === "error" || form.mode === "network_outage"}
           />
         </Box>
         <Box>

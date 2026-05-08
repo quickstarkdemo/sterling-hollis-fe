@@ -4,6 +4,28 @@ import { reactPlugin } from "@datadog/browser-rum-react";
 
 const STERLING_HOLLIS_API_ORIGIN = "https://sterling-hollis-be.quickstark.com";
 const DATADOG_STATE_KEY = "__STERLING_HOLLIS_DATADOG__";
+const DEFAULT_NETWORK_OUTAGE_TRAP_LOG = {
+  message:
+    "SNMP Trap: DATACENTER-USER-SW11A linkDown - uplink interface Gi1/0/48 unreachable, packet loss 100%, affected services: sterling-hollis-be",
+  ddsource: "snmp-traps",
+  service: "network-device-monitoring",
+  hostname: "datacenter-user-sw11a",
+  status: "critical",
+  device_name: "DATACENTER-USER-SW11A",
+  device_role: "access_switch",
+  device_vendor: "cisco",
+  trap_name: "linkDown",
+  trap_oid: "1.3.6.1.6.3.1.1.5.3",
+  interface: "Gi1/0/48",
+  site: "dc01",
+  namespace: "dc01",
+  incident_id: "demo-network-outage-2026-05-08",
+  correlation_key: "sterling-hollis-network-outage",
+  affected_service: "sterling-hollis-be",
+  outage_scope: "storefront_api",
+  ddtags:
+    "env:production,source:snmp-traps,category:network,event_type:trigger,severity:critical,device:datacenter-user-sw11a,site:dc01,service:sterling-hollis-be,incident_id:demo-network-outage-2026-05-08,correlation_key:sterling-hollis-network-outage",
+};
 const datadogState = (globalThis[DATADOG_STATE_KEY] ||= {
   authContext: null,
   enabled: false,
@@ -181,6 +203,21 @@ export function clearDatadogUser() {
 export function trackAction(name, context = {}) {
   try {
     datadogRum.addAction(name, context);
+  } catch {
+    // Optional monitoring should never affect the demo.
+  }
+}
+
+export function emitNetworkOutageTrapLog(payload = {}) {
+  if (!datadogState.enabled) return;
+
+  const logPayload = {
+    ...DEFAULT_NETWORK_OUTAGE_TRAP_LOG,
+    ...payload,
+  };
+
+  try {
+    datadogLogs.logger.error(logPayload.message, logPayload);
   } catch {
     // Optional monitoring should never affect the demo.
   }
