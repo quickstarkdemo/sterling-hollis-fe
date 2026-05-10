@@ -11,6 +11,7 @@ import {
 import { trackAction } from "../utils/datadog";
 
 const DEFAULT_TARGET_STORE_ID = DEFAULT_STORE_ID || "1001";
+const DEFAULT_NETWORK_EVENT_COUNT = 2;
 
 const modeOptions = [
   { value: "off", label: "Off" },
@@ -32,7 +33,14 @@ function stateToForm(state) {
     mode: state?.mode || "off",
     latencySeconds: String(state?.latency_seconds ?? 8),
     targetStoreId: state?.target_store_id || DEFAULT_TARGET_STORE_ID,
+    networkEventCount: String(state?.network_event_count ?? DEFAULT_NETWORK_EVENT_COUNT),
   };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export default function DemoObservabilityPanel() {
@@ -63,7 +71,8 @@ export default function DemoObservabilityPanel() {
   }, []);
 
   const applyState = async () => {
-    const latencySeconds = Math.min(60, Math.max(0, Number(form.latencySeconds) || 0));
+    const latencySeconds = clampNumber(form.latencySeconds, 0, 60, 0);
+    const networkEventCount = Math.round(clampNumber(form.networkEventCount, 1, 25, DEFAULT_NETWORK_EVENT_COUNT));
     const mode = form.mode;
     const payload =
       mode === "off"
@@ -73,6 +82,7 @@ export default function DemoObservabilityPanel() {
             mode,
             latency_seconds: latencySeconds,
             target_store_id: form.targetStoreId.trim() || DEFAULT_TARGET_STORE_ID,
+            network_event_count: networkEventCount,
           };
 
     setSaving(true);
@@ -82,11 +92,16 @@ export default function DemoObservabilityPanel() {
       const state = await updateDemoObservabilityState(payload);
       setCurrentState(state);
       setForm(stateToForm(state));
-      setNotice(`Demo harness set to ${state.mode}.`);
+      setNotice(
+        state.mode === "network_outage"
+          ? `Network outage enabled with ${state.network_event_count} Datadog log event${state.network_event_count === 1 ? "" : "s"}.`
+          : `Demo harness set to ${state.mode}.`,
+      );
       trackAction("demo_observability_apply", {
         mode: state.mode,
         latency_seconds: state.latency_seconds,
         target_store_id: state.target_store_id,
+        network_event_count: state.network_event_count,
         incident_id: state.incident_id,
         correlation_key: state.correlation_key,
         network_device: state.network_device,
@@ -113,6 +128,7 @@ export default function DemoObservabilityPanel() {
         mode: state.mode,
         latency_seconds: state.latency_seconds,
         target_store_id: state.target_store_id,
+        network_event_count: state.network_event_count,
         incident_id: state.incident_id,
         correlation_key: state.correlation_key,
       });
@@ -139,7 +155,7 @@ export default function DemoObservabilityPanel() {
         </Text>
       </Box>
 
-      <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} className="demo-state-grid">
+      <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} className="demo-state-grid">
         <Box className="demo-state-tile">
           <Text className="muted-mini">Current mode</Text>
           <Text className={`demo-state-value ${currentState?.enabled ? "active" : ""}`}>
@@ -149,6 +165,10 @@ export default function DemoObservabilityPanel() {
         <Box className="demo-state-tile">
           <Text className="muted-mini">Incident</Text>
           <Text className="demo-state-value">{currentState?.incident_id || "Not loaded"}</Text>
+        </Box>
+        <Box className="demo-state-tile">
+          <Text className="muted-mini">Network events</Text>
+          <Text className="demo-state-value">{currentState?.network_event_count ?? "Not loaded"}</Text>
         </Box>
       </SimpleGrid>
 
@@ -171,7 +191,7 @@ export default function DemoObservabilityPanel() {
         </HStack>
       </Box>
 
-      <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
+      <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
         <Box>
           <Text className="demo-field-label">Latency seconds</Text>
           <Input
@@ -193,12 +213,34 @@ export default function DemoObservabilityPanel() {
             disabled={loading || saving || resetting || form.mode === "off"}
           />
         </Box>
+        <Box>
+          <Text className="demo-field-label">Network events</Text>
+          <Input
+            type="number"
+            min={1}
+            max={25}
+            step={1}
+            value={form.networkEventCount}
+            onChange={(event) => updateForm("networkEventCount", event.target.value)}
+            disabled={loading || saving || resetting || form.mode !== "network_outage"}
+          />
+        </Box>
       </SimpleGrid>
 
       <Box className="demo-readout">
         <Text className="muted-mini">Correlation key</Text>
         <Text>{currentState?.correlation_key || "Not loaded"}</Text>
       </Box>
+
+      {form.mode === "network_outage" ? (
+        <Box className="demo-readout">
+          <Text className="muted-mini">Network outage behavior</Text>
+          <Text>
+            Apply emits SNMP trap logs through the Clerk-authorized backend control, then enables API 503 responses
+            for storefront paths. Reset remains available from this panel.
+          </Text>
+        </Box>
+      ) : null}
 
       {error ? <Text className="error-copy">{error}</Text> : null}
       {notice ? <Text className="success-copy">{notice}</Text> : null}
