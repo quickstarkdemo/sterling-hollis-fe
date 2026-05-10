@@ -8,7 +8,7 @@ import {
   resetDemoObservabilityState,
   updateDemoObservabilityState,
 } from "../utils/apiClient";
-import { emitNetworkOutageTrapLog, trackAction } from "../utils/datadog";
+import { trackAction } from "../utils/datadog";
 
 const DEFAULT_TARGET_STORE_ID = DEFAULT_STORE_ID || "1001";
 
@@ -79,9 +79,6 @@ export default function DemoObservabilityPanel() {
     setError("");
     setNotice("");
     try {
-      if (mode === "network_outage") {
-        emitNetworkOutageTrapLog(currentState?.snmp_trap_log);
-      }
       const state = await updateDemoObservabilityState(payload);
       setCurrentState(state);
       setForm(stateToForm(state));
