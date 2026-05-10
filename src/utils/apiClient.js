@@ -97,15 +97,15 @@ export function sendChat(payload = {}) {
 }
 
 export function getDemoObservabilityState() {
-  return get("/api/demo/observability");
+  return get("/admin/demo/observability");
 }
 
 export function updateDemoObservabilityState(payload = {}) {
-  return post("/api/demo/observability", payload);
+  return post("/admin/demo/observability", payload);
 }
 
 export function resetDemoObservabilityState() {
-  return post("/api/demo/observability/reset");
+  return post("/admin/demo/observability/reset");
 }
 
 function appendCleanFields(formData, fields = {}) {
