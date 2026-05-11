@@ -11,7 +11,7 @@ import {
 import { trackAction } from "../utils/datadog";
 
 const DEFAULT_TARGET_STORE_ID = DEFAULT_STORE_ID || "1001";
-const DEFAULT_NETWORK_EVENT_COUNT = 2;
+const DEFAULT_NETWORK_EVENT_COUNT = 3;
 
 const modeOptions = [
   { value: "off", label: "Off" },
@@ -236,8 +236,8 @@ export default function DemoObservabilityPanel() {
         <Box className="demo-readout">
           <Text className="muted-mini">Network outage behavior</Text>
           <Text>
-            Apply emits SNMP trap logs through the Clerk-authorized backend control, then enables API 503 responses
-            for storefront paths. Reset remains available from this panel.
+            Apply emits SNMP trap logs for the switch, downstream edge, and gmtek5000 server error, then enables
+            API 503 responses for storefront paths. Reset remains available from this panel.
           </Text>
         </Box>
       ) : null}
