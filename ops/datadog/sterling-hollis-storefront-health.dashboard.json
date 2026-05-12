@@ -1863,6 +1863,173 @@
     {
       "definition": {
         "type": "group",
+        "title": "Static Asset 404 Triage",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "Use RUM resource 404s as the actionable signal for broken frontend assets. Nginx 404s for guessed files with no browser view context are usually internet probe traffic and should not be classified as a broken Vite build unless a matching RUM resource error appears.",
+              "background_color": "gray",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "center",
+              "show_tick": false,
+              "tick_pos": "50%",
+              "tick_edge": "left"
+            },
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 2
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Actionable Browser Static 404s",
+              "title_size": "16",
+              "title_align": "left",
+              "autoscale": true,
+              "precision": 0,
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "asset_404s",
+                      "data_source": "rum",
+                      "search": {
+                        "query": "env:$env service:$fe_service @type:resource @resource.status_code:404 (@resource.url:*.js OR @resource.url:*.css OR @resource.url:*.svg OR @resource.url_path_group:/assets/*)"
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "asset_404s"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {
+                      "comparator": ">",
+                      "value": 0,
+                      "palette": "white_on_red"
+                    },
+                    {
+                      "comparator": "=",
+                      "value": 0,
+                      "palette": "white_on_green"
+                    }
+                  ]
+                }
+              ],
+              "timeseries_background": {
+                "type": "area"
+              },
+              "custom_links": [
+                {
+                  "label": "Open RUM static asset 404s",
+                  "link": "/rum/resource?query=env%3A{{$env}}%20service%3A{{$fe_service}}%20%40resource.status_code%3A404%20(%40resource.url%3A*.js%20OR%20%40resource.url%3A*.css%20OR%20%40resource.url%3A*.svg%20OR%20%40resource.url_path_group%3A%2Fassets%2F*)&from_ts={{timestamp_widget_start}}&to_ts={{timestamp_widget_end}}&live=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "width": 4,
+              "height": 4
+            }
+          },
+          {
+            "definition": {
+              "type": "query_table",
+              "title": "Probe-Style Nginx Static 404s",
+              "title_size": "16",
+              "title_align": "left",
+              "has_search_bar": "auto",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "name": "probe_404s",
+                      "data_source": "logs",
+                      "search": {
+                        "query": "service:$fe_service status:info 404 (\".js HTTP/1.1\" OR \".css HTTP/1.1\" OR \".svg HTTP/1.1\") \"\\\"-\\\"\""
+                      },
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [
+                        {
+                          "facet": "message",
+                          "limit": 20,
+                          "sort": {
+                            "aggregation": "count",
+                            "order": "desc"
+                          }
+                        }
+                      ],
+                      "indexes": [
+                        "*"
+                      ],
+                      "storage": "hot"
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "alias": "Probe requests",
+                      "formula": "probe_404s",
+                      "cell_display_mode": "bar"
+                    }
+                  ],
+                  "sort": {
+                    "count": 20,
+                    "order_by": [
+                      {
+                        "type": "formula",
+                        "index": 0,
+                        "order": "desc"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "custom_links": [
+                {
+                  "label": "Open probe-style nginx 404 logs",
+                  "link": "/logs?query=service%3A{{$fe_service}}%20status%3Ainfo%20404%20(%22.js%20HTTP%2F1.1%22%20OR%20%22.css%20HTTP%2F1.1%22%20OR%20%22.svg%20HTTP%2F1.1%22)%20%22%5C%22-%5C%22%22&from_ts={{timestamp_widget_start}}&to_ts={{timestamp_widget_end}}&live=false"
+                }
+              ]
+            },
+            "layout": {
+              "x": 4,
+              "y": 2,
+              "width": 8,
+              "height": 4
+            }
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 50,
+        "width": 12,
+        "height": 8
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
         "title": "Network Path",
         "layout_type": "ordered",
         "widgets": [
@@ -2027,7 +2194,7 @@
       },
       "layout": {
         "x": 0,
-        "y": 50,
+        "y": 58,
         "width": 12,
         "height": 7
       }
