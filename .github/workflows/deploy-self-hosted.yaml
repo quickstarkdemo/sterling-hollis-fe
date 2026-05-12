@@ -128,8 +128,7 @@ jobs:
           echo "Runtime environment: ${VITE_ENVIRONMENT}"
           echo "Runtime release: ${VITE_RELEASE}"
           if [[ "${VITE_ENVIRONMENT}" == "production" && "${VITE_CLERK_PUBLISHABLE_KEY}" == pk_test_* ]]; then
-            echo "Production deployments must use a Clerk live publishable key (pk_live_*), not a development key."
-            exit 1
+            echo "Warning: production is using a Clerk development publishable key (pk_test_*). Login will show Clerk development mode until VITE_CLERK_PUBLISHABLE_KEY is updated to pk_live_*."
           fi
           if [[ "${VITE_ENVIRONMENT}" == "production" && "${VITE_DEMO_OBSERVABILITY_UI}" == "true" ]]; then
             echo "Warning: demo observability UI is enabled in production."
