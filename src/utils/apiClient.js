@@ -156,6 +156,37 @@ export function archiveAdminCatalogProduct(productId, payload, idempotencyKey) {
   return post(catalogProductPath(productId, "/archive"), payload, idempotencyConfig(idempotencyKey));
 }
 
+const catalogWorkflowPath = (workflowId, suffix = "") =>
+  `/api/admin/catalog/workflows/${encodeURIComponent(workflowId)}${suffix}`;
+
+export function startCatalogWorkflow(payload, idempotencyKey) {
+  return post("/api/admin/catalog/workflows", payload, idempotencyConfig(idempotencyKey));
+}
+
+export function getCatalogWorkflow(workflowId, { developer = false } = {}) {
+  return get(catalogWorkflowPath(workflowId), { developer: developer ? "true" : undefined });
+}
+
+export function submitCatalogDraftCommand(workflowId, payload, idempotencyKey) {
+  return post(catalogWorkflowPath(workflowId, "/draft-commands"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function submitCatalogImageCommand(workflowId, payload, idempotencyKey) {
+  return post(catalogWorkflowPath(workflowId, "/image-commands"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function getCatalogImageJob(workflowId, jobId) {
+  return get(catalogWorkflowPath(workflowId, `/image-jobs/${encodeURIComponent(jobId)}`));
+}
+
+export function approveCatalogImageJob(workflowId, jobId, payload, idempotencyKey) {
+  return post(
+    catalogWorkflowPath(workflowId, `/image-jobs/${encodeURIComponent(jobId)}/approve`),
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
 function appendCleanFields(formData, fields = {}) {
   Object.entries(cleanParams(fields)).forEach(([key, value]) => {
     formData.append(key, String(value));

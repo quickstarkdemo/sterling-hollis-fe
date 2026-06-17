@@ -1013,6 +1013,154 @@ a {
   align-items: start;
 }
 
+.studio-mode-switcher {
+  padding: 6px;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.86);
+}
+
+.product-creation-workspace {
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.84);
+}
+
+.workflow-prompt-panel,
+.workflow-stage-panel,
+.workflow-image-panel,
+.workflow-developer-lens {
+  padding: clamp(18px, 3vw, 24px);
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 248, 243, 0.78);
+}
+
+.workflow-prompt-panel textarea,
+.workflow-image-panel input {
+  border-radius: 6px !important;
+  background: #fff !important;
+}
+
+.workflow-message {
+  padding: 14px 16px;
+  border-left: 3px solid var(--sage);
+  background: rgba(96, 114, 77, 0.08);
+  color: #405033;
+  font-weight: 700;
+}
+
+.api-stage-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 88px;
+  padding: 12px 0;
+}
+
+.api-stage-row:not(:last-child)::after {
+  position: absolute;
+  top: 50px;
+  bottom: -10px;
+  left: 16px;
+  width: 1px;
+  background: rgba(23, 19, 15, 0.16);
+  content: "";
+}
+
+.api-stage-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(23, 19, 15, 0.14);
+  border-radius: 50%;
+  background: #fffaf0;
+  color: var(--muted);
+}
+
+.api-stage-row.succeeded .api-stage-icon,
+.api-stage-row.completed .api-stage-icon {
+  border-color: rgba(96, 114, 77, 0.4);
+  color: var(--sage);
+}
+
+.api-stage-row.failed .api-stage-icon,
+.api-stage-row.blocked .api-stage-icon {
+  border-color: rgba(119, 39, 37, 0.35);
+  color: var(--oxblood);
+}
+
+.workflow-status {
+  text-transform: capitalize;
+}
+
+.workflow-status.succeeded,
+.workflow-status.completed {
+  background: rgba(96, 114, 77, 0.16) !important;
+  color: #405033 !important;
+}
+
+.workflow-status.failed,
+.workflow-status.blocked {
+  background: rgba(119, 39, 37, 0.12) !important;
+  color: var(--oxblood) !important;
+}
+
+.workflow-status.queued,
+.workflow-status.started,
+.workflow-status.running,
+.workflow-status.retrying {
+  background: rgba(170, 117, 45, 0.16) !important;
+  color: #7a4e12 !important;
+}
+
+.workflow-status.pending {
+  background: rgba(23, 19, 15, 0.08) !important;
+  color: var(--muted) !important;
+}
+
+.workflow-developer-lens {
+  border-color: rgba(32, 55, 82, 0.22);
+  background: rgba(32, 55, 82, 0.05);
+}
+
+.developer-event-card {
+  padding: 18px;
+  border: 1px solid rgba(32, 55, 82, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.9);
+}
+
+.developer-metadata-grid > div {
+  padding: 10px;
+  border: 1px solid rgba(23, 19, 15, 0.08);
+  border-radius: 6px;
+  background: rgba(238, 232, 220, 0.4);
+}
+
+.sanitized-json-viewer {
+  min-width: 0;
+}
+
+.sanitized-json-code {
+  max-height: 300px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(23, 19, 15, 0.14);
+  border-radius: 6px;
+  background: #17130f;
+  color: #f5ead7;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .catalog-product-list,
 .product-editor {
   min-width: 0;

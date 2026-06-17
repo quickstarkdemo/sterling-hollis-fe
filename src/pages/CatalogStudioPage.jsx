@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
 import { useDeveloperLens } from "../components/DeveloperLensContext";
 import CatalogProductList from "../components/admin/CatalogProductList";
+import ProductCreationWorkspace from "../components/admin/ProductCreationWorkspace";
 import ProductEditor from "../components/admin/ProductEditor";
 
 const capabilityLabels = {
@@ -23,6 +24,7 @@ export default function CatalogStudioPage() {
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+  const [studioMode, setStudioMode] = useState("create");
 
   const selectProduct = useCallback((productId) => {
     if (productId === selectedProductId) return;
@@ -34,6 +36,13 @@ export default function CatalogStudioPage() {
   const catalogChanged = useCallback(() => {
     setCatalogRefreshKey((current) => current + 1);
   }, []);
+
+  const switchMode = useCallback((nextMode) => {
+    if (nextMode === studioMode) return;
+    if (editorDirty && !window.confirm("Discard unsaved changes and switch Catalog Studio modes?")) return;
+    setEditorDirty(false);
+    setStudioMode(nextMode);
+  }, [editorDirty, studioMode]);
 
   useEffect(() => {
     if (!editorDirty) return undefined;
@@ -113,21 +122,30 @@ export default function CatalogStudioPage() {
             ) : null}
         </Box>
 
-        <Box className="catalog-management-layout">
-          <CatalogProductList
-            selectedProductId={selectedProductId}
-            onSelect={selectProduct}
-            refreshKey={catalogRefreshKey}
-          />
-          <Box minW={0}>
-            <ProductEditor
-              key={selectedProductId || "empty-editor"}
-              productId={selectedProductId}
-              onDirtyChange={setEditorDirty}
-              onCatalogChanged={catalogChanged}
+        <HStack className="studio-mode-switcher" gap={2} mb={6}>
+          <Button type="button" className={studioMode === "create" ? "primary-button" : "secondary-button"} onClick={() => switchMode("create")}>Create with OpenAI</Button>
+          <Button type="button" className={studioMode === "manage" ? "primary-button" : "secondary-button"} onClick={() => switchMode("manage")}>Manage catalog</Button>
+        </HStack>
+
+        {studioMode === "create" ? (
+          <ProductCreationWorkspace onDirtyChange={setEditorDirty} onCatalogChanged={catalogChanged} />
+        ) : (
+          <Box className="catalog-management-layout">
+            <CatalogProductList
+              selectedProductId={selectedProductId}
+              onSelect={selectProduct}
+              refreshKey={catalogRefreshKey}
             />
+            <Box minW={0}>
+              <ProductEditor
+                key={selectedProductId || "empty-editor"}
+                productId={selectedProductId}
+                onDirtyChange={setEditorDirty}
+                onCatalogChanged={catalogChanged}
+              />
+            </Box>
           </Box>
-        </Box>
+        )}
       </Container>
     </Box>
   );

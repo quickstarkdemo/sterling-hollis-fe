@@ -151,7 +151,7 @@ function FieldError({ message }) {
   return message ? <Text className="field-error">{message}</Text> : null;
 }
 
-export default function ProductEditor({ productId, onDirtyChange, onCatalogChanged }) {
+export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange, onCatalogChanged, onLifecycleChanged }) {
   const [detail, setDetail] = useState(null);
   const [product, setProduct] = useState(null);
   const [metadataText, setMetadataText] = useState("{}");
@@ -194,17 +194,20 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
     setError(null);
     setNotice("");
     try {
-      applyDetail(await getAdminCatalogProduct(productId));
+      const nextDetail = await getAdminCatalogProduct(productId);
+      applyDetail(nextDetail);
+      return nextDetail;
     } catch (nextError) {
       setError(nextError);
     } finally {
       setLoading(false);
     }
+    return null;
   }, [applyDetail, productId]);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   const dirty = useMemo(() => {
     if (!product || !baseline) return false;
@@ -317,9 +320,10 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
         mutationKey("save-draft", draftPayload),
       );
       delete idempotencyKeys.current["save-draft"];
-      applyDetail(await getAdminCatalogProduct(detail.product_id));
+      const nextDetail = await getAdminCatalogProduct(detail.product_id);
+      applyDetail(nextDetail);
       setNotice("Draft saved. The published catalog remains unchanged until publication.");
-      onCatalogChanged?.();
+      onCatalogChanged?.(nextDetail);
     } catch (nextError) {
       if (nextError?.response?.status === 409) {
         setConflict(true);
@@ -337,9 +341,10 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
   };
 
   const lifecycleChanged = async (action) => {
-    await load();
+    const nextDetail = await load();
     setNotice(action === "published" ? "Product published successfully." : "Product archived successfully.");
-    onCatalogChanged?.();
+    onCatalogChanged?.(nextDetail);
+    onLifecycleChanged?.(action, nextDetail);
   };
 
   if (!productId) return <EmptyState title="Select a product" message="Choose a catalog product to inspect and edit." />;

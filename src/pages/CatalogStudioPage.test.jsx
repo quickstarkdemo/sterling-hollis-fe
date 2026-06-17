@@ -100,7 +100,7 @@ describe("CatalogStudioPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Build and manage the product catalog" })).toBeInTheDocument();
     expect(screen.getAllByText("Catalog Studio").length).toBeGreaterThan(1);
-    expect(screen.getByText("Responses")).toBeInTheDocument();
+    expect(screen.getAllByText("Responses").length).toBeGreaterThan(0);
     expect(screen.getByText("Realtime voice")).toBeInTheDocument();
     expect(screen.queryByText("Technical view")).not.toBeInTheDocument();
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
@@ -153,6 +153,7 @@ describe("CatalogStudioPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderStudio();
 
+    await userEvent.click(await screen.findByRole("button", { name: "Manage catalog" }));
     await userEvent.click(await screen.findByRole("button", { name: /First Coat/i }));
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
