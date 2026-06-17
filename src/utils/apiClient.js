@@ -50,6 +50,11 @@ async function post(path, data, config) {
   return response.data;
 }
 
+async function put(path, data, config) {
+  const response = await apiClient.put(path, data, config);
+  return response.data;
+}
+
 async function postForm(path, formData) {
   const response = await uploadClient.post(path, formData);
   return response.data;
@@ -113,6 +118,42 @@ export async function getCatalogStudioSession(token) {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   return response.data;
+}
+
+const catalogProductPath = (productId, suffix = "") =>
+  `/api/admin/catalog/products/${encodeURIComponent(productId)}${suffix}`;
+
+const idempotencyConfig = (idempotencyKey) => ({
+  headers: { "Idempotency-Key": idempotencyKey },
+});
+
+export function createIdempotencyKey(scope = "catalog") {
+  const randomPart = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${scope}-${randomPart}`;
+}
+
+export function getAdminCatalogProducts(params = {}) {
+  return get("/api/admin/catalog/products", params);
+}
+
+export function getAdminCatalogProduct(productId) {
+  return get(catalogProductPath(productId));
+}
+
+export function startAdminCatalogProductRevision(productId, payload, idempotencyKey) {
+  return post(catalogProductPath(productId, "/revisions"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function saveAdminCatalogProductDraft(productId, payload, idempotencyKey) {
+  return put(catalogProductPath(productId, "/draft"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function publishAdminCatalogProduct(productId, payload, idempotencyKey) {
+  return post(catalogProductPath(productId, "/publish"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function archiveAdminCatalogProduct(productId, payload, idempotencyKey) {
+  return post(catalogProductPath(productId, "/archive"), payload, idempotencyConfig(idempotencyKey));
 }
 
 function appendCleanFields(formData, fields = {}) {

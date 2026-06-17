@@ -1,0 +1,66 @@
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { renderWithProviders } from "../../test/render";
+import ProductLifecycleActions from "./ProductLifecycleActions";
+
+const api = vi.hoisted(() => ({
+  archiveAdminCatalogProduct: vi.fn(),
+  createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
+  publishAdminCatalogProduct: vi.fn(),
+}));
+vi.mock("../../utils/apiClient", () => api);
+
+const product = {
+  product_id: "cat_coat",
+  lifecycle_status: "published",
+  version: 4,
+  current_draft: { revision: { id: "draft_1", moderation_state: "approved" }, draft_version: 2 },
+};
+
+describe("ProductLifecycleActions", () => {
+  beforeEach(() => {
+    api.publishAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
+    api.archiveAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("requires confirmation, publishes the expected draft version, and links to the public product", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<ProductLifecycleActions product={product} dirty={false} onChanged={onChanged} />);
+
+    expect(screen.getByRole("link", { name: /View public product/i })).toHaveAttribute("href", "/product/cat_coat");
+    await userEvent.click(screen.getByRole("button", { name: /Publish draft/i }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(api.publishAdminCatalogProduct).toHaveBeenCalledWith(
+      "cat_coat",
+      { draft_id: "draft_1", expected_version: 4 },
+      "publish-product-key",
+    );
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith("published"));
+  });
+
+  it("blocks lifecycle mutations while local edits are dirty", () => {
+    renderWithProviders(<ProductLifecycleActions product={product} dirty onChanged={() => {}} />);
+    expect(screen.getByRole("button", { name: /Publish draft/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Archive/i })).toBeDisabled();
+    expect(screen.getByText(/Save or discard local edits/i)).toBeInTheDocument();
+  });
+
+  it("archives the published version only after confirmation", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<ProductLifecycleActions product={product} dirty={false} onChanged={onChanged} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /^Archive$/i }));
+
+    expect(window.confirm).toHaveBeenCalledWith("Archive this product and remove it from public catalog results?");
+    expect(api.archiveAdminCatalogProduct).toHaveBeenCalledWith(
+      "cat_coat",
+      { expected_version: 4 },
+      "archive-product-key",
+    );
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith("archived"));
+  });
+});
