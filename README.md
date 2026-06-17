@@ -36,6 +36,7 @@ production.
 - `/product/:productId` - product detail, variants, inventory, related products
 - `/sign-in/*` - Clerk-hosted storefront sign-in/sign-up flow
 - `/style-finder` - image upload, backend visual analysis, and image recommendations
+- `/catalog-studio` - protected catalog authoring, image review, and publication
 
 ## Scripts
 
@@ -74,6 +75,7 @@ Useful runtime secrets:
 - `VITE_DATADOG_ENABLE_LOCAL`
 - `VITE_CLERK_PUBLISHABLE_KEY`
 - `VITE_DEMO_OBSERVABILITY_UI`
+- `VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID`
 - `FRONTEND_PORT`
 
 `FRONTEND_PORT` defaults to `45173`. It must be a free host port and must not
@@ -92,6 +94,11 @@ Google and email for this application in the Clerk Dashboard.
 Set `VITE_DEMO_OBSERVABILITY_UI=true` only for demo/operator environments that
 need the signed-in user menu control for backend latency and error injection.
 
+Set `VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID` to a stable published `cat_...`
+product that the presenter can use if a live provider is unavailable. The value
+is public operational metadata exposed in `/config.json`; it must never contain
+a credential or private draft identifier.
+
 Datadog browser monitoring is disabled on `localhost` by default to avoid local
 dev reloads polluting RUM sessions. Set `VITE_DATADOG_ENABLE_LOCAL=true` only
 when intentionally testing RUM from a local browser. `VITE_DATADOG_REPLAY_SAMPLE_RATE`
@@ -109,3 +116,10 @@ scripts/deploy.sh .env
 ```
 
 Set `BUMP=minor` or `BUMP=none` to control version increments.
+
+## Catalog Studio presenter preflight
+
+The mocked contract suite runs in CI with `npm test`; it does not prove the
+state of Clerk, OpenAI providers, the image worker, object storage, or ChatGPT.
+Before a customer session, complete the deployed-system checklist and choose the
+appropriate talk track in [the Catalog Studio presenter guide](docs/openai-catalog-studio-demo.md).

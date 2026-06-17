@@ -13,7 +13,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget --no-verbose --tries=1 --spider http://127.0.0.1/frontend-health",
+          "wget --no-verbose --tries=1 --spider http://127.0.0.1/frontend-health && wget --no-verbose --tries=1 --spider http://127.0.0.1/config.json",
         ]
       interval: 30s
       timeout: 5s
