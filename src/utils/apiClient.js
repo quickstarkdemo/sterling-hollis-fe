@@ -171,6 +171,18 @@ export function submitCatalogDraftCommand(workflowId, payload, idempotencyKey) {
   return post(catalogWorkflowPath(workflowId, "/draft-commands"), payload, idempotencyConfig(idempotencyKey));
 }
 
+export function createCatalogRealtimeSession(workflowId) {
+  return post(catalogWorkflowPath(workflowId, "/realtime/sessions"));
+}
+
+export function submitCatalogRealtimeToolCall(workflowId, payload, idempotencyKey) {
+  return post(
+    catalogWorkflowPath(workflowId, "/realtime/tool-calls"),
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
 export function submitCatalogImageCommand(workflowId, payload, idempotencyKey) {
   return post(catalogWorkflowPath(workflowId, "/image-commands"), payload, idempotencyConfig(idempotencyKey));
 }

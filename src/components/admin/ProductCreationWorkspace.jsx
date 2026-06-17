@@ -17,6 +17,7 @@ import {
 import ApiStageTimeline from "./ApiStageTimeline";
 import DeveloperLens from "./DeveloperLens";
 import ProductEditor from "./ProductEditor";
+import VoiceControls from "./VoiceControls";
 
 const STORAGE_KEY = "sterling-hollis:catalog-studio:active-workflow";
 const MAX_POLL_ATTEMPTS = 12;
@@ -58,7 +59,9 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
   const [pollExpired, setPollExpired] = useState(false);
   const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [voiceResetKey, setVoiceResetKey] = useState(0);
   const commandInFlight = useRef(false);
+  const workflowStartPromise = useRef(null);
   const imageInFlight = useRef(false);
   const mutationKeys = useRef({});
   const pollAttempt = useRef(0);
@@ -131,6 +134,29 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
     onDirtyChange?.(Boolean(instruction.trim()) || editorDirty);
   }, [editorDirty, instruction, onDirtyChange]);
 
+  const ensureWorkflow = async () => {
+    if (workflowId) return workflowId;
+    if (workflowStartPromise.current) return workflowStartPromise.current;
+    const workflowPayload = {
+      title: "Catalog Studio product creation",
+      business_summary: "Text-guided catalog product creation workflow.",
+    };
+    const startPromise = startCatalogWorkflow(
+      workflowPayload,
+      mutationKey("start-workflow", workflowPayload),
+    ).then((started) => {
+      setWorkflowId(started.id);
+      setWorkflow(started);
+      persist(started.id, null);
+      delete mutationKeys.current["start-workflow"];
+      return started.id;
+    }).finally(() => {
+      workflowStartPromise.current = null;
+    });
+    workflowStartPromise.current = startPromise;
+    return startPromise;
+  };
+
   const submitInstruction = async (overrideInstruction) => {
     const nextInstruction = String(overrideInstruction ?? instruction).trim();
     if (!nextInstruction || commandInFlight.current) return;
@@ -140,21 +166,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
     setMessage("");
 
     try {
-      let activeWorkflowId = workflowId;
-      if (!activeWorkflowId) {
-        const workflowPayload = {
-          title: "Catalog Studio product creation",
-          business_summary: "Text-guided catalog product creation workflow.",
-        };
-        const started = await startCatalogWorkflow(
-          workflowPayload,
-          mutationKey("start-workflow", workflowPayload),
-        );
-        activeWorkflowId = started.id;
-        setWorkflowId(activeWorkflowId);
-        setWorkflow(started);
-        delete mutationKeys.current["start-workflow"];
-      }
+      const activeWorkflowId = await ensureWorkflow();
 
       const commandPayload = {
         instruction: nextInstruction,
@@ -355,6 +367,19 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
     setActionError(null);
     setMessage("");
     setEditorDirty(false);
+    setVoiceResetKey((current) => current + 1);
+  };
+
+  const voiceToolResult = (result, activeWorkflowId) => {
+    setMessage(result.message || "The voice command finished.");
+    setActionError(null);
+    if (result.status === "succeeded" && result.draft) {
+      setDraft(result.draft);
+      persist(activeWorkflowId, result.draft);
+      setEditorRefreshKey((current) => current + 1);
+      onCatalogChanged?.();
+    }
+    if (result.workflow) setWorkflow(result.workflow);
   };
 
   const lifecycleChanged = async (action, detail) => {
@@ -419,6 +444,14 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
             <FiSend /> {submitting ? "Working…" : draft ? "Refine draft" : "Create draft"}
           </Button>
         </HStack>
+        <VoiceControls
+          workflowId={workflowId}
+          ensureWorkflow={ensureWorkflow}
+          disabled={Boolean(publishedProductId) || submitting || imageBusy}
+          resetSignal={voiceResetKey}
+          onToolResult={voiceToolResult}
+          onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
+        />
       </Box>
 
       {message ? <Box className="workflow-message"><Text>{message}</Text></Box> : null}

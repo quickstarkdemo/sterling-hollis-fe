@@ -15,6 +15,7 @@ describe("ApiStageTimeline", () => {
     expect(screen.getByText("Structured the draft.")).toBeInTheDocument();
     expect(screen.getByText("Moderation")).toBeInTheDocument();
     expect(screen.getByText("Stopped by policy.")).toBeInTheDocument();
+    expect(screen.getByText("Realtime Voice")).toBeInTheDocument();
     expect(screen.getByText("Image Generation")).toBeInTheDocument();
     expect(screen.getAllByText("pending").length).toBeGreaterThan(0);
   });

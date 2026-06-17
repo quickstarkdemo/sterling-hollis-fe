@@ -26,6 +26,19 @@ vi.mock("./ProductEditor", () => ({
     </div>
   ),
 }));
+vi.mock("./VoiceControls", () => ({
+  default: ({ ensureWorkflow, onToolResult }) => (
+    <div data-testid="voice-controls">
+      <button type="button" onClick={() => { void ensureWorkflow?.(); }}>Start voice workflow</button>
+      <button type="button" onClick={() => onToolResult?.({
+        status: "succeeded",
+        message: "Draft updated by voice.",
+        draft: { id: "draft_1", product_id: "cat_coat", draft_version: 2 },
+        workflow: baseWorkflow,
+      }, "workflow_1")}>Simulate voice result</button>
+    </div>
+  ),
+}));
 
 const event = (id, sequence, capability, status, summary, extra = {}) => ({
   id, sequence, capability, stage: capability, status, business_summary: summary, retryable: false, created_at: "2026-06-17T12:00:00Z", ...extra,
@@ -105,6 +118,19 @@ describe("ProductCreationWorkspace", () => {
       current_draft_id: "draft_1",
       expected_draft_version: 1,
     }, "draft-command-key"));
+  });
+
+  it("uses voice as an alternate input to the same workflow and draft state", async () => {
+    renderWorkspace();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice workflow" }));
+    await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("voice-controls")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Simulate voice result" }));
+    expect(await screen.findByText("Draft updated by voice.")).toBeInTheDocument();
+    expect(screen.getByText("Draft version 2")).toBeInTheDocument();
+    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
   });
 
   it("explains a moderation block and keeps image controls unavailable", async () => {
