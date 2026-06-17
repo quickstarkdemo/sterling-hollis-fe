@@ -63,4 +63,9 @@ describe("ProductLifecycleActions", () => {
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith("archived"));
   });
+
+  it("explains archive as the supported non-destructive removal action", () => {
+    renderWithProviders(<ProductLifecycleActions product={product} dirty={false} onChanged={() => {}} />);
+    expect(screen.getByText(/catalog records are retained instead of permanently deleted/i)).toBeInTheDocument();
+  });
 });

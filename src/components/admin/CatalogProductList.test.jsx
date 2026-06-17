@@ -5,7 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../test/render";
 import CatalogProductList from "./CatalogProductList";
 
-const api = vi.hoisted(() => ({ getAdminCatalogProducts: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getAdminCatalogProducts: vi.fn(),
+  getCategories: vi.fn(),
+}));
 vi.mock("../../utils/apiClient", () => api);
 
 const products = [
@@ -17,6 +20,12 @@ const products = [
 describe("CatalogProductList", () => {
   beforeEach(() => {
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
+    api.getCategories.mockReset().mockResolvedValue({
+      categories: [
+        { id: "womens_apparel", label: "Women's Apparel", product_count: 2 },
+        { id: "handbags", label: "Handbags", product_count: 1 },
+      ],
+    });
   });
 
   it("renders every lifecycle state and selects a product", async () => {
@@ -47,5 +56,40 @@ describe("CatalogProductList", () => {
         page_size: 12,
       }));
     });
+  });
+
+  it("filters with canonical categories from the catalog contract", async () => {
+    renderWithProviders(<CatalogProductList selectedProductId="" onSelect={() => {}} />);
+    await screen.findByText("Wool Coat");
+
+    const categoryFilter = await screen.findByRole("combobox", { name: "Filter by category" });
+    expect(categoryFilter).toHaveDisplayValue("All categories");
+    expect(screen.getByRole("option", { name: "Women's Apparel" })).toHaveValue("womens_apparel");
+
+    await userEvent.selectOptions(categoryFilter, "handbags");
+
+    await waitFor(() => {
+      expect(api.getAdminCatalogProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+        category: "handbags",
+        page: 1,
+        page_size: 12,
+      }));
+    });
+  });
+
+  it("summarizes results and clears active filters", async () => {
+    renderWithProviders(<CatalogProductList selectedProductId="" onSelect={() => {}} />);
+    expect(await screen.findByText("3 products")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Search catalog products"), "coat");
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByLabelText("Search catalog products")).toHaveValue("");
+    await waitFor(() => expect(api.getAdminCatalogProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+      q: "",
+      page: 1,
+    })));
   });
 });

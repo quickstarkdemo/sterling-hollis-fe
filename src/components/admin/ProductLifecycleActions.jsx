@@ -82,6 +82,10 @@ export default function ProductLifecycleActions({ product, dirty, onChanged }) {
 
   return (
     <Box className="product-lifecycle-actions">
+      <Box mb={4}>
+        <Text className="panel-title">Catalog availability</Text>
+        <Text className="muted-text" mt={1}>Publish replaces the storefront version. Archive is the supported removal action; catalog records are retained instead of permanently deleted.</Text>
+      </Box>
       <HStack justify="space-between" gap={4} flexWrap="wrap">
         <HStack gap={2}>
           <Badge className={`lifecycle-badge ${product.lifecycle_status}`}>{product.lifecycle_status}</Badge>
