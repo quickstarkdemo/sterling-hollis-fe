@@ -5,6 +5,7 @@ import { FiCamera, FiSearch } from "react-icons/fi";
 import brandLogo from "../assets/sterling-hollis-logo.svg";
 import AuthControls from "./AuthControls";
 import ChatWidget from "./ChatWidget";
+import { useCatalogStudioAccess } from "./CatalogStudioAccessContext";
 
 const navItems = [
   { to: "/", label: "Shop" },
@@ -12,6 +13,12 @@ const navItems = [
 ];
 
 export default function Shell({ children }) {
+  const { status: catalogStudioStatus } = useCatalogStudioAccess();
+  const visibleNavItems =
+    catalogStudioStatus === "authorized"
+      ? [...navItems, { to: "/catalog-studio", label: "Catalog Studio" }]
+      : navItems;
+
   return (
     <Box minH="100vh" className="app-shell">
       <Box as="header" className="topbar">
@@ -22,7 +29,7 @@ export default function Shell({ children }) {
             </RouterLink>
 
             <HStack gap={2} className="desktop-nav">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
                   {item.label}
                 </NavLink>

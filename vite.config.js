@@ -46,17 +46,18 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
         },
-        "/admin/demo/observability": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: true,
-        },
         "/health": {
           target: proxyTarget,
           changeOrigin: true,
           secure: true,
         },
       },
+    },
+    test: {
+      environment: "jsdom",
+      globals: true,
+      setupFiles: "./src/test/setup.js",
+      css: true,
     },
     build: {
       sourcemap: false,

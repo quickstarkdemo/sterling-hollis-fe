@@ -97,15 +97,22 @@ export function sendChat(payload = {}) {
 }
 
 export function getDemoObservabilityState() {
-  return get("/admin/demo/observability");
+  return get("/api/demo/observability");
 }
 
 export function updateDemoObservabilityState(payload = {}) {
-  return post("/admin/demo/observability", payload);
+  return post("/api/demo/observability", payload);
 }
 
 export function resetDemoObservabilityState() {
-  return post("/admin/demo/observability/reset");
+  return post("/api/demo/observability/reset");
+}
+
+export async function getCatalogStudioSession(token) {
+  const response = await apiClient.get("/api/admin/session", {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data;
 }
 
 function appendCleanFields(formData, fields = {}) {
