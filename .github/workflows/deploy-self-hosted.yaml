@@ -130,6 +130,7 @@ jobs:
           VITE_ENVIRONMENT: ${{ secrets.VITE_ENVIRONMENT || 'production' }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_DEMO_OBSERVABILITY_UI: ${{ secrets.VITE_DEMO_OBSERVABILITY_UI || 'false' }}
+          VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID: ${{ secrets.VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID }}
           VITE_RELEASE: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
@@ -140,6 +141,12 @@ jobs:
           fi
           if [[ "${VITE_ENVIRONMENT}" == "production" && "${VITE_DEMO_OBSERVABILITY_UI}" == "true" ]]; then
             echo "Warning: demo observability UI is enabled in production."
+          fi
+          if [[ -z "${VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID}" ]]; then
+            echo "Warning: no Catalog Studio fallback product is configured for presenter recovery."
+          elif [[ ! "${VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID}" =~ ^cat_[A-Za-z0-9_-]+$ ]]; then
+            echo "VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID must be empty or a cat_ product ID."
+            exit 1
           fi
 
       - name: Write runtime env file
@@ -157,6 +164,7 @@ jobs:
           VITE_RELEASE=${{ steps.version.outputs.version }}
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_DEMO_OBSERVABILITY_UI=${{ secrets.VITE_DEMO_OBSERVABILITY_UI || 'false' }}
+          VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID=${{ secrets.VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID }}
           VITE_DATADOG_APPLICATION_ID=${{ secrets.VITE_DATADOG_APPLICATION_ID }}
           VITE_DATADOG_CLIENT_TOKEN=${{ secrets.VITE_DATADOG_CLIENT_TOKEN }}
           VITE_DATADOG_SITE=${{ secrets.VITE_DATADOG_SITE || 'datadoghq.com' }}
@@ -193,8 +201,8 @@ jobs:
               fi
             fi
 
-            if curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/frontend-health" || curl -fsS "http://localhost:${FRONTEND_PORT}/frontend-health"; then
-              echo "Application responded on the host port."
+            if (curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/frontend-health" && curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/config.json") || (curl -fsS "http://localhost:${FRONTEND_PORT}/frontend-health" && curl -fsS "http://localhost:${FRONTEND_PORT}/config.json"); then
+              echo "Application and runtime configuration responded on the host port."
               exit 0
             fi
 
