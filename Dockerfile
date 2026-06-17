@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --registry=https://registry.npmjs.org --replace-registry-host=always
 
 COPY . .
 

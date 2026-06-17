@@ -94,6 +94,14 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate portable npm lockfile
+        if: steps.image_changes.outputs.changed == 'true'
+        run: |
+          if grep -Eq 'internal\.api\.openai\.org|socket-firewall-registry' package-lock.json; then
+            echo "package-lock.json contains a workstation-only npm registry URL. Regenerate it with the public npm registry before deploying."
+            exit 1
+          fi
+
       - name: Build and push image
         if: steps.image_changes.outputs.changed == 'true'
         run: |
