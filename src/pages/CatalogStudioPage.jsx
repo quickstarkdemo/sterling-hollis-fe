@@ -1,8 +1,11 @@
-import { Badge, Box, Button, Container, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import { FiCode, FiEye, FiLock, FiShield } from "react-icons/fi";
+import { Badge, Box, Button, Container, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import { FiCode, FiEye } from "react-icons/fi";
+import { useCallback, useEffect, useState } from "react";
 
 import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
 import { useDeveloperLens } from "../components/DeveloperLensContext";
+import CatalogProductList from "../components/admin/CatalogProductList";
+import ProductEditor from "../components/admin/ProductEditor";
 
 const capabilityLabels = {
   responses: "Responses",
@@ -17,6 +20,33 @@ export default function CatalogStudioPage() {
   const { session } = useCatalogStudioAccess();
   const { enabled: developerLensEnabled, toggle } = useDeveloperLens();
   const capabilities = session?.capabilities || {};
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+
+  const selectProduct = useCallback((productId) => {
+    if (productId === selectedProductId) return;
+    if (editorDirty && !window.confirm("Discard unsaved changes and open another product?")) return;
+    setSelectedProductId(productId);
+    setEditorDirty(false);
+  }, [editorDirty, selectedProductId]);
+
+  const catalogChanged = useCallback(() => {
+    setCatalogRefreshKey((current) => current + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!editorDirty) return undefined;
+    const confirmInternalNavigation = (event) => {
+      const link = event.target.closest?.("a[href]");
+      if (!link || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (window.confirm("Discard unsaved changes and leave Catalog Studio?")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener("click", confirmInternalNavigation, true);
+    return () => document.removeEventListener("click", confirmInternalNavigation, true);
+  }, [editorDirty]);
 
   return (
     <Box className="catalog-studio-page">
@@ -45,43 +75,8 @@ export default function CatalogStudioPage() {
         </Container>
       </Box>
 
-      <Container maxW="1180px" py={{ base: 8, md: 12 }}>
-        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={8} alignItems="start">
-          <VStack align="stretch" gap={5}>
-            <Box>
-              <Text className="section-kicker">Workspace</Text>
-              <Text as="h2" className="section-title">
-                Catalog operations
-              </Text>
-              <Text className="muted-text" mt={3}>
-                The protected shell is ready. Product search, editing, and lifecycle actions arrive in the next catalog-management unit.
-              </Text>
-            </Box>
-            <Box className="studio-assurance-row">
-              <Box className="studio-assurance-icon">
-                <FiLock />
-              </Box>
-              <Box>
-                <Text className="panel-title">Server-authorized access</Text>
-                <Text className="muted-text">
-                  Clerk identifies the presenter; the backend independently decides who can use this workspace.
-                </Text>
-              </Box>
-            </Box>
-            <Box className="studio-assurance-row">
-              <Box className="studio-assurance-icon">
-                <FiShield />
-              </Box>
-              <Box>
-                <Text className="panel-title">Published catalog stays separate</Text>
-                <Text className="muted-text">
-                  Draft work remains private until an administrator explicitly publishes it.
-                </Text>
-              </Box>
-            </Box>
-          </VStack>
-
-          <Box className="studio-readiness-panel">
+      <Container maxW="1440px" py={{ base: 8, md: 10 }}>
+        <Box className="studio-readiness-panel studio-readiness-compact" mb={8}>
             <HStack justify="space-between" align="start" gap={4} mb={5}>
               <Box>
                 <Text className="section-kicker">System readiness</Text>
@@ -116,8 +111,23 @@ export default function CatalogStudioPage() {
                 </Text>
               </Box>
             ) : null}
+        </Box>
+
+        <Box className="catalog-management-layout">
+          <CatalogProductList
+            selectedProductId={selectedProductId}
+            onSelect={selectProduct}
+            refreshKey={catalogRefreshKey}
+          />
+          <Box minW={0}>
+            <ProductEditor
+              key={selectedProductId || "empty-editor"}
+              productId={selectedProductId}
+              onDirtyChange={setEditorDirty}
+              onCatalogChanged={catalogChanged}
+            />
           </Box>
-        </SimpleGrid>
+        </Box>
       </Container>
     </Box>
   );

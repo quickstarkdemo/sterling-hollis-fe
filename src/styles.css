@@ -998,6 +998,193 @@ a {
   box-shadow: 0 18px 70px rgba(23, 19, 15, 0.07);
 }
 
+.studio-readiness-compact {
+  box-shadow: none;
+}
+
+.studio-readiness-compact .studio-capability-row {
+  min-height: 40px;
+}
+
+.catalog-management-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.catalog-product-list,
+.product-editor {
+  min-width: 0;
+  padding: clamp(18px, 3vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.86);
+}
+
+.catalog-product-list {
+  position: sticky;
+  top: 88px;
+}
+
+.studio-column-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.catalog-search-field {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding-inline: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.catalog-search-field input {
+  padding-inline: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.catalog-product-results {
+  max-height: min(58vh, 680px);
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.catalog-product-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  width: 100%;
+  height: auto !important;
+  min-height: 72px !important;
+  padding: 12px !important;
+  border: 1px solid rgba(23, 19, 15, 0.1) !important;
+  border-radius: 6px !important;
+  background: rgba(250, 248, 243, 0.72) !important;
+  color: var(--ink) !important;
+  white-space: normal !important;
+}
+
+.catalog-product-row:hover,
+.catalog-product-row.selected {
+  border-color: rgba(96, 114, 77, 0.52) !important;
+  background: rgba(96, 114, 77, 0.1) !important;
+}
+
+.catalog-product-row-title {
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-product-row-meta {
+  margin-top: 4px !important;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lifecycle-badge {
+  text-transform: capitalize;
+}
+
+.lifecycle-badge.published {
+  background: rgba(96, 114, 77, 0.16) !important;
+  color: #405033 !important;
+}
+
+.lifecycle-badge.draft,
+.draft-badge {
+  background: rgba(170, 117, 45, 0.16) !important;
+  color: #7a4e12 !important;
+}
+
+.lifecycle-badge.archived {
+  background: rgba(23, 19, 15, 0.1) !important;
+  color: var(--muted) !important;
+}
+
+.draft-badge {
+  font-size: 10px !important;
+}
+
+.catalog-list-pagination .muted-text {
+  font-size: 12px;
+}
+
+.editor-section,
+.product-lifecycle-actions {
+  padding: clamp(16px, 3vw, 22px);
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 248, 243, 0.7);
+}
+
+.editor-section input,
+.editor-section textarea,
+.catalog-product-list input {
+  border-radius: 6px !important;
+  background: #fff !important;
+}
+
+.catalog-variant-editor {
+  padding: 18px;
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.catalog-inventory-row {
+  padding: 12px;
+  border: 1px solid rgba(23, 19, 15, 0.08);
+  border-radius: 6px;
+  background: rgba(238, 232, 220, 0.4);
+}
+
+.danger-button {
+  color: var(--oxblood) !important;
+}
+
+.field-error,
+.catalog-action-hint {
+  margin-top: 5px !important;
+  color: var(--oxblood);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.catalog-conflict-alert,
+.catalog-validation-summary {
+  padding: 16px;
+  border-left: 3px solid var(--oxblood);
+  background: rgba(119, 39, 37, 0.08);
+}
+
+.catalog-validation-summary > p:not(:first-child) {
+  margin-top: 4px !important;
+  font-size: 13px;
+}
+
+.catalog-public-link {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .studio-panel-title {
   margin-top: 4px !important;
   font-size: clamp(24px, 3vw, 32px);
@@ -1059,6 +1246,14 @@ a {
   }
 
   .category-sidebar {
+    position: static;
+  }
+
+  .catalog-management-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-product-list {
     position: static;
   }
 
