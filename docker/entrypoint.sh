@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+CATALOG_STUDIO_FALLBACK_PRODUCT_ID="${VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID:-}"
+if [ -n "$CATALOG_STUDIO_FALLBACK_PRODUCT_ID" ] && ! printf '%s' "$CATALOG_STUDIO_FALLBACK_PRODUCT_ID" | grep -Eq '^cat_[A-Za-z0-9_-]+$'; then
+  echo "VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID must be empty or a cat_ product ID." >&2
+  exit 1
+fi
+
 replace_env_vars() {
   echo "Injecting runtime environment variables..."
   for file in /usr/share/nginx/html/assets/*.js /usr/share/nginx/html/index.html; do
@@ -36,7 +42,8 @@ cat > /usr/share/nginx/html/config.json <<EOF
   "datadogLocalEnabled": $([ "${VITE_DATADOG_ENABLE_LOCAL:-false}" = "true" ] && echo true || echo false),
   "release": "${VITE_RELEASE:-local}",
   "clerkEnabled": $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo true || echo false),
-  "demoObservabilityUiEnabled": $([ "${VITE_DEMO_OBSERVABILITY_UI:-false}" = "true" ] && echo true || echo false)
+  "demoObservabilityUiEnabled": $([ "${VITE_DEMO_OBSERVABILITY_UI:-false}" = "true" ] && echo true || echo false),
+  "catalogStudioFallbackProductId": "${CATALOG_STUDIO_FALLBACK_PRODUCT_ID}"
 }
 EOF
 
@@ -48,6 +55,7 @@ echo "Datadog sample rates: session=${VITE_DATADOG_SESSION_SAMPLE_RATE:-100}, re
 echo "Release: ${VITE_RELEASE:-local}"
 echo "Clerk: $([ -n "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && echo enabled || echo disabled)"
 echo "Demo observability UI: $([ "${VITE_DEMO_OBSERVABILITY_UI:-false}" = "true" ] && echo enabled || echo disabled)"
+echo "Catalog Studio fallback product: ${CATALOG_STUDIO_FALLBACK_PRODUCT_ID:-not configured}"
 
 replace_env_vars
 

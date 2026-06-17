@@ -14,6 +14,7 @@ import {
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
 } from "../../utils/apiClient";
+import { trackCatalogStudioMilestone } from "../../utils/datadog";
 import ApiStageTimeline from "./ApiStageTimeline";
 import DeveloperLens from "./DeveloperLens";
 import ProductEditor from "./ProductEditor";
@@ -149,6 +150,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       setWorkflow(started);
       persist(started.id, null);
       delete mutationKeys.current["start-workflow"];
+      trackCatalogStudioMilestone("workflow_started", { workflow_id: started.id });
       return started.id;
     }).finally(() => {
       workflowStartPromise.current = null;
@@ -188,13 +190,26 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
         onCatalogChanged?.();
       }
       setWorkflow(result.workflow);
+      trackCatalogStudioMilestone("draft_command_finished", {
+        product_id: result.draft?.product_id,
+        source: "text",
+        status: result.status,
+        workflow_id: activeWorkflowId,
+      });
       await refreshWorkflow(activeWorkflowId);
     } catch (error) {
+      const retryable = retryableError(error);
       setActionError({
         kind: "draft",
-        retryable: retryableError(error),
+        retryable,
         instruction: nextInstruction,
         message: safeErrorMessage(error, "The instruction could not be applied. Your current draft is preserved."),
+      });
+      trackCatalogStudioMilestone("recovery_presented", {
+        capability: "responses",
+        retryable,
+        status: error?.response?.status || "error",
+        workflow_id: workflowId,
       });
     } finally {
       commandInFlight.current = false;
@@ -230,14 +245,27 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       setImageApproved(false);
       persist(workflowId, draft);
       setImageRefinement("");
+      trackCatalogStudioMilestone("image_job_started", {
+        action,
+        product_id: draft.product_id,
+        status: nextJob.status,
+        workflow_id: workflowId,
+      });
       await refreshWorkflow();
     } catch (error) {
+      const retryable = retryableError(error);
       setActionError({
         kind: "image",
-        retryable: retryableError(error),
+        retryable,
         imageAction: action,
         imagePayload: lastImagePayload.current,
         message: safeErrorMessage(error, "Image generation could not start. The product draft is unchanged."),
+      });
+      trackCatalogStudioMilestone("recovery_presented", {
+        capability: "image_generation",
+        retryable,
+        status: error?.response?.status || "error",
+        workflow_id: workflowId,
       });
     } finally {
       imageInFlight.current = false;
@@ -256,7 +284,15 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       setImageJob(nextJob);
       setImageApproved(approvedImageJobId.current === nextJob.id);
       setActionError((current) => current?.kind === "image-poll" ? null : current);
-      if (!["queued", "running"].includes(nextJob.status)) await refreshWorkflow();
+      const finished = !["queued", "running"].includes(nextJob.status);
+      if (finished) {
+        trackCatalogStudioMilestone("image_job_finished", {
+          product_id: draft?.product_id,
+          status: nextJob.status,
+          workflow_id: workflowId,
+        });
+      }
+      if (finished) await refreshWorkflow();
       return nextJob;
     } catch (error) {
       if (imageRequestId.current !== currentRequestId) return null;
@@ -267,7 +303,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       });
       return null;
     }
-  }, [imageJob?.id, refreshWorkflow, workflow?.image_job_id, workflowId]);
+  }, [draft?.product_id, imageJob?.id, refreshWorkflow, workflow?.image_job_id, workflowId]);
 
   useEffect(() => {
     const linkedJobId = workflow?.image_job_id;
@@ -323,6 +359,10 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       }
       persist(workflowId, recoveryDraft);
       setEditorRefreshKey((current) => current + 1);
+      trackCatalogStudioMilestone("image_approved", {
+        product_id: draft.product_id,
+        workflow_id: workflowId,
+      });
       await refreshWorkflow();
     } catch (error) {
       setActionError({
@@ -380,6 +420,12 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
       onCatalogChanged?.();
     }
     if (result.workflow) setWorkflow(result.workflow);
+    trackCatalogStudioMilestone("voice_command_finished", {
+      product_id: result.draft?.product_id,
+      source: "voice",
+      status: result.status,
+      workflow_id: activeWorkflowId,
+    });
   };
 
   const lifecycleChanged = async (action, detail) => {
@@ -393,6 +439,10 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
     if (action === "published") {
       setEditorDirty(false);
       setMessage("The approved product is published. The workflow remains available as a read-only summary.");
+      trackCatalogStudioMilestone("product_published", {
+        product_id: detail?.product_id || draft?.product_id,
+        workflow_id: workflowId,
+      });
     }
   };
 
