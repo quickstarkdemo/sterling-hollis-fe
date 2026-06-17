@@ -14,6 +14,7 @@ vi.mock("axios", () => ({
 import {
   archiveAdminCatalogProduct,
   approveCatalogImageJob,
+  createCatalogRealtimeSession,
   getAdminCatalogProduct,
   getAdminCatalogProducts,
   getCatalogImageJob,
@@ -27,6 +28,7 @@ import {
   startAdminCatalogProductRevision,
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
+  submitCatalogRealtimeToolCall,
   updateDemoObservabilityState,
 } from "./apiClient";
 
@@ -119,4 +121,32 @@ it("uses production Catalog Workflow routes for guided creation and images", asy
   }, { headers: { "Idempotency-Key": "approve-key" } });
   expect(client.post.mock.calls.flat().join(" ")).not.toContain("demo-runs");
   expect(client.get.mock.calls.flat().join(" ")).not.toContain("demo-runs");
+});
+
+it("uses workflow-bound Realtime routes without exposing provider credentials", async () => {
+  await createCatalogRealtimeSession("workflow/one");
+  await submitCatalogRealtimeToolCall("workflow/one", {
+    call_id: "call_1",
+    name: "refine_catalog_draft",
+    arguments: {
+      instruction: "Make it ivory",
+      current_draft_id: "draft_1",
+      expected_draft_version: 1,
+    },
+  }, "voice-call-key");
+
+  expect(client.post).toHaveBeenNthCalledWith(
+    1,
+    "/api/admin/catalog/workflows/workflow%2Fone/realtime/sessions",
+    undefined,
+    undefined,
+  );
+  expect(client.post).toHaveBeenNthCalledWith(
+    2,
+    "/api/admin/catalog/workflows/workflow%2Fone/realtime/tool-calls",
+    expect.objectContaining({ call_id: "call_1", name: "refine_catalog_draft" }),
+    { headers: { "Idempotency-Key": "voice-call-key" } },
+  );
+  expect(JSON.stringify(client.post.mock.calls)).not.toContain("client_secret");
+  expect(JSON.stringify(client.post.mock.calls)).not.toContain("api.openai.com");
 });

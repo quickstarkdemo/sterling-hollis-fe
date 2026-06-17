@@ -2,6 +2,7 @@ import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { FiCheckCircle, FiCircle, FiClock, FiXCircle } from "react-icons/fi";
 
 const stages = [
+  { capability: "realtime", label: "Realtime Voice", description: "Capture an optional voice instruction through a short-lived browser session." },
   { capability: "responses", label: "Responses", description: "Turn the instruction into structured catalog fields." },
   { capability: "moderation", label: "Moderation", description: "Apply the application-owned allow or block policy." },
   { capability: "image_generation", label: "Image Generation", description: "Create and review version-bound product imagery." },
