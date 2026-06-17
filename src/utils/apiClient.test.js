@@ -13,14 +13,20 @@ vi.mock("axios", () => ({
 
 import {
   archiveAdminCatalogProduct,
+  approveCatalogImageJob,
   getAdminCatalogProduct,
   getAdminCatalogProducts,
+  getCatalogImageJob,
   getCatalogStudioSession,
+  getCatalogWorkflow,
   getDemoObservabilityState,
   publishAdminCatalogProduct,
   resetDemoObservabilityState,
   saveAdminCatalogProductDraft,
+  startCatalogWorkflow,
   startAdminCatalogProductRevision,
+  submitCatalogDraftCommand,
+  submitCatalogImageCommand,
   updateDemoObservabilityState,
 } from "./apiClient";
 
@@ -81,4 +87,36 @@ it("uses only protected browser API routes for administrator operations", async 
   expect(client.post).toHaveBeenNthCalledWith(2, "/api/demo/observability/reset", undefined, undefined);
   expect(client.get.mock.calls.flat().join(" ")).not.toContain("/admin/demo");
   expect(client.post.mock.calls.flat().join(" ")).not.toContain("/admin/demo");
+});
+
+it("uses production Catalog Workflow routes for guided creation and images", async () => {
+  await startCatalogWorkflow({ title: "New coat", business_summary: "Create a coat" }, "workflow-key");
+  await getCatalogWorkflow("workflow/one", { developer: true });
+  await submitCatalogDraftCommand("workflow/one", { instruction: "Create it", expected_draft_version: 0 }, "draft-key");
+  await submitCatalogImageCommand("workflow/one", { draft_id: "draft_1", expected_draft_version: 1 }, "image-key");
+  await getCatalogImageJob("workflow/one", "job/one");
+  await approveCatalogImageJob("workflow/one", "job/one", { draft_id: "draft_1", expected_draft_version: 1 }, "approve-key");
+
+  expect(client.post).toHaveBeenNthCalledWith(1, "/api/admin/catalog/workflows", {
+    title: "New coat",
+    business_summary: "Create a coat",
+  }, { headers: { "Idempotency-Key": "workflow-key" } });
+  expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/catalog/workflows/workflow%2Fone", {
+    params: { developer: "true" },
+  });
+  expect(client.post).toHaveBeenNthCalledWith(2, "/api/admin/catalog/workflows/workflow%2Fone/draft-commands", {
+    instruction: "Create it",
+    expected_draft_version: 0,
+  }, { headers: { "Idempotency-Key": "draft-key" } });
+  expect(client.post).toHaveBeenNthCalledWith(3, "/api/admin/catalog/workflows/workflow%2Fone/image-commands", {
+    draft_id: "draft_1",
+    expected_draft_version: 1,
+  }, { headers: { "Idempotency-Key": "image-key" } });
+  expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/catalog/workflows/workflow%2Fone/image-jobs/job%2Fone", { params: {} });
+  expect(client.post).toHaveBeenNthCalledWith(4, "/api/admin/catalog/workflows/workflow%2Fone/image-jobs/job%2Fone/approve", {
+    draft_id: "draft_1",
+    expected_draft_version: 1,
+  }, { headers: { "Idempotency-Key": "approve-key" } });
+  expect(client.post.mock.calls.flat().join(" ")).not.toContain("demo-runs");
+  expect(client.get.mock.calls.flat().join(" ")).not.toContain("demo-runs");
 });

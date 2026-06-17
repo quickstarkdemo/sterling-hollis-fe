@@ -92,12 +92,28 @@ describe("CatalogStudioPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Build and manage the product catalog" })).toBeInTheDocument();
     expect(screen.getAllByText("Catalog Studio").length).toBeGreaterThan(1);
-    expect(screen.getByRole("heading", { name: "Product catalog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Describe the product outcome" })).toBeInTheDocument();
     expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Developer lens/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Developer lens off" })).toHaveAttribute("aria-pressed", "false");
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
+  });
+
+  it("persists the developer lens for the browser session", async () => {
+    const user = userEvent.setup();
+    const firstRender = renderStudio();
+    await screen.findByRole("heading", { name: "Build and manage the product catalog" });
+
+    await user.click(screen.getByRole("button", { name: "Developer lens off" }));
+
+    expect(screen.getByLabelText("Workflow developer lens")).toBeInTheDocument();
+    expect(sessionStorage.getItem("sterling-hollis:catalog-studio:developer-lens")).toBe("enabled");
+
+    firstRender.unmount();
+    renderStudio();
+
+    expect(await screen.findByRole("button", { name: "Developer lens on" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("warns before switching away from a dirty product", async () => {
@@ -129,6 +145,7 @@ describe("CatalogStudioPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderStudio();
 
+    await userEvent.click(await screen.findByRole("button", { name: "Manage catalog" }));
     await userEvent.click(await screen.findByRole("button", { name: /First Coat/i }));
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
