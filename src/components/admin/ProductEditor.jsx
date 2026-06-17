@@ -1,7 +1,8 @@
-import { Badge, Box, Button, HStack, Input, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Link, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FiPlus, FiRefreshCw, FiSave, FiTrash2 } from "react-icons/fi";
+import { FiExternalLink, FiPlus, FiRefreshCw, FiSave, FiTrash2 } from "react-icons/fi";
 
+import ProductImage from "../ProductImage";
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
 import {
   createIdempotencyKey,
@@ -151,6 +152,14 @@ function FieldError({ message }) {
   return message ? <Text className="field-error">{message}</Text> : null;
 }
 
+function variantImageUrl(variant) {
+  return variant.image_link
+    || variant.image_set?.primary_url
+    || variant.image_set?.thumbnail_url
+    || variant.image_set?.detail_urls?.[0]
+    || "";
+}
+
 export default function ProductEditor({ productId, onDirtyChange, onCatalogChanged }) {
   const [detail, setDetail] = useState(null);
   const [product, setProduct] = useState(null);
@@ -236,7 +245,7 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
       ...current,
       variants: current.variants.map((variant, index) => (
         index === variantIndex
-          ? { ...variant, [field]: value, ...(field === "image_link" && !value ? { image_set: {} } : {}) }
+          ? { ...variant, [field]: value, ...(field === "image_link" ? { image_set: {} } : {}) }
           : variant
       )),
     }));
@@ -265,6 +274,15 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
     ...current,
     variants: current.variants.filter((_, index) => index !== variantIndex),
   }));
+  const removeVariantImage = (variantIndex) => {
+    setProduct((current) => ({
+      ...current,
+      variants: current.variants.map((variant, index) => (
+        index === variantIndex ? { ...variant, image_link: "", image_set: {} } : variant
+      )),
+    }));
+    setNotice("");
+  };
   const addInventory = (variantIndex) => setProduct((current) => ({
     ...current,
     variants: current.variants.map((variant, index) => (
@@ -381,6 +399,65 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
       {error && product ? <Text className="error-copy">The draft could not be saved. Your local edits are still available.</Text> : null}
       {notice ? <Text className="notice-text">{notice}</Text> : null}
 
+      <Box className="catalog-editor-guidance">
+        <Text className="panel-title">How catalog changes work</Text>
+        <Text className="muted-text">
+          Edits and image changes are saved to a private draft. Publish promotes that draft to the storefront. Archive removes the product from shopping surfaces while retaining its catalog history.
+        </Text>
+      </Box>
+
+      <Box className="editor-section">
+        <Text className="panel-title">Product imagery</Text>
+        <Text className="muted-text" mt={1} mb={4}>
+          Preview each variant, paste a replacement image URL, or remove the image from the next saved draft.
+        </Text>
+        <SimpleGrid columns={1} gap={4} className="catalog-image-grid">
+          {product.variants.map((variant, variantIndex) => {
+            const imageUrl = variantImageUrl(variant);
+            const variantLabel = variant.color || variant.material || `Variant ${variantIndex + 1}`;
+            const imageAlt = `${product.title} – ${variantLabel}`;
+            return (
+              <Box key={variant.variant_id || `image-${variantIndex}`} className="catalog-image-card">
+                <ProductImage key={imageUrl || `empty-${variantIndex}`} src={imageUrl} alt={imageAlt} className="catalog-editor-image" ratio="1 / 1" />
+                <VStack align="stretch" gap={3} className="catalog-image-controls">
+                  <Box>
+                    <Text className="panel-title">Variant {variantIndex + 1}</Text>
+                    <Text className="muted-text">{variantLabel}</Text>
+                  </Box>
+                  <Box>
+                    <Text className="filter-label">Primary image URL</Text>
+                    <Input
+                      type="url"
+                      aria-label={`Variant ${variantIndex + 1} image URL`}
+                      value={variant.image_link || ""}
+                      onChange={updateVariant(variantIndex, "image_link")}
+                      placeholder="https://…"
+                    />
+                  </Box>
+                  <HStack gap={3} flexWrap="wrap">
+                    {imageUrl ? (
+                      <Link href={imageUrl} target="_blank" rel="noreferrer" className="catalog-public-link">
+                        Open image <FiExternalLink />
+                      </Link>
+                    ) : <Text className="muted-text">No image assigned</Text>}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="danger-button"
+                      disabled={!imageUrl}
+                      onClick={() => removeVariantImage(variantIndex)}
+                    >
+                      <FiTrash2 /> Remove image
+                    </Button>
+                  </HStack>
+                </VStack>
+              </Box>
+            );
+          })}
+        </SimpleGrid>
+      </Box>
+
       <Box className="editor-section">
         <Text className="panel-title" mb={4}>Product information</Text>
         <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
@@ -412,7 +489,6 @@ export default function ProductEditor({ productId, onDirtyChange, onCatalogChang
                 <Box><Text className="filter-label">Minimum price</Text><Input aria-label={`Variant ${variantIndex + 1} minimum price`} type="number" min="0" value={variant.price_min} onChange={updateVariant(variantIndex, "price_min")} /><FieldError message={errors[`variant.${variantIndex}.price_min`]} /></Box>
                 <Box><Text className="filter-label">Maximum price</Text><Input aria-label={`Variant ${variantIndex + 1} maximum price`} type="number" min="0" value={variant.price_max} onChange={updateVariant(variantIndex, "price_max")} /><FieldError message={errors[`variant.${variantIndex}.price_max`]} /></Box>
                 <Box><Text className="filter-label">Product link</Text><Input aria-label={`Variant ${variantIndex + 1} product link`} value={variant.link || ""} onChange={updateVariant(variantIndex, "link")} /></Box>
-                <Box><Text className="filter-label">Image URL</Text><Input aria-label={`Variant ${variantIndex + 1} image URL`} value={variant.image_link || ""} onChange={updateVariant(variantIndex, "image_link")} /></Box>
               </SimpleGrid>
 
               <HStack justify="space-between" mt={5} mb={3}>

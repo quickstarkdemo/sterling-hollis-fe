@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
   getAdminCatalogProducts: vi.fn(),
+  getCategories: vi.fn(),
   getCatalogStudioSession: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
   saveAdminCatalogProductDraft: vi.fn(),
@@ -46,17 +47,7 @@ vi.mock("../utils/clerkConfig", () => ({
 vi.mock("../components/ChatWidget", () => ({ default: () => null }));
 vi.mock("../components/DemoObservabilityPanel", () => ({ default: () => null }));
 
-const session = {
-  authorized: true,
-  capabilities: {
-    responses: { configured: true },
-    moderation: { configured: true },
-    image_generation: { configured: true },
-    realtime: { configured: false },
-    worker_storage: { configured: true },
-    catalog: { configured: true },
-  },
-};
+const session = { authorized: true, capabilities: {} };
 
 function renderStudio() {
   return renderWithProviders(
@@ -82,6 +73,7 @@ describe("CatalogStudioPage", () => {
     };
     api.getCatalogStudioSession.mockReset().mockResolvedValue(session);
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getCategories.mockReset().mockResolvedValue({ categories: [] });
     api.getAdminCatalogProduct.mockReset();
   });
 
@@ -95,33 +87,17 @@ describe("CatalogStudioPage", () => {
     expect(api.getCatalogStudioSession).not.toHaveBeenCalled();
   });
 
-  it("shows authorized navigation and a business-first capability view", async () => {
+  it("shows authorized navigation and focuses the page on catalog work", async () => {
     renderStudio();
 
     expect(await screen.findByRole("heading", { name: "Build and manage the product catalog" })).toBeInTheDocument();
     expect(screen.getAllByText("Catalog Studio").length).toBeGreaterThan(1);
-    expect(screen.getByText("Responses")).toBeInTheDocument();
-    expect(screen.getByText("Realtime voice")).toBeInTheDocument();
-    expect(screen.queryByText("Technical view")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Product catalog" })).toBeInTheDocument();
+    expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Developer lens/i })).not.toBeInTheDocument();
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
-  });
-
-  it("persists the developer lens for the browser session", async () => {
-    const user = userEvent.setup();
-    const firstRender = renderStudio();
-    await screen.findByRole("heading", { name: "Build and manage the product catalog" });
-
-    await user.click(screen.getByRole("button", { name: "Developer lens off" }));
-
-    expect(screen.getByText("Technical view")).toBeInTheDocument();
-    expect(sessionStorage.getItem("sterling-hollis:catalog-studio:developer-lens")).toBe("enabled");
-
-    firstRender.unmount();
-    renderStudio();
-
-    expect(await screen.findByRole("button", { name: "Developer lens on" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("warns before switching away from a dirty product", async () => {

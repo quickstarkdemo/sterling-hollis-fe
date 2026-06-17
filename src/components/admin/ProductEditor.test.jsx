@@ -101,6 +101,33 @@ describe("ProductEditor", () => {
     });
   });
 
+  it("previews, replaces, and removes variant imagery through the draft", async () => {
+    renderWithProviders(<ProductEditor productId="cat_coat" />);
+
+    const currentImage = await screen.findByRole("img", { name: "Studio Coat – Black" });
+    expect(currentImage).toHaveAttribute("src", "https://cdn.example/coat.jpg");
+    expect(screen.getByRole("link", { name: /Open image/i })).toHaveAttribute("href", "https://cdn.example/coat.jpg");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove image" }));
+    expect(screen.queryByRole("img", { name: "Studio Coat – Black" })).not.toBeInTheDocument();
+    expect(screen.getByText("No image assigned")).toBeInTheDocument();
+
+    const imageUrl = screen.getByLabelText("Variant 1 image URL");
+    await userEvent.type(imageUrl, "https://cdn.example/replacement.jpg");
+    expect(await screen.findByRole("img", { name: "Studio Coat – Black" })).toHaveAttribute("src", "https://cdn.example/replacement.jpg");
+
+    await userEvent.click(screen.getByRole("button", { name: /Save draft/i }));
+    await waitFor(() => expect(api.saveAdminCatalogProductDraft).toHaveBeenCalledWith(
+      "cat_coat",
+      expect.objectContaining({
+        product: expect.objectContaining({
+          variants: [expect.objectContaining({ image_link: "https://cdn.example/replacement.jpg", image_set: {} })],
+        }),
+      }),
+      "save-draft-key",
+    ));
+  });
+
   it("maps local validation to the relevant field and does not call the server", async () => {
     renderWithProviders(<ProductEditor productId="cat_coat" />);
     const title = await screen.findByLabelText("Product title");

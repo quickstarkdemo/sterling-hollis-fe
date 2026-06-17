@@ -1,25 +1,10 @@
-import { Badge, Box, Button, Container, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
-import { FiCode, FiEye } from "react-icons/fi";
+import { Box, Container, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useState } from "react";
 
-import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
-import { useDeveloperLens } from "../components/DeveloperLensContext";
 import CatalogProductList from "../components/admin/CatalogProductList";
 import ProductEditor from "../components/admin/ProductEditor";
 
-const capabilityLabels = {
-  responses: "Responses",
-  moderation: "Moderation",
-  image_generation: "Image generation",
-  realtime: "Realtime voice",
-  worker_storage: "Worker storage",
-  catalog: "Catalog",
-};
-
 export default function CatalogStudioPage() {
-  const { session } = useCatalogStudioAccess();
-  const { enabled: developerLensEnabled, toggle } = useDeveloperLens();
-  const capabilities = session?.capabilities || {};
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
@@ -52,67 +37,19 @@ export default function CatalogStudioPage() {
     <Box className="catalog-studio-page">
       <Box className="catalog-studio-hero">
         <Container maxW="1180px">
-          <Flex align={{ base: "stretch", md: "end" }} justify="space-between" gap={6} direction={{ base: "column", md: "row" }}>
-            <Box maxW="760px">
-              <Text className="section-kicker">Catalog Studio</Text>
-              <Text as="h1" className="page-title">
-                Build and manage the product catalog
-              </Text>
-              <Text className="hero-copy" mt={4}>
-                A protected production workspace for product drafts, generated imagery, review, and publication.
-              </Text>
-            </Box>
-            <Button
-              type="button"
-              className={developerLensEnabled ? "developer-lens-toggle enabled" : "developer-lens-toggle"}
-              aria-pressed={developerLensEnabled}
-              onClick={toggle}
-            >
-              {developerLensEnabled ? <FiCode /> : <FiEye />}
-              Developer lens {developerLensEnabled ? "on" : "off"}
-            </Button>
-          </Flex>
+          <Box maxW="760px">
+            <Text className="section-kicker">Catalog Studio</Text>
+            <Text as="h1" className="page-title">
+              Build and manage the product catalog
+            </Text>
+            <Text className="hero-copy" mt={4}>
+              Find a product, review its current state, and publish deliberate catalog changes.
+            </Text>
+          </Box>
         </Container>
       </Box>
 
-      <Container maxW="1440px" py={{ base: 8, md: 10 }}>
-        <Box className="studio-readiness-panel studio-readiness-compact" mb={8}>
-            <HStack justify="space-between" align="start" gap={4} mb={5}>
-              <Box>
-                <Text className="section-kicker">System readiness</Text>
-                <Text as="h2" className="section-title studio-panel-title">
-                  Connected capabilities
-                </Text>
-              </Box>
-              <Badge className="ready-badge">Authorized</Badge>
-            </HStack>
-            <SimpleGrid columns={{ base: 1, sm: 2 }} gap={3}>
-              {Object.entries(capabilityLabels).map(([key, label]) => {
-                const configured = Boolean(capabilities[key]?.configured);
-                return (
-                  <Flex key={key} className="studio-capability-row" justify="space-between" align="center" gap={3}>
-                    <Text>{label}</Text>
-                    <Badge className={configured ? "ready-badge" : "blocked-badge"}>
-                      {configured ? "Ready" : "Unavailable"}
-                    </Badge>
-                  </Flex>
-                );
-              })}
-            </SimpleGrid>
-
-            {developerLensEnabled ? (
-              <Box className="developer-lens-detail" mt={5}>
-                <HStack gap={2} mb={2}>
-                  <FiCode />
-                  <Text className="panel-title">Technical view</Text>
-                </HStack>
-                <Text className="muted-text">
-                  Authorization resolved through <code>GET /api/admin/session</code>. Capability values report configuration only; provider credentials and raw configuration never reach the browser.
-                </Text>
-              </Box>
-            ) : null}
-        </Box>
-
+      <Container maxW="1440px" py={{ base: 6, md: 8 }}>
         <Box className="catalog-management-layout">
           <CatalogProductList
             selectedProductId={selectedProductId}
