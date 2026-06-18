@@ -185,3 +185,38 @@ export function trackAction(name, context = {}) {
     // Optional monitoring should never affect the demo.
   }
 }
+
+const CATALOG_STUDIO_MILESTONES = new Set([
+  "workflow_started",
+  "draft_command_finished",
+  "image_job_started",
+  "image_job_finished",
+  "image_approved",
+  "voice_command_finished",
+  "product_published",
+  "recovery_presented",
+]);
+
+const CATALOG_STUDIO_CONTEXT_KEYS = new Set([
+  "action",
+  "capability",
+  "product_id",
+  "retryable",
+  "source",
+  "status",
+  "workflow_id",
+]);
+
+export function trackCatalogStudioMilestone(milestone, context = {}) {
+  if (!CATALOG_STUDIO_MILESTONES.has(milestone)) return;
+
+  const safeContext = Object.fromEntries(
+    Object.entries(context).flatMap(([key, value]) => {
+      if (!CATALOG_STUDIO_CONTEXT_KEYS.has(key)) return [];
+      if (typeof value === "string") return [[key, value.slice(0, 200)]];
+      if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) return [[key, value]];
+      return [];
+    }),
+  );
+  trackAction("catalog_studio.milestone", { milestone, ...safeContext });
+}
