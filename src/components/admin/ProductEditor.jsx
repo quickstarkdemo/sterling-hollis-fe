@@ -1,15 +1,19 @@
-import { Badge, Box, Button, HStack, Input, Link, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FiExternalLink, FiPlus, FiRefreshCw, FiSave, FiTrash2 } from "react-icons/fi";
+import { FiPlus, FiRefreshCw, FiSave, FiTrash2 } from "react-icons/fi";
 
-import ProductImage from "../ProductImage";
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
 import {
   createIdempotencyKey,
+  approveCatalogImageJob,
   getAdminCatalogProduct,
+  getCatalogImageJob,
   saveAdminCatalogProductDraft,
+  startCatalogWorkflow,
   startAdminCatalogProductRevision,
+  submitCatalogMediaCommand,
 } from "../../utils/apiClient";
+import ProductMediaEditor from "./ProductMediaEditor";
 import ProductLifecycleActions from "./ProductLifecycleActions";
 
 const blankInventory = () => ({
@@ -50,6 +54,7 @@ function editableProduct(detail) {
     design_specification: null,
     variant_axes: [],
     primary_variant_index: 0,
+    media: [],
     variants: [blankVariant()],
   };
 }
@@ -172,6 +177,8 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
   const [serverErrors, setServerErrors] = useState([]);
   const [conflict, setConflict] = useState(false);
   const [notice, setNotice] = useState("");
+  const [mediaJob, setMediaJob] = useState(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const saveInFlight = useRef(false);
   const idempotencyKeys = useRef({});
 
@@ -242,6 +249,11 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
     setNotice("");
   };
 
+  const updateMedia = (media) => {
+    setProduct((current) => ({ ...current, media }));
+    setNotice("");
+  };
+
   const updateVariant = (variantIndex, field) => (event) => {
     const value = event.target.value;
     setProduct((current) => ({
@@ -277,15 +289,6 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
     ...current,
     variants: current.variants.filter((_, index) => index !== variantIndex),
   }));
-  const removeVariantImage = (variantIndex) => {
-    setProduct((current) => ({
-      ...current,
-      variants: current.variants.map((variant, index) => (
-        index === variantIndex ? { ...variant, image_link: "", image_set: {} } : variant
-      )),
-    }));
-    setNotice("");
-  };
   const addInventory = (variantIndex) => setProduct((current) => ({
     ...current,
     variants: current.variants.map((variant, index) => (
@@ -365,6 +368,72 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
     onLifecycleChanged?.(action, nextDetail);
   };
 
+  const generateMedia = async (command) => {
+    if (dirty) {
+      setNotice("Save the draft before generating a media variation.");
+      return;
+    }
+    const currentDraft = detail.current_draft;
+    if (!currentDraft) {
+      setNotice("Start and save a private draft before generating media.");
+      return;
+    }
+    setMediaBusy(true);
+    setNotice("");
+    try {
+      let workflowId = currentDraft.workflow_id;
+      if (!workflowId) {
+        const workflow = await startCatalogWorkflow({
+          title: `Media variations for ${product.title}`,
+          business_summary: "Create reviewed product media without changing sellable inventory.",
+          draft_id: currentDraft.revision.id,
+        }, createIdempotencyKey("media-workflow"));
+        workflowId = workflow.id;
+      }
+      let job = await submitCatalogMediaCommand(workflowId, {
+        draft_id: currentDraft.revision.id,
+        expected_draft_version: currentDraft.draft_version,
+        ...command,
+      }, createIdempotencyKey("media-variation"));
+      setMediaJob(job);
+      for (let attempt = 0; attempt < 60 && ["queued", "running"].includes(job.status); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, Math.min(500 * (attempt + 1), 2000)));
+        job = await getCatalogImageJob(workflowId, job.id);
+        setMediaJob(job);
+      }
+      await load();
+      if (job.status === "failed") setNotice("The media variation failed. The product draft and inventory are unchanged.");
+      if (["queued", "running"].includes(job.status)) setNotice("The media variation is still processing. Refresh the product to check its status.");
+    } catch {
+      setNotice("The media variation could not be created. The product draft and inventory are unchanged.");
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const approveMedia = async () => {
+    if (!mediaJob || !detail.current_draft) return;
+    setMediaBusy(true);
+    try {
+      await approveCatalogImageJob(
+        mediaJob.workflow_id,
+        mediaJob.id,
+        {
+          draft_id: detail.current_draft.revision.id,
+          expected_draft_version: detail.current_draft.draft_version,
+        },
+        createIdempotencyKey("approve-media"),
+      );
+      setMediaJob(null);
+      await load();
+      setNotice("Media variation approved for the next publication.");
+    } catch {
+      setNotice("The media variation could not be approved. Try again with the current draft.");
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
   if (!productId) return <EmptyState title="Select a product" message="Choose a catalog product to inspect and edit." />;
   if (loading) return <LoadingState label="Loading product editor" />;
   if (error && !product) return <ErrorState title="Product unavailable" onRetry={load} />;
@@ -411,57 +480,15 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
         </Text>
       </Box>
 
-      <Box className="editor-section">
-        <Text className="panel-title">Product imagery</Text>
-        <Text className="muted-text" mt={1} mb={4}>
-          Preview each variant, paste a replacement image URL, or remove the image from the next saved draft.
-        </Text>
-        <SimpleGrid columns={1} gap={4} className="catalog-image-grid">
-          {product.variants.map((variant, variantIndex) => {
-            const imageUrl = variantImageUrl(variant);
-            const variantLabel = variant.color || variant.material || `Variant ${variantIndex + 1}`;
-            const imageAlt = `${product.title} – ${variantLabel}`;
-            return (
-              <Box key={variant.variant_id || `image-${variantIndex}`} className="catalog-image-card">
-                <ProductImage key={imageUrl || `empty-${variantIndex}`} src={imageUrl} alt={imageAlt} className="catalog-editor-image" ratio="1 / 1" />
-                <VStack align="stretch" gap={3} className="catalog-image-controls">
-                  <Box>
-                    <Text className="panel-title">Variant {variantIndex + 1}</Text>
-                    <Text className="muted-text">{variantLabel}</Text>
-                  </Box>
-                  <Box>
-                    <Text className="filter-label">Primary image URL</Text>
-                    <Input
-                      type="url"
-                      aria-label={`Variant ${variantIndex + 1} image URL`}
-                      value={variant.image_link || ""}
-                      onChange={updateVariant(variantIndex, "image_link")}
-                      placeholder="https://…"
-                    />
-                  </Box>
-                  <HStack gap={3} flexWrap="wrap">
-                    {imageUrl ? (
-                      <Link href={imageUrl} target="_blank" rel="noreferrer" className="catalog-public-link">
-                        Open image <FiExternalLink />
-                      </Link>
-                    ) : <Text className="muted-text">No image assigned</Text>}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="danger-button"
-                      disabled={!imageUrl}
-                      onClick={() => removeVariantImage(variantIndex)}
-                    >
-                      <FiTrash2 /> Remove image
-                    </Button>
-                  </HStack>
-                </VStack>
-              </Box>
-            );
-          })}
-        </SimpleGrid>
-      </Box>
+      <ProductMediaEditor
+        media={product.media || []}
+        fallbackCoreUrl={variantImageUrl(product.variants[product.primary_variant_index || 0])}
+        busy={mediaBusy}
+        job={mediaJob}
+        onChange={updateMedia}
+        onGenerate={generateMedia}
+        onApprove={approveMedia}
+      />
 
       <Box className="editor-section">
         <Text className="panel-title" mb={4}>Product information</Text>
@@ -477,8 +504,8 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
 
       <Box className="editor-section">
         <HStack justify="space-between" mb={4}>
-          <Box><Text className="panel-title">Variants and inventory</Text><FieldError message={errors.variants} /></Box>
-          <Button type="button" size="sm" className="secondary-button" onClick={addVariant}><FiPlus /> Add variant</Button>
+          <Box><Text className="panel-title">Sellable options and inventory</Text><FieldError message={errors.variants} /></Box>
+          <Button type="button" size="sm" className="secondary-button" onClick={addVariant}><FiPlus /> Add sellable option</Button>
         </HStack>
         <VStack align="stretch" gap={5}>
           {product.variants.map((variant, variantIndex) => (

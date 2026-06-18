@@ -51,6 +51,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState("");
+  const [selectedView, setSelectedView] = useState(0);
 
   const chatContext = useMemo(() => {
     const baseContext = {
@@ -85,6 +86,7 @@ export default function ProductPage() {
         getProductRecommendations({ category: detail.category, brand: detail.brand, top_k: 4 }),
       ]);
       setProduct(detail);
+      setSelectedView(0);
       setRelated(relatedData.items || []);
       setRecommendations(recData.recommendations || []);
     } catch (err) {
@@ -124,11 +126,31 @@ export default function ProductPage() {
       </Button>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={{ base: 8, lg: 12 }} alignItems="start">
-        <SimpleGrid columns={{ base: 1, md: gallery.length > 1 ? 2 : 1 }} gap={4}>
-          {(gallery.length ? gallery : [""]).slice(0, 4).map((src, index) => (
-            <ProductImage key={`${src}-${index}`} src={src} alt={`${product.title} view ${index + 1}`} ratio="1 / 1.15" />
-          ))}
-        </SimpleGrid>
+        <VStack align="stretch" gap={3} className="product-media-gallery">
+          <ProductImage
+            src={gallery[selectedView] || ""}
+            alt={`${product.title} view ${selectedView + 1}`}
+            ratio="1 / 1.15"
+          />
+          {gallery.length > 1 ? (
+            <HStack gap={2} flexWrap="wrap" aria-label="Product gallery views">
+              {gallery.map((src, index) => (
+                <Button
+                  type="button"
+                  key={`${src}-${index}`}
+                  variant="ghost"
+                  className={selectedView === index ? "gallery-thumbnail selected" : "gallery-thumbnail"}
+                  aria-label={`Show product view ${index + 1}`}
+                  aria-pressed={selectedView === index}
+                  onClick={() => setSelectedView(index)}
+                >
+                  <ProductImage src={src} alt="" ratio="1 / 1" />
+                </Button>
+              ))}
+            </HStack>
+          ) : null}
+          {product.media?.length ? <Text className="muted-text">Gallery views are visual presentations, not purchasable color or inventory options.</Text> : null}
+        </VStack>
 
         <VStack align="stretch" gap={6}>
           <Box>
@@ -177,7 +199,7 @@ export default function ProductPage() {
         <Box mt={14}>
           <HStack mb={5} gap={3}>
             <FiPackage />
-            <Text className="section-title">Variants and inventory</Text>
+            <Text className="section-title">Sellable options and inventory</Text>
           </HStack>
           <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
             {product.variants.map((variant) => {
