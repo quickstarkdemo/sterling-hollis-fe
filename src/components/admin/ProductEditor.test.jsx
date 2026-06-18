@@ -7,9 +7,13 @@ import ProductEditor from "./ProductEditor";
 
 const api = vi.hoisted(() => ({
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
+  approveCatalogImageJob: vi.fn(),
   getAdminCatalogProduct: vi.fn(),
+  getCatalogImageJob: vi.fn(),
   saveAdminCatalogProductDraft: vi.fn(),
+  startCatalogWorkflow: vi.fn(),
   startAdminCatalogProductRevision: vi.fn(),
+  submitCatalogMediaCommand: vi.fn(),
   archiveAdminCatalogProduct: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
 }));
@@ -41,6 +45,7 @@ function detailFixture() {
         design_specification: null,
         variant_axes: ["color"],
         primary_variant_index: 0,
+        media: [],
         variants: [{
           variant_id: "var_black",
           color: "Black",
@@ -65,8 +70,12 @@ describe("ProductEditor", () => {
   beforeEach(() => {
     const fixture = detailFixture();
     api.getAdminCatalogProduct.mockReset().mockResolvedValue(fixture);
+    api.getCatalogImageJob.mockReset();
     api.saveAdminCatalogProductDraft.mockReset().mockResolvedValue(fixture.current_draft.revision);
+    api.startCatalogWorkflow.mockReset();
     api.startAdminCatalogProductRevision.mockReset();
+    api.submitCatalogMediaCommand.mockReset();
+    api.approveCatalogImageJob.mockReset();
     api.archiveAdminCatalogProduct.mockReset();
     api.publishAdminCatalogProduct.mockReset();
   });
@@ -101,31 +110,70 @@ describe("ProductEditor", () => {
     });
   });
 
-  it("previews, replaces, and removes variant imagery through the draft", async () => {
+  it("promotes existing imagery to core media without changing inventory", async () => {
     renderWithProviders(<ProductEditor productId="cat_coat" />);
 
-    const currentImage = await screen.findByRole("img", { name: "Studio Coat – Black" });
-    expect(currentImage).toHaveAttribute("src", "https://cdn.example/coat.jpg");
-    expect(screen.getByRole("link", { name: /Open image/i })).toHaveAttribute("href", "https://cdn.example/coat.jpg");
-
-    await userEvent.click(screen.getByRole("button", { name: "Remove image" }));
-    expect(screen.queryByRole("img", { name: "Studio Coat – Black" })).not.toBeInTheDocument();
-    expect(screen.getByText("No image assigned")).toBeInTheDocument();
-
-    const imageUrl = screen.getByLabelText("Variant 1 image URL");
-    await userEvent.type(imageUrl, "https://cdn.example/replacement.jpg");
-    expect(await screen.findByRole("img", { name: "Studio Coat – Black" })).toHaveAttribute("src", "https://cdn.example/replacement.jpg");
+    await screen.findByText("Product media");
+    await userEvent.click(screen.getByRole("button", { name: /Use current image as core/i }));
+    expect(screen.getByRole("img", { name: "Core product view" })).toHaveAttribute("src", "https://cdn.example/coat.jpg");
 
     await userEvent.click(screen.getByRole("button", { name: /Save draft/i }));
     await waitFor(() => expect(api.saveAdminCatalogProductDraft).toHaveBeenCalledWith(
       "cat_coat",
       expect.objectContaining({
         product: expect.objectContaining({
-          variants: [expect.objectContaining({ image_link: "https://cdn.example/replacement.jpg", image_set: {} })],
+          media: [expect.objectContaining({ role: "core", approval_status: "approved" })],
+          variants: [expect.objectContaining({ inventory: [expect.objectContaining({ inventory_qty: 8 })] })],
         }),
       }),
       "save-draft-key",
     ));
+  });
+
+  it("generates and approves a gallery view without creating sellable inventory", async () => {
+    const fixture = detailFixture();
+    fixture.current_draft.workflow_id = "workflow_1";
+    fixture.current_draft.product.media = [{
+      media_id: "media_core",
+      role: "core",
+      intent: "manual",
+      source_media_id: null,
+      parameters: {},
+      image_set: { primary_url: "https://cdn.example/coat.jpg" },
+      approval_status: "approved",
+      display_order: 0,
+      provenance: {},
+    }];
+    api.getAdminCatalogProduct.mockResolvedValue(fixture);
+    api.submitCatalogMediaCommand.mockResolvedValue({
+      id: "job_1",
+      workflow_id: "workflow_1",
+      status: "succeeded",
+      intent: "scene",
+    });
+    api.approveCatalogImageJob.mockResolvedValue({ approval_status: "approved" });
+    renderWithProviders(<ProductEditor productId="cat_coat" />);
+
+    await userEvent.type(await screen.findByLabelText("Image variation instruction"), "bright living room");
+    await userEvent.click(screen.getByRole("button", { name: /Generate variation/i }));
+    await waitFor(() => expect(api.submitCatalogMediaCommand).toHaveBeenCalledWith(
+      "workflow_1",
+      expect.objectContaining({
+        source_media_id: "media_core",
+        intent: "scene",
+        parameters: { scene: "bright living room" },
+      }),
+      "media-variation-key",
+    ));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Approve variation/i }));
+    await waitFor(() => expect(api.approveCatalogImageJob).toHaveBeenCalledWith(
+      "workflow_1",
+      "job_1",
+      { draft_id: "draft_1", expected_draft_version: 2 },
+      "approve-media-key",
+    ));
+    expect(fixture.current_draft.product.variants).toHaveLength(1);
   });
 
   it("maps local validation to the relevant field and does not call the server", async () => {

@@ -28,6 +28,7 @@ import {
   startAdminCatalogProductRevision,
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
+  submitCatalogMediaCommand,
   submitCatalogRealtimeToolCall,
   updateDemoObservabilityState,
 } from "./apiClient";
@@ -96,6 +97,7 @@ it("uses production Catalog Workflow routes for guided creation and images", asy
   await getCatalogWorkflow("workflow/one", { developer: true });
   await submitCatalogDraftCommand("workflow/one", { instruction: "Create it", expected_draft_version: 0 }, "draft-key");
   await submitCatalogImageCommand("workflow/one", { draft_id: "draft_1", expected_draft_version: 1 }, "image-key");
+  await submitCatalogMediaCommand("workflow/one", { draft_id: "draft_1", source_media_id: "media_core", intent: "scene" }, "media-key");
   await getCatalogImageJob("workflow/one", "job/one");
   await approveCatalogImageJob("workflow/one", "job/one", { draft_id: "draft_1", expected_draft_version: 1 }, "approve-key");
 
@@ -114,8 +116,13 @@ it("uses production Catalog Workflow routes for guided creation and images", asy
     draft_id: "draft_1",
     expected_draft_version: 1,
   }, { headers: { "Idempotency-Key": "image-key" } });
+  expect(client.post).toHaveBeenNthCalledWith(4, "/api/admin/catalog/workflows/workflow%2Fone/media-commands", {
+    draft_id: "draft_1",
+    source_media_id: "media_core",
+    intent: "scene",
+  }, { headers: { "Idempotency-Key": "media-key" } });
   expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/catalog/workflows/workflow%2Fone/image-jobs/job%2Fone", { params: {} });
-  expect(client.post).toHaveBeenNthCalledWith(4, "/api/admin/catalog/workflows/workflow%2Fone/image-jobs/job%2Fone/approve", {
+  expect(client.post).toHaveBeenNthCalledWith(5, "/api/admin/catalog/workflows/workflow%2Fone/image-jobs/job%2Fone/approve", {
     draft_id: "draft_1",
     expected_draft_version: 1,
   }, { headers: { "Idempotency-Key": "approve-key" } });

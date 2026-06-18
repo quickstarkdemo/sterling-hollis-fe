@@ -4,6 +4,7 @@ import { FiImage, FiRefreshCw, FiSend, FiThumbsUp } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 
 import { useDeveloperLens } from "../DeveloperLensContext";
+import { useCatalogStudioAccess } from "../CatalogStudioAccessContext";
 import {
   approveCatalogImageJob,
   createIdempotencyKey,
@@ -46,6 +47,7 @@ function safeErrorMessage(error, fallback) {
 export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChanged }) {
   const initial = useMemo(restoredState, []);
   const { enabled: developerLensEnabled } = useDeveloperLens();
+  const { session: catalogStudioSession } = useCatalogStudioAccess();
   const [instruction, setInstruction] = useState("");
   const [workflow, setWorkflow] = useState(null);
   const [workflowId, setWorkflowId] = useState(initial.workflowId || "");
@@ -498,6 +500,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
           workflowId={workflowId}
           ensureWorkflow={ensureWorkflow}
           disabled={Boolean(publishedProductId) || submitting || imageBusy}
+          realtimeCapability={catalogStudioSession?.capabilities?.realtime}
           resetSignal={voiceResetKey}
           onToolResult={voiceToolResult}
           onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}

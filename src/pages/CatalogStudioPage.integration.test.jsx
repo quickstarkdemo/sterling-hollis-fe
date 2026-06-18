@@ -39,10 +39,13 @@ vi.mock("../components/admin/ProductEditor", () => ({
   ),
 }));
 vi.mock("../components/admin/VoiceControls", () => ({
-  default: ({ onToolResult, workflowId }) => (
-    <button type="button" onClick={() => onToolResult?.({ status: "failed", message: "Voice is unavailable; continue with text." }, workflowId)}>
-      Simulate voice failure
-    </button>
+  default: ({ onToolResult, realtimeCapability, workflowId }) => (
+    <div>
+      <span>Realtime capability: {realtimeCapability?.reason || (realtimeCapability?.configured ? "ready" : "unknown")}</span>
+      <button type="button" onClick={() => onToolResult?.({ status: "failed", message: "Voice is unavailable; continue with text." }, workflowId)}>
+        Simulate voice failure
+      </button>
+    </div>
   ),
 }));
 
@@ -123,6 +126,7 @@ describe("Catalog Studio contract journey", () => {
     renderStudio();
 
     await screen.findByRole("heading", { name: "Build and manage the product catalog" });
+    expect(screen.getByText("Realtime capability: ready")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a contract coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
 

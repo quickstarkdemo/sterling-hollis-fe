@@ -23,8 +23,21 @@ const statusCopy = {
   unavailable: "Voice is not supported in this browser. Use the text controls instead.",
   expired: "The voice session expired. Your draft is preserved; start a fresh session to continue.",
   disconnected: "Voice disconnected. Your draft is preserved and text controls remain available.",
+  provider: "OpenAI Realtime is temporarily unavailable. Your draft is preserved; use text or try again.",
+  timeout: "The voice session timed out before connecting. Your draft is preserved; use text or try again.",
+  transport: "The browser could not complete the secure voice connection. Your draft is preserved; use text or try again.",
   error: "Voice could not connect. Your draft is preserved; use text or try again.",
 };
+
+const configurationCopy = {
+  feature_disabled: "Voice is disabled in this environment. Enable Catalog Studio Realtime or continue with text.",
+  missing_api_key: "Voice is not configured with an OpenAI API key. Ask an operator to update the backend environment.",
+  missing_safety_secret: "Voice is missing its safety identifier secret. Ask an operator to update the backend environment.",
+};
+
+function realtimeErrorCode(error) {
+  return error?.response?.data?.detail?.code || error?.message || "";
+}
 
 function defaultPeerConnection() {
   if (typeof RTCPeerConnection === "undefined") throw new Error("realtime_unsupported");
@@ -72,6 +85,7 @@ function voiceIdempotencyKey(callId) {
 export default function VoiceControls({
   workflowId,
   disabled = false,
+  realtimeCapability,
   ensureWorkflow,
   onToolResult,
   onWorkflowEvent,
@@ -227,7 +241,7 @@ export default function VoiceControls({
   };
 
   const startSession = async () => {
-    if (disabled || ACTIVE_STATES.has(status)) return;
+    if (disabled || realtimeCapability?.configured === false || ACTIVE_STATES.has(status)) return;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     clearResources();
@@ -303,13 +317,30 @@ export default function VoiceControls({
       expiryRef.current = setTimeout(() => endSession("expired"), remainingLifetime);
     } catch (error) {
       if (generationRef.current !== generation) return;
-      const unsupported = error?.message === "realtime_unsupported";
+      const code = realtimeErrorCode(error);
+      const unsupported = code === "realtime_unsupported";
       const denied = error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError";
-      endSession(unsupported ? "unavailable" : denied ? "denied" : "error");
+      const nextStatus = unsupported
+        ? "unavailable"
+        : denied
+          ? "denied"
+          : code === "realtime_timeout"
+            ? "timeout"
+            : ["realtime_unavailable", "realtime_failed"].includes(code)
+              ? "provider"
+              : ["realtime_invalid_url", "realtime_connection_failed"].includes(code)
+                ? "transport"
+                : "error";
+      endSession(nextStatus);
     }
   };
 
   const active = ACTIVE_STATES.has(status);
+  const configurationUnavailable = realtimeCapability?.configured === false;
+  const displayStatus = configurationUnavailable ? "unavailable" : status;
+  const displayCopy = configurationUnavailable
+    ? configurationCopy[realtimeCapability.reason] || "Voice is not configured in this environment. Use text or ask an operator to review the backend settings."
+    : statusCopy[status];
 
   return (
     <Box className="voice-controls">
@@ -317,16 +348,16 @@ export default function VoiceControls({
         <Box>
           <HStack gap={2}>
             <Text className="filter-label">Voice input</Text>
-            <Badge className={`workflow-status ${status === "listening" ? "running" : status}`}>{status}</Badge>
+            <Badge className={`workflow-status ${displayStatus === "listening" ? "running" : displayStatus}`}>{displayStatus}</Badge>
           </HStack>
-          <Text className="muted-text">{statusCopy[status]}</Text>
+          <Text className="muted-text">{displayCopy}</Text>
         </Box>
         {active ? (
           <Button type="button" className="secondary-button" onClick={() => endSession("idle")}>
             <FiMicOff /> Stop voice
           </Button>
         ) : (
-          <Button type="button" className="secondary-button" disabled={disabled} onClick={startSession}>
+          <Button type="button" className="secondary-button" disabled={disabled || configurationUnavailable} onClick={startSession}>
             {status === "idle" ? <FiMic /> : <FiRefreshCw />} {status === "idle" ? "Start voice" : "Start fresh session"}
           </Button>
         )}

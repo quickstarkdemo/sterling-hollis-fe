@@ -18,6 +18,15 @@ export function imageFor(product) {
 }
 
 export function detailImages(product) {
+  const mediaUrls = [...(product?.media || [])]
+    .sort((left, right) => Number(left.display_order || 0) - Number(right.display_order || 0))
+    .flatMap((asset) => [
+      asset?.images?.primary_url,
+      ...(asset?.images?.detail_urls || []),
+      asset?.images?.thumbnail_url,
+    ])
+    .filter(Boolean);
+  if (mediaUrls.length) return Array.from(new Set(mediaUrls));
   const urls = [
     product?.images?.primary_url,
     ...(product?.images?.detail_urls || []),

@@ -102,6 +102,22 @@ describe("VoiceControls", () => {
     expect(document.body).not.toHaveTextContent("ephemeral-secret");
   });
 
+  it.each([
+    ["feature_disabled", /disabled in this environment/i],
+    ["missing_api_key", /OpenAI API key/i],
+    ["missing_safety_secret", /safety identifier secret/i],
+  ])("preflights %s before requesting microphone permission", async (reason, message) => {
+    const { props } = renderVoice({
+      props: { realtimeCapability: { configured: false, reason } },
+    });
+
+    expect(screen.getByText("unavailable")).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start voice" })).toBeDisabled();
+    expect(props.requestMicrophone).not.toHaveBeenCalled();
+    expect(api.createCatalogRealtimeSession).not.toHaveBeenCalled();
+  });
+
   it("keeps text available when microphone permission is denied", async () => {
     const denied = Object.assign(new Error("denied"), { name: "NotAllowedError" });
     renderVoice({ props: { requestMicrophone: vi.fn().mockRejectedValue(denied) } });
@@ -125,6 +141,22 @@ describe("VoiceControls", () => {
     expect(api.createCatalogRealtimeSession).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["realtime_timeout", "timeout"],
+    ["realtime_unavailable", "provider"],
+    ["realtime_failed", "provider"],
+  ])("maps backend %s failures to %s", async (code, expectedStatus) => {
+    api.createCatalogRealtimeSession.mockRejectedValueOnce({
+      response: { data: { detail: { code, retryable: code !== "realtime_failed" } } },
+    });
+    renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+
+    expect(await screen.findByText(expectedStatus)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start fresh session" })).toBeInTheDocument();
+  });
+
   it("refuses to send the ephemeral credential to an unexpected WebRTC URL", async () => {
     api.createCatalogRealtimeSession.mockResolvedValueOnce(session({ webrtc_url: "https://example.com/collect" }));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -132,7 +164,7 @@ describe("VoiceControls", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
 
-    expect(await screen.findByText("error")).toBeInTheDocument();
+    expect(await screen.findByText("transport")).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });

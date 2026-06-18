@@ -187,6 +187,10 @@ export function submitCatalogImageCommand(workflowId, payload, idempotencyKey) {
   return post(catalogWorkflowPath(workflowId, "/image-commands"), payload, idempotencyConfig(idempotencyKey));
 }
 
+export function submitCatalogMediaCommand(workflowId, payload, idempotencyKey) {
+  return post(catalogWorkflowPath(workflowId, "/media-commands"), payload, idempotencyConfig(idempotencyKey));
+}
+
 export function getCatalogImageJob(workflowId, jobId) {
   return get(catalogWorkflowPath(workflowId, `/image-jobs/${encodeURIComponent(jobId)}`));
 }
