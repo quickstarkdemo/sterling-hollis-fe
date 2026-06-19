@@ -1027,6 +1027,80 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
+.catalog-source-dropzone {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  min-height: 150px;
+  padding: 24px;
+  border: 1px dashed rgba(23, 19, 15, 0.32);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.52);
+  text-align: center;
+  cursor: pointer;
+}
+
+.catalog-source-dropzone:focus-visible {
+  outline: 3px solid rgba(161, 128, 72, 0.28);
+  outline-offset: 2px;
+}
+
+.catalog-source-file,
+.catalog-source-card,
+.suggestion-card,
+.suggestion-set {
+  padding: 14px;
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.catalog-source-preview {
+  display: grid;
+  place-items: center;
+  flex: 0 0 88px;
+  width: 88px;
+  height: 88px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--paper-deep);
+  color: var(--sage);
+}
+
+.catalog-follow-up {
+  padding: 14px;
+  border-left: 3px solid var(--saffron);
+  background: rgba(161, 128, 72, 0.08);
+}
+
+.suggestion-set.stale {
+  border-color: rgba(161, 65, 65, 0.35);
+}
+
+.suggestion-card.accepted {
+  border-left: 3px solid var(--sage);
+}
+
+.suggestion-card.rejected,
+.suggestion-card.superseded {
+  opacity: 0.76;
+}
+
+.suggestion-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.suggestion-diff > div {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--paper-deep);
+  overflow-wrap: anywhere;
+}
+
 .studio-mode-switcher {
   padding: 6px;
   width: fit-content;
@@ -1565,6 +1639,15 @@ a {
 
   .catalog-workbench-navigation {
     position: static;
+  }
+
+  .catalog-source-card {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .suggestion-diff {
+    grid-template-columns: 1fr;
   }
 
   .catalog-product-list {

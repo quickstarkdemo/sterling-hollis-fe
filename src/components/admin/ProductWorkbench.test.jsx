@@ -18,13 +18,20 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("../../utils/apiClient", () => api);
 vi.mock("./ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged }) => (
+  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged, onDetailChange }) => (
     <div data-testid="product-editor">
       Editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onCatalogChanged?.({ product_id: productId, current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Simulate editor save</button>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>Simulate publication</button>
+      <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Studio Coat", current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Load authoring draft</button>
     </div>
   ),
+}));
+vi.mock("./ProductSourceTray", () => ({
+  default: ({ productId, draft, onSuggestionsChanged }) => <div data-testid="source-tray">Sources for {productId} v{draft.draft_version}<button type="button" onClick={() => onSuggestionsChanged?.({ id: "set_one" })}>Simulate supplier analysis</button></div>,
+}));
+vi.mock("./SuggestionReviewPanel", () => ({
+  default: ({ productId, refreshSignal }) => <div data-testid="suggestion-review">Suggestions for {productId}; refresh {refreshSignal}</div>,
 }));
 vi.mock("./VoiceControls", () => ({
   default: ({ ensureWorkflow, onToolResult }) => (
@@ -118,6 +125,18 @@ describe("ProductWorkbench", () => {
       current_draft_id: "draft_1",
       expected_draft_version: 1,
     }, "draft-command-key"));
+  });
+
+  it("reveals supplier sources and one suggestion lifecycle for the active draft", async () => {
+    renderWorkspace({ authoringSchemaVersion: 3 });
+    await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Create a supplier-backed coat");
+    await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
+
+    expect(screen.getByTestId("source-tray")).toHaveTextContent("cat_coat v2");
+    expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 0");
+    await userEvent.click(screen.getByRole("button", { name: "Simulate supplier analysis" }));
+    expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 1");
   });
 
   it("uses voice as an alternate input to the same workflow and draft state", async () => {

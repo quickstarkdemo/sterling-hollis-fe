@@ -55,8 +55,13 @@ async function put(path, data, config) {
   return response.data;
 }
 
-async function postForm(path, formData) {
-  const response = await uploadClient.post(path, formData);
+async function postForm(path, formData, config) {
+  const response = await uploadClient.post(path, formData, config);
+  return response.data;
+}
+
+async function remove(path) {
+  const response = await apiClient.delete(path);
   return response.data;
 }
 
@@ -275,6 +280,59 @@ export function submitCatalogRealtimeToolCall(workflowId, payload, idempotencyKe
 export function submitCatalogRealtimeV3ToolCall(workflowId, payload, idempotencyKey) {
   return post(
     catalogWorkflowPath(workflowId, "/realtime/v3/tool-calls"),
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
+export function uploadCatalogSourceBundle(files, fields = {}, onUploadProgress) {
+  const formData = new FormData();
+  formData.append("title", fields.title || "Supplier source bundle");
+  if (fields.catalogProductId) formData.append("catalog_product_id", fields.catalogProductId);
+  if (fields.draftRevisionId) formData.append("draft_revision_id", fields.draftRevisionId);
+  files.forEach((file) => formData.append("files", file));
+  return postForm("/api/admin/catalog/source-bundles", formData, { onUploadProgress });
+}
+
+export function getCatalogSourceBundles() {
+  return get("/api/admin/catalog/source-bundles");
+}
+
+export async function getCatalogSourcePreview(previewUrl) {
+  if (!String(previewUrl).startsWith("/api/admin/catalog/source-bundles/")) {
+    throw new Error("invalid_catalog_source_preview_url");
+  }
+  const response = await apiClient.get(previewUrl, { responseType: "blob" });
+  return response.data;
+}
+
+export function deleteCatalogSourceAsset(bundleId, assetId) {
+  return remove(`/api/admin/catalog/source-bundles/${encodeURIComponent(bundleId)}/assets/${encodeURIComponent(assetId)}`);
+}
+
+export function promoteCatalogSourceAsset(bundleId, assetId, payload, idempotencyKey) {
+  return post(
+    `/api/admin/catalog/source-bundles/${encodeURIComponent(bundleId)}/assets/${encodeURIComponent(assetId)}/promote`,
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
+export function generateCatalogSuggestionSet(productId, payload, idempotencyKey) {
+  return post(
+    `/api/admin/catalog/v3/products/${encodeURIComponent(productId)}/ai-suggestion-sets`,
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
+export function getCatalogSuggestionSets(productId) {
+  return get(`/api/admin/catalog/v3/products/${encodeURIComponent(productId)}/suggestion-sets`);
+}
+
+export function decideCatalogSuggestionSet(productId, suggestionSetId, payload, idempotencyKey) {
+  return post(
+    `/api/admin/catalog/v3/products/${encodeURIComponent(productId)}/suggestion-sets/${encodeURIComponent(suggestionSetId)}/decisions`,
     payload,
     idempotencyConfig(idempotencyKey),
   );
