@@ -37,6 +37,9 @@ vi.mock("./ProductSourceTray", () => ({
 vi.mock("./SuggestionReviewPanel", () => ({
   default: ({ productId, refreshSignal }) => <div data-testid="suggestion-review">Suggestions for {productId}; refresh {refreshSignal}</div>,
 }));
+vi.mock("./ProductReviewPanel", () => ({
+  default: ({ productId, manualEditsPending }) => <div data-testid="product-review-panel">Reviews for {productId}; edits {manualEditsPending ? "pending" : "saved"}</div>,
+}));
 vi.mock("./VoiceControls", () => ({
   default: ({ ensureWorkflow, onToolResult, sessionContext, contextLabel }) => (
     <div data-testid="voice-controls">
@@ -141,6 +144,8 @@ describe("ProductWorkbench", () => {
 
     expect(screen.getByTestId("source-tray")).toHaveTextContent("cat_coat v2");
     expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 0");
+    expect(screen.getByTestId("product-review-panel")).toHaveTextContent("Reviews for cat_coat");
+    expect(screen.getByRole("link", { name: "Reviews" })).toHaveAttribute("href", "#workbench-reviews");
     await userEvent.click(screen.getByRole("button", { name: "Simulate supplier analysis" }));
     expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 1");
   });

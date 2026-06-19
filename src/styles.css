@@ -1101,6 +1101,62 @@ a {
   overflow-wrap: anywhere;
 }
 
+.product-review-card {
+  padding: clamp(16px, 3vw, 22px);
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.product-review-rating {
+  color: #8a5c10;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+}
+
+.product-review-quote {
+  padding: 14px 16px;
+  border-left: 3px solid var(--saffron);
+  background: var(--paper-deep);
+}
+
+.review-assistance,
+.merchant-response-editor {
+  padding: 14px;
+  border-radius: 7px;
+  background: rgba(238, 232, 220, 0.44);
+}
+
+.review-audit-history > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.review-audit-entry {
+  padding: 10px 12px;
+  border-left: 2px solid rgba(96, 114, 77, 0.45);
+  background: rgba(96, 114, 77, 0.06);
+}
+
+.public-review-list {
+  max-width: 920px;
+}
+
+.public-review-card {
+  padding: clamp(18px, 3vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.84);
+}
+
+.public-merchant-response {
+  padding: 14px 16px;
+  border-left: 3px solid var(--sage);
+  background: rgba(96, 114, 77, 0.08);
+}
+
 .studio-mode-switcher {
   padding: 6px;
   width: fit-content;

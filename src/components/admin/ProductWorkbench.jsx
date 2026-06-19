@@ -20,6 +20,7 @@ import { trackCatalogStudioMilestone } from "../../utils/datadog";
 import ApiStageTimeline from "./ApiStageTimeline";
 import DeveloperLens from "./DeveloperLens";
 import ProductEditor from "./ProductEditor";
+import ProductReviewPanel from "./ProductReviewPanel";
 import ProductSourceTray from "./ProductSourceTray";
 import SuggestionReviewPanel from "./SuggestionReviewPanel";
 import VoiceControls from "./VoiceControls";
@@ -615,6 +616,7 @@ export default function ProductWorkbench({
         <Button as="a" href="#workbench-media" size="sm" className="secondary-button">Media</Button>
         <Button as="a" href="#workbench-inventory" size="sm" className="secondary-button">Inventory</Button>
         <Button as="a" href="#workbench-readiness" size="sm" className="secondary-button">Preview & readiness</Button>
+        {editorProductId ? <Button as="a" href="#workbench-reviews" size="sm" className="secondary-button">Reviews</Button> : null}
       </HStack>
 
       <Box className="workflow-prompt-panel">
@@ -756,6 +758,13 @@ export default function ProductWorkbench({
             fieldActionsDisabled={editorDirty}
           />
         </Box>
+      ) : null}
+
+      {editorProductId ? (
+        <ProductReviewPanel
+          productId={editorProductId}
+          manualEditsPending={editorDirty}
+        />
       ) : null}
     </VStack>
   );
