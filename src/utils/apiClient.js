@@ -104,22 +104,27 @@ function adaptPublicProduct(product) {
   if (!product) return product;
   const variants = product.variants || [];
   const legacyInventory = variants.flatMap((variant) => variant.inventory || []);
-  const inventory = product.inventory?.length ? product.inventory : legacyInventory;
+  const hasCanonicalInventory = Object.prototype.hasOwnProperty.call(product, "inventory") && Array.isArray(product.inventory);
+  const hasCanonicalAttributes = Object.prototype.hasOwnProperty.call(product, "attributes");
+  const hasCanonicalImages = Object.prototype.hasOwnProperty.call(product, "images");
+  const inventory = hasCanonicalInventory ? product.inventory : legacyInventory;
   const legacyPriceMins = variants.map((variant) => Number(variant.price_min)).filter(Number.isFinite);
   const legacyPriceMaxes = variants.map((variant) => Number(variant.price_max)).filter(Number.isFinite);
-  const priceMin = finiteNumber(product.price_min) ?? Math.min(...legacyPriceMins);
-  const priceMax = finiteNumber(product.price_max) ?? Math.max(...legacyPriceMaxes);
+  const priceMin = finiteNumber(product.price_min) ?? (legacyPriceMins.length ? Math.min(...legacyPriceMins) : null);
+  const priceMax = finiteNumber(product.price_max) ?? (legacyPriceMaxes.length ? Math.max(...legacyPriceMaxes) : null);
   const legacyImages = variants.find((variant) => variant.images || variant.image_url);
 
   return {
     ...product,
-    price: finiteNumber(product.price) ?? priceMin,
-    price_min: Number.isFinite(priceMin) ? priceMin : 0,
-    price_max: Number.isFinite(priceMax) ? priceMax : Number.isFinite(priceMin) ? priceMin : 0,
-    attributes: Object.keys(product.attributes || {}).length
-      ? product.attributes
+    price: finiteNumber(product.price) ?? priceMin ?? 0,
+    price_min: priceMin ?? 0,
+    price_max: priceMax ?? priceMin ?? 0,
+    attributes: hasCanonicalAttributes
+      ? product.attributes || {}
       : variants.find((variant) => Object.keys(variant.attributes || {}).length)?.attributes || {},
-    images: product.images || legacyImages?.images || (legacyImages?.image_url ? { primary_url: legacyImages.image_url, detail_urls: [] } : null),
+    images: hasCanonicalImages
+      ? product.images
+      : legacyImages?.images || (legacyImages?.image_url ? { primary_url: legacyImages.image_url, detail_urls: [] } : null),
     inventory,
     inventory_summary: product.inventory_summary || inventorySummary(inventory),
   };

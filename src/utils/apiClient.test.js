@@ -76,6 +76,38 @@ it("adapts legacy-only product detail into canonical public fields", async () =>
   expect(detail.inventory).toHaveLength(1);
 });
 
+it("keeps explicit canonical empty fields authoritative over legacy projections", async () => {
+  client.get.mockResolvedValueOnce({ data: {
+    id: "cat_canonical",
+    title: "Canonical Coat",
+    price_min: 0,
+    price_max: 0,
+    attributes: {},
+    images: null,
+    inventory: [],
+    variants: [{
+      id: "var_legacy",
+      price_min: 180,
+      price_max: 220,
+      image_url: "https://example.com/stale-legacy.jpg",
+      attributes: { color: "navy" },
+      inventory: [{ store_id: "1001", availability: "in_stock", inventory_qty: 3 }],
+    }],
+  } });
+
+  const detail = await getProduct("cat_canonical");
+
+  expect(detail).toMatchObject({
+    price: 0,
+    price_min: 0,
+    price_max: 0,
+    attributes: {},
+    images: null,
+    inventory: [],
+    inventory_summary: { availability: "out_of_stock", in_stock_units: 0, store_count: 0 },
+  });
+});
+
 it("uses the protected versioned catalog lifecycle contract", async () => {
   await getAdminCatalogProducts({ lifecycle_status: "draft", page: 2 });
   await getAdminCatalogProduct("cat/one");
