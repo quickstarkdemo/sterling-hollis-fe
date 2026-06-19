@@ -86,7 +86,9 @@ export default function VoiceControls({
   onToolResult,
   onWorkflowEvent,
   resetSignal = 0,
+  startSignal = 0,
   sessionContext,
+  contextLabel = "",
   createPeerConnection = defaultPeerConnection,
   requestMicrophone = defaultMicrophoneRequest,
   exchangeSdp = defaultSdpExchange,
@@ -109,6 +111,8 @@ export default function VoiceControls({
   const assistantPartialRef = useRef("");
   const entrySequenceRef = useRef(0);
   const resetSignalRef = useRef(resetSignal);
+  const startSignalRef = useRef(startSignal);
+  const startSessionRef = useRef(null);
   const callbacksRef = useRef({ onToolResult, onWorkflowEvent });
   callbacksRef.current = { onToolResult, onWorkflowEvent };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
@@ -327,13 +331,24 @@ export default function VoiceControls({
       endSession(nextStatus);
     }
   };
+  startSessionRef.current = startSession;
+
+  useEffect(() => {
+    if (startSignalRef.current === startSignal) return;
+    startSignalRef.current = startSignal;
+    void startSessionRef.current?.();
+  }, [startSignal]);
 
   const active = ACTIVE_STATES.has(status);
   const configurationUnavailable = realtimeCapability?.configured === false;
   const displayStatus = configurationUnavailable ? "unavailable" : status;
   const displayCopy = configurationUnavailable
     ? configurationCopy[realtimeCapability.reason] || "Voice is not configured in this environment. Use text or ask an operator to review the backend settings."
-    : statusCopy[status];
+    : contextLabel && status === "idle"
+      ? `Voice is scoped to ${contextLabel}. Start a session to dictate or request a refinement.`
+      : contextLabel && status === "listening"
+        ? `Listening for changes to ${contextLabel}. The result will be staged for review.`
+        : statusCopy[status];
 
   return (
     <Box className="voice-controls">

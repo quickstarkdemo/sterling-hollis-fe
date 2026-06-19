@@ -28,7 +28,7 @@ function decisionError(error) {
   return "The suggestion decision could not be saved. The product draft is unchanged.";
 }
 
-export default function SuggestionReviewPanel({ productId, draft, refreshSignal = 0, onDraftChanged }) {
+export default function SuggestionReviewPanel({ productId, draft, refreshSignal = 0, onDraftChanged, manualEditsPending = false }) {
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -106,6 +106,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
 
       {loading ? <Text className="muted-text" mt={4}>Loading reviewable suggestions…</Text> : null}
       {!loading && !sets.length ? <Text className="muted-text" mt={4}>No suggestions yet. Analyze supplier images or use an inline AI action to create a reviewable proposal.</Text> : null}
+      {manualEditsPending ? <Text className="catalog-action-hint" mt={4}>Save or discard manual edits before accepting a proposal. Rejecting a proposal remains available.</Text> : null}
 
       <VStack align="stretch" gap={5} mt={5}>
         {sets.map((set) => {
@@ -134,7 +135,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
                       {suggestion.status === "pending" ? (
                         <HStack justify="end" mt={3} gap={2}>
                           <Button type="button" size="sm" variant="ghost" className="danger-button" disabled={Boolean(busyKey) || stale} onClick={() => decide(set, "reject", "suggestion", { suggestionId: suggestion.id })}><FiX /> Reject {fieldLabel(suggestion.target_path)}</Button>
-                          <Button type="button" size="sm" className="primary-button" disabled={Boolean(busyKey) || stale} onClick={() => decide(set, "accept", "suggestion", { suggestionId: suggestion.id })}><FiCheck /> {suggestionBusy ? "Applying…" : `Accept ${fieldLabel(suggestion.target_path)}`}</Button>
+                          <Button type="button" size="sm" className="primary-button" disabled={Boolean(busyKey) || stale || manualEditsPending} onClick={() => decide(set, "accept", "suggestion", { suggestionId: suggestion.id })}><FiCheck /> {suggestionBusy ? "Applying…" : `Accept ${fieldLabel(suggestion.target_path)}`}</Button>
                         </HStack>
                       ) : suggestion.review_reason ? <Text className="muted-text" mt={3}>{suggestion.review_reason}</Text> : null}
                     </Box>
@@ -142,7 +143,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
                 })}
               </VStack>
 
-              {sections.length ? <HStack mt={4} gap={2} flexWrap="wrap">{sections.map((section) => <Button key={section} type="button" size="sm" className="secondary-button" disabled={Boolean(busyKey) || stale} onClick={() => decide(set, "accept", "section", { section })}><FiCheck /> Accept {section} section</Button>)}</HStack> : null}
+              {sections.length ? <HStack mt={4} gap={2} flexWrap="wrap">{sections.map((section) => <Button key={section} type="button" size="sm" className="secondary-button" disabled={Boolean(busyKey) || stale || manualEditsPending} onClick={() => decide(set, "accept", "section", { section })}><FiCheck /> Accept {section} section</Button>)}</HStack> : null}
             </Box>
           );
         })}

@@ -8,6 +8,7 @@ import { useCatalogStudioAccess } from "../CatalogStudioAccessContext";
 import {
   approveCatalogImageJob,
   createIdempotencyKey,
+  generateCatalogSuggestionSet,
   getAdminCatalogProduct,
   getCatalogImageJob,
   getCatalogWorkflow,
@@ -74,8 +75,11 @@ export default function ProductWorkbench({
   const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [editorDirty, setEditorDirty] = useState(false);
   const [voiceResetKey, setVoiceResetKey] = useState(0);
+  const [fieldVoiceStartKey, setFieldVoiceStartKey] = useState(0);
   const [activeDetail, setActiveDetail] = useState(null);
   const [suggestionRefreshKey, setSuggestionRefreshKey] = useState(0);
+  const [fieldVoiceTarget, setFieldVoiceTarget] = useState(null);
+  const [fieldAiBusyTarget, setFieldAiBusyTarget] = useState("");
   const commandInFlight = useRef(false);
   const workflowStartPromise = useRef(null);
   const imageInFlight = useRef(false);
@@ -149,6 +153,13 @@ export default function ProductWorkbench({
   useEffect(() => {
     onDirtyChange?.(Boolean(!activeProductId && instruction.trim()) || editorDirty);
   }, [activeProductId, editorDirty, instruction, onDirtyChange]);
+
+  useEffect(() => {
+    setActiveDetail(null);
+    setEditorDirty(false);
+    setFieldVoiceTarget(null);
+    setVoiceResetKey((current) => current + 1);
+  }, [activeProductId]);
 
   const ensureWorkflow = async () => {
     if (workflowId) return workflowId;
@@ -441,6 +452,9 @@ export default function ProductWorkbench({
       setEditorRefreshKey((current) => current + 1);
       onCatalogChanged?.();
     }
+    if (result.status === "succeeded" && result.suggestion_set) {
+      setSuggestionRefreshKey((current) => current + 1);
+    }
     if (result.workflow) setWorkflow(result.workflow);
     trackCatalogStudioMilestone("voice_command_finished", {
       product_id: result.draft?.product_id,
@@ -500,21 +514,82 @@ export default function ProductWorkbench({
   const editorProductId = activeProductId || draft?.product_id || "";
   const contextualDraft = activeDetail?.current_draft;
   const voiceContext = contextualDraft ? {
-    mode: "workbench",
+    mode: fieldVoiceTarget ? "field" : "workbench",
     product_id: activeDetail.product_id,
     draft_id: contextualDraft.revision.id,
     expected_draft_version: contextualDraft.draft_version,
-    query_scopes: ["product", "catalog", "inventory", "readiness"],
+    ...(fieldVoiceTarget
+      ? { target_path: fieldVoiceTarget.targetPath }
+      : { query_scopes: ["product", "catalog", "inventory", "readiness"] }),
   } : null;
   const voiceContextKey = voiceContext
-    ? `${voiceContext.product_id}:${voiceContext.draft_id}:${voiceContext.expected_draft_version}`
+    ? `${voiceContext.product_id}:${voiceContext.draft_id}:${voiceContext.expected_draft_version}:${voiceContext.target_path || "workbench"}`
     : "new-product";
   const previousVoiceContextKey = useRef(voiceContextKey);
   useEffect(() => {
     if (previousVoiceContextKey.current === voiceContextKey) return;
     previousVoiceContextKey.current = voiceContextKey;
     setVoiceResetKey((current) => current + 1);
-  }, [voiceContextKey]);
+    if (fieldVoiceTarget) setFieldVoiceStartKey((current) => current + 1);
+  }, [fieldVoiceTarget, voiceContextKey]);
+
+  useEffect(() => {
+    setFieldVoiceTarget(null);
+    setFieldAiBusyTarget("");
+  }, [editorProductId, contextualDraft?.revision?.id]);
+
+  useEffect(() => {
+    if (!editorDirty || !fieldVoiceTarget) return;
+    setFieldVoiceTarget(null);
+    setMessage("Field voice was reset because the draft has unsaved manual edits. Your edits are preserved.");
+  }, [editorDirty, fieldVoiceTarget]);
+
+  const requestFieldVoice = (target) => {
+    if (editorDirty) {
+      setMessage("Save or discard manual edits before starting field voice so the proposal compares against the current draft.");
+      return;
+    }
+    setFieldVoiceTarget(target);
+    setMessage(`Starting voice for ${target.label}. Dictation or refinement will remain a proposal until accepted.`);
+  };
+
+  const requestFieldAi = async (target) => {
+    if (!editorProductId || !contextualDraft || fieldAiBusyTarget) return;
+    if (editorDirty) {
+      setMessage("Save or discard manual edits before generating a field proposal so the comparison uses the current draft.");
+      return;
+    }
+    setFieldAiBusyTarget(target.targetPath);
+    setActionError(null);
+    try {
+      const activeWorkflowId = await ensureWorkflow();
+      const payload = {
+        draft_id: contextualDraft.revision.id,
+        expected_draft_version: contextualDraft.draft_version,
+        workflow_id: activeWorkflowId,
+        instruction: target.instruction,
+        input_origin: "typed_action",
+        source_asset_ids: [],
+        target_paths: [target.targetPath],
+      };
+      const result = await generateCatalogSuggestionSet(
+        editorProductId,
+        payload,
+        mutationKey("typed-field", payload),
+      );
+      delete mutationKeys.current["typed-field"];
+      setMessage(result.message || `${target.label} proposal is ready for review.`);
+      if (result.suggestion_set) setSuggestionRefreshKey((current) => current + 1);
+    } catch (error) {
+      setActionError({
+        kind: "field-ai",
+        retryable: retryableError(error),
+        message: safeErrorMessage(error, "The field proposal could not be generated. The current draft is unchanged."),
+      });
+    } finally {
+      setFieldAiBusyTarget("");
+    }
+  };
 
   const authoringDraftChanged = () => {
     setEditorRefreshKey((current) => current + 1);
@@ -568,10 +643,18 @@ export default function ProductWorkbench({
           disabled={Boolean(publishedProductId) || submitting || imageBusy || Boolean(activeProductId && !voiceContext)}
           realtimeCapability={catalogStudioSession?.capabilities?.realtime}
           resetSignal={voiceResetKey}
+          startSignal={fieldVoiceStartKey}
           sessionContext={voiceContext}
+          contextLabel={fieldVoiceTarget?.label || ""}
           onToolResult={voiceToolResult}
           onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
         />
+        {fieldVoiceTarget ? (
+          <HStack mt={3} justify="space-between" gap={3} flexWrap="wrap" className="catalog-editor-guidance">
+            <Text>Field voice target: <strong>{fieldVoiceTarget.label}</strong>. The backend pins this field outside model-generated arguments.</Text>
+            <Button type="button" size="sm" className="secondary-button" onClick={() => setFieldVoiceTarget(null)}>Return to product questions</Button>
+          </HStack>
+        ) : null}
       </Box>
 
       {message ? <Box className="workflow-message"><Text>{message}</Text></Box> : null}
@@ -597,7 +680,7 @@ export default function ProductWorkbench({
       ) : null}
 
       <SimpleGrid columns={{ base: 1, xl: usesCanonicalEditor ? 1 : 2 }} gap={6} alignItems="start">
-        <Box id="workbench-readiness" className="workflow-stage-panel">
+        <Box id="workbench-api-stages" className="workflow-stage-panel">
           <Text className="section-kicker">API stages</Text>
           <Text className="panel-title" mb={4}>Business timeline</Text>
           <ApiStageTimeline events={workflow?.events || []} />
@@ -644,6 +727,7 @@ export default function ProductWorkbench({
             draft={contextualDraft}
             refreshSignal={suggestionRefreshKey}
             onDraftChanged={authoringDraftChanged}
+            manualEditsPending={editorDirty}
           />
         </>
       ) : null}
@@ -665,6 +749,11 @@ export default function ProductWorkbench({
             onRetryReferences={onRetryReferences}
             onBrandAdded={onBrandAdded}
             onDetailChange={setActiveDetail}
+            activeVoiceTarget={fieldVoiceTarget?.targetPath || ""}
+            aiBusyTarget={fieldAiBusyTarget}
+            onFieldVoiceRequest={requestFieldVoice}
+            onFieldAiRequest={requestFieldAi}
+            fieldActionsDisabled={editorDirty}
           />
         </Box>
       ) : null}

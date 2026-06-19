@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiArrowDown, FiArrowUp, FiCheck, FiImage, FiPlus, FiRotateCcw, FiStar, FiTrash2 } from "react-icons/fi";
 
 import ProductImage from "../ProductImage";
+import FieldVoiceControl from "./FieldVoiceControl";
 
 const INTENTS = ["color", "angle", "scene", "scale", "people", "freeform"];
 
@@ -34,6 +35,12 @@ export default function ProductMediaEditor({
   onGenerate,
   onApprove,
   mutationsDisabled = false,
+  enableAltText = false,
+  activeVoiceTarget = "",
+  aiBusyTarget = "",
+  onVoiceRequest,
+  onAiRequest,
+  fieldActionsDisabled = false,
 }) {
   const [intent, setIntent] = useState("scene");
   const [instruction, setInstruction] = useState("");
@@ -166,6 +173,28 @@ export default function ProductMediaEditor({
                     <Button type="button" size="sm" variant="ghost" aria-label={`Move ${label} down`} disabled={mutationsDisabled || index === orderedMedia.length - 1 || asset.role === "core"} onClick={() => move(index, 1)}><FiArrowDown /></Button>
                     <Button type="button" size="sm" variant="ghost" className="danger-button" disabled={mutationsDisabled || asset.role === "core" || orderedMedia.length <= 1} onClick={() => remove(asset, index)}><FiTrash2 /> Remove</Button>
                   </HStack>
+                  {enableAltText ? (
+                    <Box>
+                      <HStack justify="space-between" gap={2} flexWrap="wrap">
+                        <Text className="filter-label">Alt text</Text>
+                        <FieldVoiceControl
+                          label={`${label} alt text`}
+                          targetPath={`/media/${asset.media_id}/alt_text`}
+                          active={activeVoiceTarget === `/media/${asset.media_id}/alt_text`}
+                          aiBusy={aiBusyTarget === `/media/${asset.media_id}/alt_text`}
+                          onVoiceRequest={onVoiceRequest}
+                          onAiRequest={onAiRequest}
+                          disabled={fieldActionsDisabled}
+                        />
+                      </HStack>
+                      <Input
+                        aria-label={`${label} alt text`}
+                        value={asset.alt_text || ""}
+                        maxLength={500}
+                        onChange={(event) => update(orderedMedia.map((item) => item.media_id === asset.media_id ? { ...item, alt_text: event.target.value } : item))}
+                      />
+                    </Box>
+                  ) : null}
                   {sourceJob ? (
                     <Box className="catalog-media-job" aria-live="polite">
                       <HStack gap={2} flexWrap="wrap">

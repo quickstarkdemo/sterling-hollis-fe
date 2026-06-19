@@ -9,6 +9,7 @@ import {
   createIdempotencyKey,
   publishAdminCatalogProduct,
   publishAdminCatalogProductV2,
+  publishAdminCatalogProductV3,
 } from "../../utils/apiClient";
 
 function errorMessage(error, fallback) {
@@ -17,14 +18,15 @@ function errorMessage(error, fallback) {
   return fallback;
 }
 
-export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 1 }) {
+export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 1, readiness }) {
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const mutationKeys = useRef({});
   const draftId = product?.current_draft?.revision?.id;
   const draftApproved = product?.current_draft?.revision?.moderation_state === "approved";
-  const canPublish = Boolean(draftId) && draftApproved && !dirty;
+  const readinessBlocked = authoringSchemaVersion >= 3 && readiness?.ready !== true;
+  const canPublish = Boolean(draftId) && draftApproved && !dirty && !readinessBlocked;
   const canArchive = product?.lifecycle_status === "published" && !dirty;
 
   const mutationKey = (scope, payload) => {
@@ -44,9 +46,11 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
     setError("");
     try {
       const payload = { draft_id: draftId, expected_version: product.version };
-      const publishProduct = authoringSchemaVersion >= 2
-        ? publishAdminCatalogProductV2
-        : publishAdminCatalogProduct;
+      const publishProduct = authoringSchemaVersion >= 3
+        ? publishAdminCatalogProductV3
+        : authoringSchemaVersion >= 2
+          ? publishAdminCatalogProductV2
+          : publishAdminCatalogProduct;
       await publishProduct(
         product.product_id,
         payload,
@@ -115,6 +119,7 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
       </HStack>
       {dirty ? <Text className="catalog-action-hint">Save or discard local edits before changing lifecycle state.</Text> : null}
       {draftId && !draftApproved ? <Text className="catalog-action-hint">The draft must be moderation-approved before publication.</Text> : null}
+      {readinessBlocked ? <Text className="catalog-action-hint">Resolve the blocking readiness issues before publication.</Text> : null}
       {error ? <Text className="error-copy">{error}</Text> : null}
     </Box>
   );

@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   approveCatalogImageJob: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
+  generateCatalogSuggestionSet: vi.fn(),
   getCatalogImageJob: vi.fn(),
   getCatalogWorkflow: vi.fn(),
   startCatalogWorkflow: vi.fn(),
@@ -18,12 +19,15 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("../../utils/apiClient", () => api);
 vi.mock("./ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged, onDetailChange }) => (
+  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged, onDetailChange, onFieldVoiceRequest, onFieldAiRequest, activeVoiceTarget }) => (
     <div data-testid="product-editor">
       Editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onCatalogChanged?.({ product_id: productId, current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Simulate editor save</button>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>Simulate publication</button>
       <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Studio Coat", current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Load authoring draft</button>
+      <button type="button" onClick={() => onFieldVoiceRequest?.({ targetPath: "/description", label: "Description" })}>Select description voice</button>
+      <button type="button" onClick={() => onFieldAiRequest?.({ targetPath: "/description", label: "Description", instruction: "Improve description" })}>Improve description</button>
+      <span>Voice target {activeVoiceTarget || "none"}</span>
     </div>
   ),
 }));
@@ -34,7 +38,7 @@ vi.mock("./SuggestionReviewPanel", () => ({
   default: ({ productId, refreshSignal }) => <div data-testid="suggestion-review">Suggestions for {productId}; refresh {refreshSignal}</div>,
 }));
 vi.mock("./VoiceControls", () => ({
-  default: ({ ensureWorkflow, onToolResult }) => (
+  default: ({ ensureWorkflow, onToolResult, sessionContext, contextLabel }) => (
     <div data-testid="voice-controls">
       <button type="button" onClick={() => { void ensureWorkflow?.(); }}>Start voice workflow</button>
       <button type="button" onClick={() => onToolResult?.({
@@ -43,6 +47,7 @@ vi.mock("./VoiceControls", () => ({
         draft: { id: "draft_1", product_id: "cat_coat", draft_version: 2 },
         workflow: baseWorkflow,
       }, "workflow_1")}>Simulate voice result</button>
+      <span>Voice mode {sessionContext?.mode || "none"}; target {sessionContext?.target_path || "none"}; label {contextLabel || "none"}</span>
     </div>
   ),
 }));
@@ -91,6 +96,7 @@ describe("ProductWorkbench", () => {
     api.getCatalogImageJob.mockReset();
     api.approveCatalogImageJob.mockReset().mockResolvedValue({ job_id: "job_1", draft_id: "draft_1", variant_index: 0, approval_status: "approved" });
     api.getAdminCatalogProduct.mockReset().mockResolvedValue({ current_draft: { revision: { id: "draft_1" }, draft_version: 2 } });
+    api.generateCatalogSuggestionSet.mockReset().mockResolvedValue({ status: "succeeded", message: "Proposal ready.", suggestion_set: { id: "set_voice" } });
   });
 
   it("creates one draft with separate Responses and Moderation stages, then refines the same draft", async () => {
@@ -154,6 +160,23 @@ describe("ProductWorkbench", () => {
     expect(await screen.findByText("Draft updated by voice.")).toBeInTheDocument();
     expect(screen.getByText("Draft version 2")).toBeInTheDocument();
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat; schema 2; stores 1");
+  });
+
+  it("pins field voice outside model arguments and stages typed AI as a proposal", async () => {
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+    await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select description voice" }));
+
+    expect(screen.getByTestId("voice-controls")).toHaveTextContent("Voice mode field; target /description; label Description");
+    expect(screen.getByTestId("product-editor")).toHaveTextContent("Voice target /description");
+
+    await userEvent.click(screen.getByRole("button", { name: "Improve description" }));
+    await waitFor(() => expect(api.generateCatalogSuggestionSet).toHaveBeenCalledWith(
+      "cat_coat",
+      expect.objectContaining({ input_origin: "typed_action", target_paths: ["/description"], draft_id: "draft_1", expected_draft_version: 2 }),
+      "typed-field-key",
+    ));
+    expect(await screen.findByText("Proposal ready.")).toBeInTheDocument();
   });
 
   it("hands a v2 guided draft to the canonical editor with shared references", async () => {
