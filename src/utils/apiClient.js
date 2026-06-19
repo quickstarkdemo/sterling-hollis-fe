@@ -76,8 +76,57 @@ export function getCategoryProducts(category, params) {
   return get(`/api/categories/${encodeURIComponent(category)}/products`, params);
 }
 
-export function getProduct(productId, params) {
-  return get(`/api/products/${encodeURIComponent(productId)}`, params);
+function inventorySummary(rows) {
+  const state = (row) => String(row.stock_state || row.availability || "").trim().toLowerCase().replace(/\s+/g, "_");
+  const inStockRows = rows.filter((row) => state(row) === "in_stock");
+  const preorderRows = rows.filter((row) => state(row) === "preorder");
+  const stores = new Set(rows.map((row) => row.store_id).filter(Boolean));
+  const inStockStores = new Set(inStockRows.map((row) => row.store_id).filter(Boolean));
+  const inStockUnits = inStockRows.reduce((total, row) => total + Number(row.inventory_qty || 0), 0);
+  const preorderUnits = preorderRows.reduce((total, row) => total + Number(row.inventory_qty || 0), 0);
+  return {
+    total_units: rows.reduce((total, row) => total + Number(row.inventory_qty || 0), 0),
+    in_stock_units: inStockUnits,
+    preorder_units: preorderUnits,
+    store_count: stores.size,
+    in_stock_store_count: inStockStores.size,
+    availability: inStockUnits > 0 ? "in_stock" : preorderUnits > 0 ? "preorder" : "out_of_stock",
+  };
+}
+
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function adaptPublicProduct(product) {
+  if (!product) return product;
+  const variants = product.variants || [];
+  const legacyInventory = variants.flatMap((variant) => variant.inventory || []);
+  const inventory = product.inventory?.length ? product.inventory : legacyInventory;
+  const legacyPriceMins = variants.map((variant) => Number(variant.price_min)).filter(Number.isFinite);
+  const legacyPriceMaxes = variants.map((variant) => Number(variant.price_max)).filter(Number.isFinite);
+  const priceMin = finiteNumber(product.price_min) ?? Math.min(...legacyPriceMins);
+  const priceMax = finiteNumber(product.price_max) ?? Math.max(...legacyPriceMaxes);
+  const legacyImages = variants.find((variant) => variant.images || variant.image_url);
+
+  return {
+    ...product,
+    price: finiteNumber(product.price) ?? priceMin,
+    price_min: Number.isFinite(priceMin) ? priceMin : 0,
+    price_max: Number.isFinite(priceMax) ? priceMax : Number.isFinite(priceMin) ? priceMin : 0,
+    attributes: Object.keys(product.attributes || {}).length
+      ? product.attributes
+      : variants.find((variant) => Object.keys(variant.attributes || {}).length)?.attributes || {},
+    images: product.images || legacyImages?.images || (legacyImages?.image_url ? { primary_url: legacyImages.image_url, detail_urls: [] } : null),
+    inventory,
+    inventory_summary: product.inventory_summary || inventorySummary(inventory),
+  };
+}
+
+export async function getProduct(productId, params) {
+  return adaptPublicProduct(await get(`/api/products/${encodeURIComponent(productId)}`, params));
 }
 
 export function getRelatedProducts(productId, params) {

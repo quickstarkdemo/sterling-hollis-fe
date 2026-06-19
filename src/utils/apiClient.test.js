@@ -26,6 +26,7 @@ import {
   getCatalogStudioSession,
   getCatalogWorkflow,
   getDemoObservabilityState,
+  getProduct,
   publishAdminCatalogProduct,
   publishAdminCatalogProductV2,
   resetDemoObservabilityState,
@@ -45,6 +46,34 @@ beforeEach(() => {
   client.get.mockReset().mockResolvedValue({ data: {} });
   client.post.mockReset().mockResolvedValue({ data: {} });
   client.put.mockReset().mockResolvedValue({ data: {} });
+});
+
+it("adapts legacy-only product detail into canonical public fields", async () => {
+  client.get.mockResolvedValueOnce({ data: {
+    id: "cat_legacy",
+    title: "Legacy Coat",
+    variants: [{
+      id: "var_legacy",
+      price_min: 180,
+      price_max: 220,
+      image_url: "https://example.com/legacy.jpg",
+      attributes: { color: "navy" },
+      inventory: [{ store_id: "1001", availability: "in_stock", inventory_qty: 3 }],
+    }],
+  } });
+
+  const detail = await getProduct("cat/legacy");
+
+  expect(client.get).toHaveBeenCalledWith("/api/products/cat%2Flegacy", { params: {} });
+  expect(detail).toMatchObject({
+    price: 180,
+    price_min: 180,
+    price_max: 220,
+    attributes: { color: "navy" },
+    images: { primary_url: "https://example.com/legacy.jpg" },
+    inventory_summary: { availability: "in_stock", in_stock_units: 3, store_count: 1 },
+  });
+  expect(detail.inventory).toHaveLength(1);
 });
 
 it("uses the protected versioned catalog lifecycle contract", async () => {

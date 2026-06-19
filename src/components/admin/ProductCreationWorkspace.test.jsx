@@ -18,9 +18,9 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("../../utils/apiClient", () => api);
 vi.mock("./ProductEditor", () => ({
-  default: ({ productId, onCatalogChanged, onLifecycleChanged }) => (
+  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged }) => (
     <div data-testid="product-editor">
-      Editor for {productId}
+      Editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onCatalogChanged?.({ product_id: productId, current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Simulate editor save</button>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>Simulate publication</button>
     </div>
@@ -71,8 +71,8 @@ const draft = {
   product: { title: "Studio Coat" },
 };
 
-function renderWorkspace() {
-  return renderWithProviders(<DeveloperLensProvider><ProductCreationWorkspace /></DeveloperLensProvider>, { route: "/catalog-studio" });
+function renderWorkspace(props = {}) {
+  return renderWithProviders(<DeveloperLensProvider><ProductCreationWorkspace {...props} /></DeveloperLensProvider>, { route: "/catalog-studio" });
 }
 
 describe("ProductCreationWorkspace", () => {
@@ -121,7 +121,11 @@ describe("ProductCreationWorkspace", () => {
   });
 
   it("uses voice as an alternate input to the same workflow and draft state", async () => {
-    renderWorkspace();
+    renderWorkspace({
+      authoringSchemaVersion: 2,
+      references: { stores: [{ id: "1001", name: "Dallas" }], brands: [], categories: [], availability: [] },
+      referencesStatus: "ready",
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Start voice workflow" }));
     await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledTimes(1));
@@ -130,7 +134,19 @@ describe("ProductCreationWorkspace", () => {
     await userEvent.click(screen.getByRole("button", { name: "Simulate voice result" }));
     expect(await screen.findByText("Draft updated by voice.")).toBeInTheDocument();
     expect(screen.getByText("Draft version 2")).toBeInTheDocument();
-    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
+    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat; schema 2; stores 1");
+  });
+
+  it("hands a v2 guided draft to the canonical editor with shared references", async () => {
+    const references = { stores: [{ id: "1001", name: "Dallas" }], brands: [], categories: [], availability: [] };
+    renderWorkspace({ authoringSchemaVersion: 2, references, referencesStatus: "ready" });
+
+    await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
+    await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
+
+    expect(await screen.findByTestId("product-editor")).toHaveTextContent("schema 2; stores 1");
+    expect(screen.queryByText("Version-bound imagery")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Generate primary image/i })).not.toBeInTheDocument();
   });
 
   it("explains a moderation block and keeps image controls unavailable", async () => {

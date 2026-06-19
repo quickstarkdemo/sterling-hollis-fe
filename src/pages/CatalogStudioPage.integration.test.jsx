@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
   getAdminCatalogProducts: vi.fn(),
+  getAdminCatalogReferences: vi.fn(),
   getCatalogImageJob: vi.fn(),
   getCatalogStudioSession: vi.fn(),
   getCatalogWorkflow: vi.fn(),
@@ -29,9 +30,9 @@ vi.mock("../utils/apiClient", () => api);
 vi.mock("../utils/clerkConfig", () => ({ CLERK_ENABLED: true }));
 vi.mock("../utils/datadog", () => telemetry);
 vi.mock("../components/admin/ProductEditor", () => ({
-  default: ({ productId, onLifecycleChanged }) => (
+  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged }) => (
     <div data-testid="contract-product-editor">
-      Product editor for {productId}
+      Product editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>
         Publish contract product
       </button>
@@ -117,6 +118,8 @@ describe("Catalog Studio contract journey", () => {
     api.approveCatalogImageJob.mockReset();
     api.getAdminCatalogProduct.mockReset();
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getAdminCatalogReferences.mockReset().mockResolvedValue({ stores: [{ id: "1001", name: "Dallas" }], brands: [], categories: [], availability: [] });
+    session.capabilities.catalog.authoring_schema_version = 1;
     telemetry.trackCatalogStudioMilestone.mockReset();
   });
 
@@ -176,6 +179,18 @@ describe("Catalog Studio contract journey", () => {
     expect(screen.queryByTestId("contract-product-editor")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Generate primary image/i })).not.toBeInTheDocument();
     expect(api.submitCatalogImageCommand).not.toHaveBeenCalled();
+  });
+
+  it("uses the canonical merchandiser editor for guided v2 drafts", async () => {
+    session.capabilities.catalog.authoring_schema_version = 2;
+    renderStudio();
+
+    await userEvent.type(await screen.findByLabelText("Catalog product instruction"), "Create a canonical coat");
+    await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
+
+    expect(await screen.findByTestId("contract-product-editor")).toHaveTextContent("schema 2; stores 1");
+    expect(api.getAdminCatalogReferences).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Version-bound imagery")).not.toBeInTheDocument();
   });
 
   it("preserves the draft when text, image, or voice capabilities fail", async () => {

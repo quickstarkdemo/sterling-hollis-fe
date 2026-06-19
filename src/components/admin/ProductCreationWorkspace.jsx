@@ -44,7 +44,15 @@ function safeErrorMessage(error, fallback) {
   return fallback;
 }
 
-export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChanged }) {
+export default function ProductCreationWorkspace({
+  onDirtyChange,
+  onCatalogChanged,
+  authoringSchemaVersion = 1,
+  references,
+  referencesStatus,
+  onRetryReferences,
+  onBrandAdded,
+}) {
   const initial = useMemo(restoredState, []);
   const { enabled: developerLensEnabled } = useDeveloperLens();
   const { session: catalogStudioSession } = useCatalogStudioAccess();
@@ -388,6 +396,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
     && (imageJob.action === "generate" || Boolean(lastImagePayload.current?.refinement_prompt));
   const blocked = latestModerationEvent?.status === "blocked";
   const publishedProductId = workflow?.published_product_id || "";
+  const usesCanonicalEditor = Number(authoringSchemaVersion) >= 2;
 
   const resetWorkflow = () => {
     if (commandInFlight.current || imageInFlight.current) return;
@@ -529,14 +538,14 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
         </Box>
       ) : null}
 
-      <SimpleGrid columns={{ base: 1, xl: 2 }} gap={6} alignItems="start">
+      <SimpleGrid columns={{ base: 1, xl: usesCanonicalEditor ? 1 : 2 }} gap={6} alignItems="start">
         <Box className="workflow-stage-panel">
           <Text className="section-kicker">API stages</Text>
           <Text className="panel-title" mb={4}>Business timeline</Text>
           <ApiStageTimeline events={workflow?.events || []} />
         </Box>
 
-        <Box className="workflow-image-panel">
+        {!usesCanonicalEditor ? <Box className="workflow-image-panel">
           <HStack justify="space-between" gap={3} mb={4}>
             <Box><Text className="section-kicker">Image review</Text><Text className="panel-title">Version-bound imagery</Text></Box>
             {imageJob ? <Badge className={`workflow-status ${imageJob.status}`}>{imageJob.status}</Badge> : null}
@@ -558,7 +567,7 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
               {pollExpired ? <Button type="button" className="secondary-button" onClick={resumeImagePolling}><FiRefreshCw /> Refresh image status</Button> : null}
             </VStack>
           ) : null}
-        </Box>
+        </Box> : null}
       </SimpleGrid>
 
       <DeveloperLens events={workflow?.events || []} />
@@ -574,6 +583,11 @@ export default function ProductCreationWorkspace({ onDirtyChange, onCatalogChang
             onDirtyChange={setEditorDirty}
             onCatalogChanged={editorChanged}
             onLifecycleChanged={lifecycleChanged}
+            authoringSchemaVersion={authoringSchemaVersion}
+            references={references}
+            referencesStatus={referencesStatus}
+            onRetryReferences={onRetryReferences}
+            onBrandAdded={onBrandAdded}
           />
         </Box>
       ) : null}
