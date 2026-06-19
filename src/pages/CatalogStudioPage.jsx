@@ -112,7 +112,15 @@ export default function CatalogStudioPage() {
         </HStack>
 
         {studioMode === "create" ? (
-          <ProductCreationWorkspace onDirtyChange={setEditorDirty} onCatalogChanged={catalogChanged} />
+          <ProductCreationWorkspace
+            onDirtyChange={setEditorDirty}
+            onCatalogChanged={catalogChanged}
+            authoringSchemaVersion={authoringSchemaVersion}
+            references={references}
+            referencesStatus={referencesStatus}
+            onRetryReferences={loadReferences}
+            onBrandAdded={brandAdded}
+          />
         ) : (
           <Box className="catalog-management-layout">
             <CatalogProductList

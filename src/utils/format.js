@@ -34,3 +34,23 @@ export function detailImages(product) {
   ].filter(Boolean);
   return Array.from(new Set(urls));
 }
+
+export function inventoryByStore(product) {
+  const stores = new Map();
+  (product?.inventory || []).forEach((row) => {
+    const storeId = row.store_id || "Store";
+    const current = stores.get(storeId) || { storeId, units: 0, sizes: new Set(), availability: new Set() };
+    current.units += Number(row.inventory_qty || 0);
+    if (row.size) current.sizes.add(row.size);
+    current.availability.add(String(row.stock_state || row.availability || "unknown").trim().toLowerCase().replace(/\s+/g, "_"));
+    stores.set(storeId, current);
+  });
+  return [...stores.values()].map((store) => ({
+    storeId: store.storeId,
+    units: store.units,
+    sizes: [...store.sizes],
+    availability: store.availability.has("in_stock")
+      ? "in_stock"
+      : store.availability.has("preorder") ? "preorder" : [...store.availability][0],
+  }));
+}

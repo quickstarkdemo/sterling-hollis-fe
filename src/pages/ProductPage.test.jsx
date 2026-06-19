@@ -26,6 +26,7 @@ const product = {
   price_max: 120,
   attributes: { color: "black" },
   inventory_summary: { availability: "in_stock", in_stock_units: 7, store_count: 1 },
+  inventory: [{ store_id: "1001", size: "One Size", inventory_qty: 7, stock_state: "in_stock", availability: "in_stock" }],
   images: { primary_url: "https://example.com/legacy.jpg", detail_urls: [] },
   media: [
     { id: "media_core", role: "core", intent: "manual", display_order: 0, images: { primary_url: "https://example.com/core.jpg", detail_urls: [] } },
@@ -58,13 +59,25 @@ describe("ProductPage media gallery", () => {
     api.getProductRecommendations.mockReset().mockResolvedValue({ recommendations: [] });
   });
 
-  it("switches approved gallery views without changing sellable inventory", async () => {
+  it("switches approved gallery views without changing product price or inventory", async () => {
     renderPage();
 
     expect(await screen.findByRole("img", { name: "Augustin Mercer Black Pillow view 1" })).toHaveAttribute("src", "https://example.com/core.jpg");
     await userEvent.click(screen.getByRole("button", { name: "Show product view 2" }));
     expect(screen.getByRole("img", { name: "Augustin Mercer Black Pillow view 2" })).toHaveAttribute("src", "https://example.com/room.jpg");
-    expect(screen.getAllByText("7 in stock")).toHaveLength(2);
-    expect(screen.getByText(/visual presentations, not purchasable color/i)).toBeInTheDocument();
+    expect(screen.getByText("7 in stock")).toBeInTheDocument();
+    expect(screen.getByText("$120")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Store availability" })).toBeInTheDocument();
+    expect(screen.getByText("Store 1001")).toBeInTheDocument();
+    expect(screen.queryByText("Sellable options and inventory")).not.toBeInTheDocument();
+    expect(screen.getByText(/does not change price or availability/i)).toBeInTheDocument();
+  });
+
+  it("keeps products unavailable when the public API no longer publishes them", async () => {
+    api.getProduct.mockRejectedValueOnce({ response: { status: 404 } });
+    renderPage();
+
+    expect(await screen.findByText("Product unavailable")).toBeInTheDocument();
+    expect(screen.queryByText(product.title)).not.toBeInTheDocument();
   });
 });

@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import { FiArrowLeft, FiHeart, FiMail, FiPackage } from "react-icons/fi";
+import { FiArrowLeft, FiHeart, FiMail, FiMapPin } from "react-icons/fi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { usePageChatContext } from "../components/ChatContext";
@@ -18,30 +18,8 @@ import ProductImage from "../components/ProductImage";
 import ProductGrid from "../components/ProductGrid";
 import { ErrorState, LoadingState } from "../components/StatusState";
 import { DEFAULT_STORE_ID, getProduct, getProductRecommendations, getRelatedProducts } from "../utils/apiClient";
-import { detailImages, money, titleize } from "../utils/format";
+import { detailImages, inventoryByStore, money, titleize } from "../utils/format";
 import { trackAction } from "../utils/datadog";
-
-function variantTitle(variant, fallbackTitle) {
-  const attributes = Object.entries(variant.attributes || {})
-    .filter(([key, value]) => value && ["color", "material"].includes(key))
-    .map(([, value]) => titleize(value));
-  if (attributes.length) return attributes.join(" / ");
-
-  const sizes = (variant.sizes || []).filter(Boolean).map(titleize);
-  if (sizes.length) return sizes.join(" / ");
-
-  return fallbackTitle;
-}
-
-function variantStockBadges(variant) {
-  const totals = (variant.inventory || []).reduce((summary, row) => {
-    const label = titleize(row.stock_state || row.availability || "available");
-    summary[label] = (summary[label] || 0) + Number(row.inventory_qty || 0);
-    return summary;
-  }, {});
-
-  return Object.entries(totals).map(([label, quantity]) => `${quantity} ${label.toLowerCase()}`);
-}
 
 export default function ProductPage() {
   const { productId } = useParams();
@@ -101,6 +79,7 @@ export default function ProductPage() {
   }, [load]);
 
   const gallery = useMemo(() => detailImages(product), [product]);
+  const storeAvailability = useMemo(() => inventoryByStore(product), [product]);
 
   const handleStub = (action) => {
     trackAction(action, { product_id: product?.id, title: product?.title });
@@ -149,7 +128,7 @@ export default function ProductPage() {
               ))}
             </HStack>
           ) : null}
-          {product.media?.length ? <Text className="muted-text">Gallery views are visual presentations, not purchasable color or inventory options.</Text> : null}
+          {product.media?.length ? <Text className="muted-text">Gallery views show approved product photography. Selecting a view does not change price or availability.</Text> : null}
         </VStack>
 
         <VStack align="stretch" gap={6}>
@@ -195,30 +174,23 @@ export default function ProductPage() {
         </VStack>
       </SimpleGrid>
 
-      {product.variants?.length ? (
+      {storeAvailability.length ? (
         <Box mt={14}>
           <HStack mb={5} gap={3}>
-            <FiPackage />
-            <Text className="section-title">Sellable options and inventory</Text>
+            <FiMapPin />
+            <Text as="h2" className="section-title">Store availability</Text>
           </HStack>
           <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
-            {product.variants.map((variant) => {
-              const stockBadges = variantStockBadges(variant);
-              return (
-                <Box key={variant.id} className="variant-card">
-                  <Text className="variant-title">{variantTitle(variant, product.title)}</Text>
-                  <Text className="muted-text">{money(variant.price_min)} - {money(variant.price_max)}</Text>
-                  <HStack mt={3} gap={2} flexWrap="wrap">
-                    {stockBadges.map((badge) => (
-                      <Badge key={badge} className="soft-badge">{badge}</Badge>
-                    ))}
-                    {(variant.sizes || []).map((size) => (
-                      <Badge key={size} className="soft-badge">{titleize(size)}</Badge>
-                    ))}
-                  </HStack>
-                </Box>
-              );
-            })}
+            {storeAvailability.map((store) => (
+              <Box key={store.storeId} className="store-availability-card">
+                <Text className="store-availability-title">Store {store.storeId}</Text>
+                <HStack mt={3} gap={2} flexWrap="wrap">
+                  <Badge className={`availability ${store.availability}`}>{titleize(store.availability)}</Badge>
+                  <Badge className="soft-badge">{store.units} units</Badge>
+                  {store.sizes.map((size) => <Badge key={size} className="soft-badge">{titleize(size)}</Badge>)}
+                </HStack>
+              </Box>
+            ))}
           </SimpleGrid>
         </Box>
       ) : null}

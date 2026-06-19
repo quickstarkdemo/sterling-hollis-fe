@@ -621,6 +621,20 @@ a {
   padding: 16px;
 }
 
+.store-availability-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.84);
+}
+
+.store-availability-title {
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
 .auth-controls {
   min-height: 32px;
 }
