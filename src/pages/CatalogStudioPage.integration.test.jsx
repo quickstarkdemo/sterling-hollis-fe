@@ -30,14 +30,21 @@ vi.mock("../utils/apiClient", () => api);
 vi.mock("../utils/clerkConfig", () => ({ CLERK_ENABLED: true }));
 vi.mock("../utils/datadog", () => telemetry);
 vi.mock("../components/admin/ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged }) => (
+  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged, onDetailChange, refreshKey }) => (
     <div data-testid="contract-product-editor">
-      Product editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
+      Product editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}; refresh {refreshKey}
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>
         Publish contract product
       </button>
+      <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Contract Coat", current_draft: { revision: { id: "draft_contract" }, draft_version: 1 } })}>Load supplier authoring</button>
     </div>
   ),
+}));
+vi.mock("../components/admin/ProductSourceTray", () => ({
+  default: ({ productId, onSuggestionsChanged }) => <div data-testid="contract-source-tray">Supplier sources for {productId}<button type="button" onClick={() => onSuggestionsChanged?.({ id: "supplier_set" })}>Analyze supplier handoff</button></div>,
+}));
+vi.mock("../components/admin/SuggestionReviewPanel", () => ({
+  default: ({ productId, refreshSignal, onDraftChanged }) => <div data-testid="contract-suggestion-review">Suggestion review for {productId}; refresh {refreshSignal}<button type="button" onClick={() => onDraftChanged?.({ draft: { draft_version: 2 } })}>Accept supplier description</button></div>,
 }));
 vi.mock("../components/admin/VoiceControls", () => ({
   default: ({ onToolResult, realtimeCapability, workflowId }) => (
@@ -191,6 +198,22 @@ describe("Catalog Studio contract journey", () => {
     expect(await screen.findByTestId("contract-product-editor")).toHaveTextContent("schema 2; stores 1");
     expect(api.getAdminCatalogReferences).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Version-bound imagery")).not.toBeInTheDocument();
+  });
+
+  it("continues from a supplier handoff into explicit suggestion acceptance", async () => {
+    session.capabilities.catalog.authoring_schema_version = 3;
+    renderStudio();
+
+    await userEvent.type(await screen.findByLabelText("Catalog product instruction"), "Create a supplier-backed coat");
+    await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Load supplier authoring" }));
+
+    expect(screen.getByTestId("contract-source-tray")).toHaveTextContent("cat_contract_coat");
+    expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 0");
+    await userEvent.click(screen.getByRole("button", { name: "Analyze supplier handoff" }));
+    expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 1");
+    await userEvent.click(screen.getByRole("button", { name: "Accept supplier description" }));
+    expect(screen.getByTestId("contract-product-editor")).toHaveTextContent("refresh 2");
   });
 
   it("preserves the draft when text, image, or voice capabilities fail", async () => {

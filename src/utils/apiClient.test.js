@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const client = vi.hoisted(() => ({
   get: vi.fn(),
+  delete: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
   interceptors: { request: { use: vi.fn() } },
@@ -17,18 +18,25 @@ import {
   approveCatalogImageJob,
   createAdminCatalogBrand,
   createCatalogRealtimeSession,
+  decideCatalogSuggestionSet,
+  deleteCatalogSourceAsset,
+  generateCatalogSuggestionSet,
   getAdminCatalogProduct,
   getAdminCatalogProductV2,
   getAdminCatalogProducts,
   getAdminCatalogProductsV2,
   getAdminCatalogReferences,
   getCatalogImageJob,
+  getCatalogSourceBundles,
+  getCatalogSourcePreview,
+  getCatalogSuggestionSets,
   getCatalogStudioSession,
   getCatalogWorkflow,
   getDemoObservabilityState,
   getProduct,
   publishAdminCatalogProduct,
   publishAdminCatalogProductV2,
+  promoteCatalogSourceAsset,
   resetDemoObservabilityState,
   saveAdminCatalogProductDraft,
   saveAdminCatalogProductDraftV2,
@@ -41,12 +49,58 @@ import {
   submitCatalogRealtimeToolCall,
   submitCatalogRealtimeV3ToolCall,
   updateDemoObservabilityState,
+  uploadCatalogSourceBundle,
 } from "./apiClient";
 
 beforeEach(() => {
   client.get.mockReset().mockResolvedValue({ data: {} });
+  client.delete.mockReset().mockResolvedValue({ data: undefined });
   client.post.mockReset().mockResolvedValue({ data: {} });
   client.put.mockReset().mockResolvedValue({ data: {} });
+});
+
+it("uses private source and versioned suggestion contracts", async () => {
+  const file = new File(["image"], "front.jpg", { type: "image/jpeg" });
+  await uploadCatalogSourceBundle([file], {
+    title: "Supplier handoff",
+    catalogProductId: "cat/one",
+    draftRevisionId: "draft_one",
+  });
+  const uploadCall = client.post.mock.calls[0];
+  expect(uploadCall[0]).toBe("/api/admin/catalog/source-bundles");
+  expect([...uploadCall[1].entries()]).toEqual(expect.arrayContaining([
+    ["title", "Supplier handoff"],
+    ["catalog_product_id", "cat/one"],
+    ["draft_revision_id", "draft_one"],
+    ["files", file],
+  ]));
+
+  await getCatalogSourceBundles();
+  await getCatalogSourcePreview("/api/admin/catalog/source-bundles/bundle/assets/asset/preview");
+  await expect(getCatalogSourcePreview("https://example.com/private.jpg")).rejects.toThrow("invalid_catalog_source_preview_url");
+  await deleteCatalogSourceAsset("bundle/one", "asset/one");
+  await promoteCatalogSourceAsset("bundle/one", "asset/one", { draft_id: "draft_one", expected_draft_version: 2 }, "promote-key");
+  await generateCatalogSuggestionSet("cat/one", { draft_id: "draft_one" }, "generate-key");
+  await getCatalogSuggestionSets("cat/one");
+  await decideCatalogSuggestionSet("cat/one", "set/one", { action: "accept" }, "decision-key");
+
+  expect(client.delete).toHaveBeenCalledWith("/api/admin/catalog/source-bundles/bundle%2Fone/assets/asset%2Fone");
+  expect(client.post).toHaveBeenCalledWith(
+    "/api/admin/catalog/source-bundles/bundle%2Fone/assets/asset%2Fone/promote",
+    { draft_id: "draft_one", expected_draft_version: 2 },
+    { headers: { "Idempotency-Key": "promote-key" } },
+  );
+  expect(client.post).toHaveBeenCalledWith(
+    "/api/admin/catalog/v3/products/cat%2Fone/ai-suggestion-sets",
+    { draft_id: "draft_one" },
+    { headers: { "Idempotency-Key": "generate-key" } },
+  );
+  expect(client.get).toHaveBeenCalledWith("/api/admin/catalog/v3/products/cat%2Fone/suggestion-sets", { params: {} });
+  expect(client.post).toHaveBeenCalledWith(
+    "/api/admin/catalog/v3/products/cat%2Fone/suggestion-sets/set%2Fone/decisions",
+    { action: "accept" },
+    { headers: { "Idempotency-Key": "decision-key" } },
+  );
 });
 
 it("adapts legacy-only product detail into canonical public fields", async () => {

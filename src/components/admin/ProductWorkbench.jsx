@@ -19,6 +19,8 @@ import { trackCatalogStudioMilestone } from "../../utils/datadog";
 import ApiStageTimeline from "./ApiStageTimeline";
 import DeveloperLens from "./DeveloperLens";
 import ProductEditor from "./ProductEditor";
+import ProductSourceTray from "./ProductSourceTray";
+import SuggestionReviewPanel from "./SuggestionReviewPanel";
 import VoiceControls from "./VoiceControls";
 
 const STORAGE_KEY = "sterling-hollis:catalog-studio:active-workflow";
@@ -73,6 +75,7 @@ export default function ProductWorkbench({
   const [editorDirty, setEditorDirty] = useState(false);
   const [voiceResetKey, setVoiceResetKey] = useState(0);
   const [activeDetail, setActiveDetail] = useState(null);
+  const [suggestionRefreshKey, setSuggestionRefreshKey] = useState(0);
   const commandInFlight = useRef(false);
   const workflowStartPromise = useRef(null);
   const imageInFlight = useRef(false);
@@ -404,6 +407,7 @@ export default function ProductWorkbench({
   const blocked = latestModerationEvent?.status === "blocked";
   const publishedProductId = workflow?.published_product_id || "";
   const usesCanonicalEditor = Number(authoringSchemaVersion) >= 2;
+  const usesStructuredSuggestions = Number(authoringSchemaVersion) >= 3;
 
   const resetWorkflow = () => {
     if (commandInFlight.current || imageInFlight.current) return;
@@ -512,6 +516,12 @@ export default function ProductWorkbench({
     setVoiceResetKey((current) => current + 1);
   }, [voiceContextKey]);
 
+  const authoringDraftChanged = () => {
+    setEditorRefreshKey((current) => current + 1);
+    setSuggestionRefreshKey((current) => current + 1);
+    onCatalogChanged?.();
+  };
+
   return (
     <VStack align="stretch" gap={7} className="product-workbench">
       <HStack justify="space-between" gap={4} align="start" flexWrap="wrap">
@@ -525,6 +535,8 @@ export default function ProductWorkbench({
 
       <HStack as="nav" aria-label="Product sections" className="product-workbench-sections" gap={2} flexWrap="wrap">
         <Button as="a" href="#workbench-product" size="sm" className="secondary-button">Product details</Button>
+        {usesStructuredSuggestions ? <Button as="a" href="#workbench-sources" size="sm" className="secondary-button">Supplier sources</Button> : null}
+        {usesStructuredSuggestions ? <Button as="a" href="#workbench-suggestions" size="sm" className="secondary-button">AI suggestions</Button> : null}
         <Button as="a" href="#workbench-media" size="sm" className="secondary-button">Media</Button>
         <Button as="a" href="#workbench-inventory" size="sm" className="secondary-button">Inventory</Button>
         <Button as="a" href="#workbench-readiness" size="sm" className="secondary-button">Preview & readiness</Button>
@@ -617,6 +629,24 @@ export default function ProductWorkbench({
       </SimpleGrid>
 
       <DeveloperLens events={workflow?.events || []} />
+
+      {usesStructuredSuggestions && editorProductId && contextualDraft ? (
+        <>
+          <ProductSourceTray
+            productId={editorProductId}
+            draft={contextualDraft}
+            ensureWorkflow={ensureWorkflow}
+            onDraftChanged={authoringDraftChanged}
+            onSuggestionsChanged={() => setSuggestionRefreshKey((current) => current + 1)}
+          />
+          <SuggestionReviewPanel
+            productId={editorProductId}
+            draft={contextualDraft}
+            refreshSignal={suggestionRefreshKey}
+            onDraftChanged={authoringDraftChanged}
+          />
+        </>
+      ) : null}
 
       {editorProductId && !publishedProductId ? (
         <Box id="workbench-product">
