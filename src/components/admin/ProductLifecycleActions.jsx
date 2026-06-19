@@ -5,8 +5,10 @@ import { Link as RouterLink } from "react-router-dom";
 
 import {
   archiveAdminCatalogProduct,
+  archiveAdminCatalogProductV2,
   createIdempotencyKey,
   publishAdminCatalogProduct,
+  publishAdminCatalogProductV2,
 } from "../../utils/apiClient";
 
 function errorMessage(error, fallback) {
@@ -15,7 +17,7 @@ function errorMessage(error, fallback) {
   return fallback;
 }
 
-export default function ProductLifecycleActions({ product, dirty, onChanged }) {
+export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 1 }) {
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
   const inFlight = useRef(false);
@@ -42,7 +44,10 @@ export default function ProductLifecycleActions({ product, dirty, onChanged }) {
     setError("");
     try {
       const payload = { draft_id: draftId, expected_version: product.version };
-      await publishAdminCatalogProduct(
+      const publishProduct = authoringSchemaVersion >= 2
+        ? publishAdminCatalogProductV2
+        : publishAdminCatalogProduct;
+      await publishProduct(
         product.product_id,
         payload,
         mutationKey("publish", payload),
@@ -65,7 +70,10 @@ export default function ProductLifecycleActions({ product, dirty, onChanged }) {
     setError("");
     try {
       const payload = { expected_version: product.version };
-      await archiveAdminCatalogProduct(
+      const archiveProduct = authoringSchemaVersion >= 2
+        ? archiveAdminCatalogProductV2
+        : archiveAdminCatalogProduct;
+      await archiveProduct(
         product.product_id,
         payload,
         mutationKey("archive", payload),

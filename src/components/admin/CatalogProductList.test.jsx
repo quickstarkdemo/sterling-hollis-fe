@@ -7,6 +7,7 @@ import CatalogProductList from "./CatalogProductList";
 
 const api = vi.hoisted(() => ({
   getAdminCatalogProducts: vi.fn(),
+  getAdminCatalogProductsV2: vi.fn(),
   getCategories: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
@@ -20,12 +21,28 @@ const products = [
 describe("CatalogProductList", () => {
   beforeEach(() => {
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
+    api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getCategories.mockReset().mockResolvedValue({
       categories: [
         { id: "womens_apparel", label: "Women's Apparel", product_count: 2 },
         { id: "handbags", label: "Handbags", product_count: 1 },
       ],
     });
+  });
+
+  it("switches to canonical product search only when schema v2 is advertised", async () => {
+    renderWithProviders(<CatalogProductList
+      selectedProductId=""
+      onSelect={() => {}}
+      authoringSchemaVersion={2}
+      referenceCategories={[{ id: "handbags", label: "Handbags" }]}
+    />);
+
+    expect(await screen.findByText("Wool Coat")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Handbags" })).toHaveValue("handbags");
+    expect(api.getAdminCatalogProductsV2).toHaveBeenCalled();
+    expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
+    expect(api.getCategories).not.toHaveBeenCalled();
   });
 
   it("renders every lifecycle state and selects a product", async () => {

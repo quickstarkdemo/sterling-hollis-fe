@@ -49,4 +49,20 @@ describe("DeveloperLens", () => {
     expect(copied).not.toContain("private reasoning");
     expect(copied).toContain("[REDACTED]");
   });
+
+  it("keeps catalog provenance read-only and sanitized behind the lens", () => {
+    renderWithProviders(<DeveloperLensProvider><DeveloperLens catalogContext={{
+      schema_version: 2,
+      product_id: "cat_pillow",
+      draft_id: "draft_2",
+      seed_run_id: "run_catalog",
+      metadata: { source: "catalog_studio", authorization: "Bearer private-token" },
+    }} /></DeveloperLensProvider>);
+
+    expect(screen.getByText("Catalog technical context")).toBeInTheDocument();
+    expect(screen.getByText("cat_pillow")).toBeInTheDocument();
+    expect(screen.getByText("draft_2")).toBeInTheDocument();
+    expect(screen.queryByText(/private-token/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Seed run ID")).not.toBeInTheDocument();
+  });
 });

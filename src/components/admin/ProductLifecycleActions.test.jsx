@@ -7,8 +7,10 @@ import ProductLifecycleActions from "./ProductLifecycleActions";
 
 const api = vi.hoisted(() => ({
   archiveAdminCatalogProduct: vi.fn(),
+  archiveAdminCatalogProductV2: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   publishAdminCatalogProduct: vi.fn(),
+  publishAdminCatalogProductV2: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
 
@@ -23,7 +25,22 @@ describe("ProductLifecycleActions", () => {
   beforeEach(() => {
     api.publishAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     api.archiveAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
+    api.archiveAdminCatalogProductV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
+    api.publishAdminCatalogProductV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("publishes through the canonical lifecycle when schema v2 is active", async () => {
+    renderWithProviders(<ProductLifecycleActions product={product} dirty={false} onChanged={() => {}} authoringSchemaVersion={2} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Publish draft/i }));
+
+    expect(api.publishAdminCatalogProductV2).toHaveBeenCalledWith(
+      "cat_coat",
+      { draft_id: "draft_1", expected_version: 4 },
+      "publish-product-key",
+    );
+    expect(api.publishAdminCatalogProduct).not.toHaveBeenCalled();
   });
 
   it("requires confirmation, publishes the expected draft version, and links to the public product", async () => {

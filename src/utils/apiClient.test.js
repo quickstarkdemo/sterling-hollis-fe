@@ -13,19 +13,27 @@ vi.mock("axios", () => ({
 
 import {
   archiveAdminCatalogProduct,
+  archiveAdminCatalogProductV2,
   approveCatalogImageJob,
+  createAdminCatalogBrand,
   createCatalogRealtimeSession,
   getAdminCatalogProduct,
+  getAdminCatalogProductV2,
   getAdminCatalogProducts,
+  getAdminCatalogProductsV2,
+  getAdminCatalogReferences,
   getCatalogImageJob,
   getCatalogStudioSession,
   getCatalogWorkflow,
   getDemoObservabilityState,
   publishAdminCatalogProduct,
+  publishAdminCatalogProductV2,
   resetDemoObservabilityState,
   saveAdminCatalogProductDraft,
+  saveAdminCatalogProductDraftV2,
   startCatalogWorkflow,
   startAdminCatalogProductRevision,
+  startAdminCatalogProductRevisionV2,
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
   submitCatalogMediaCommand,
@@ -74,6 +82,26 @@ it("uses the protected versioned catalog lifecycle contract", async () => {
     { expected_version: 4 },
     { headers: { "Idempotency-Key": "archive-key" } },
   );
+});
+
+it("uses the canonical v2 catalog authoring contract", async () => {
+  await getAdminCatalogReferences();
+  await createAdminCatalogBrand({ name: "August & Mercer" }, "brand-key");
+  await getAdminCatalogProductsV2({ lifecycle_status: "published" });
+  await getAdminCatalogProductV2("cat/one");
+  await startAdminCatalogProductRevisionV2("cat/one", { expected_version: 3 }, "revision-v2-key");
+  await saveAdminCatalogProductDraftV2("cat/one", { expected_version: 3 }, "save-v2-key");
+  await publishAdminCatalogProductV2("cat/one", { draft_id: "draft_1", expected_version: 3 }, "publish-v2-key");
+  await archiveAdminCatalogProductV2("cat/one", { expected_version: 4 }, "archive-v2-key");
+
+  expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/catalog/v2/references", { params: {} });
+  expect(client.post).toHaveBeenNthCalledWith(1, "/api/admin/catalog/v2/brands", { name: "August & Mercer" }, { headers: { "Idempotency-Key": "brand-key" } });
+  expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/catalog/v2/products", { params: { lifecycle_status: "published" } });
+  expect(client.get).toHaveBeenNthCalledWith(3, "/api/admin/catalog/v2/products/cat%2Fone", { params: {} });
+  expect(client.post).toHaveBeenNthCalledWith(2, "/api/admin/catalog/v2/products/cat%2Fone/revisions", { expected_version: 3 }, { headers: { "Idempotency-Key": "revision-v2-key" } });
+  expect(client.put).toHaveBeenCalledWith("/api/admin/catalog/v2/products/cat%2Fone/draft", { expected_version: 3 }, { headers: { "Idempotency-Key": "save-v2-key" } });
+  expect(client.post).toHaveBeenNthCalledWith(3, "/api/admin/catalog/v2/products/cat%2Fone/publish", { draft_id: "draft_1", expected_version: 3 }, { headers: { "Idempotency-Key": "publish-v2-key" } });
+  expect(client.post).toHaveBeenNthCalledWith(4, "/api/admin/catalog/v2/products/cat%2Fone/archive", { expected_version: 4 }, { headers: { "Idempotency-Key": "archive-v2-key" } });
 });
 
 it("uses only protected browser API routes for administrator operations", async () => {
