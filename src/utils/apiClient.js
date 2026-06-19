@@ -1,5 +1,10 @@
 import axios from "axios";
 
+import {
+  installAxiosTraceInterceptors,
+  setApiTraceEventTransport,
+} from "./apiTraceClient";
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 export const DEFAULT_STORE_ID = import.meta.env.VITE_DEFAULT_STORE_ID || "";
 
@@ -34,6 +39,8 @@ async function attachAuth(config) {
 
 apiClient.interceptors.request.use(attachAuth);
 uploadClient.interceptors.request.use(attachAuth);
+installAxiosTraceInterceptors(apiClient);
+installAxiosTraceInterceptors(uploadClient, { requestKind: "upload" });
 
 const cleanParams = (params = {}) =>
   Object.fromEntries(
@@ -64,6 +71,17 @@ async function remove(path) {
   const response = await apiClient.delete(path);
   return response.data;
 }
+
+export async function postApiTraceEvent(traceId, event) {
+  const response = await apiClient.post(
+    `/api/admin/traces/${encodeURIComponent(traceId)}/events`,
+    event,
+    { apiTrace: false, timeout: 5000 },
+  );
+  return response.data;
+}
+
+setApiTraceEventTransport(postApiTraceEvent);
 
 export function getCatalog(params) {
   return get("/api/catalog", params);

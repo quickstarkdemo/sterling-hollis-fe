@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FiMic, FiMicOff, FiRefreshCw } from "react-icons/fi";
 
 import useCatalogRealtimeSession from "../../hooks/useCatalogRealtimeSession";
+import { useApiTrace } from "../ApiTraceContext";
+import { recordApiTraceEvent, traceApiFetch } from "../../utils/apiTraceClient";
 import RealtimeTranscript from "./RealtimeTranscript";
 
 const ACTIVE_STATES = new Set(["requesting", "connecting", "listening"]);
@@ -47,15 +49,24 @@ function defaultMicrophoneRequest() {
 
 async function defaultSdpExchange(session, offerSdp, signal) {
   if (session.webrtc_url !== REALTIME_WEBRTC_URL) throw new Error("realtime_invalid_url");
-  const response = await fetch(session.webrtc_url, {
-    method: "POST",
-    body: offerSdp,
-    signal,
-    headers: {
-      Authorization: `Bearer ${session.client_secret}`,
-      "Content-Type": "application/sdp",
+  const response = await traceApiFetch(
+    session.webrtc_url,
+    {
+      method: "POST",
+      body: offerSdp,
+      signal,
+      headers: {
+        Authorization: `Bearer ${session.client_secret}`,
+        "Content-Type": "application/sdp",
+      },
     },
-  });
+    {
+      operation: "realtime.sdp",
+      propagate: false,
+      requestKind: "realtime",
+      transport: "webrtc",
+    },
+  );
   if (!response.ok) throw new Error("realtime_connection_failed");
   return response.text();
 }
@@ -99,6 +110,7 @@ export default function VoiceControls({
   const [entries, setEntries] = useState([]);
   const [presenterPartial, setPresenterPartial] = useState("");
   const [assistantPartial, setAssistantPartial] = useState("");
+  const { startAction } = useApiTrace();
   const peerRef = useRef(null);
   const channelRef = useRef(null);
   const streamRef = useRef(null);
@@ -113,6 +125,7 @@ export default function VoiceControls({
   const resetSignalRef = useRef(resetSignal);
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
+  const traceActionRef = useRef(null);
   const callbacksRef = useRef({ onToolResult, onWorkflowEvent });
   callbacksRef.current = { onToolResult, onWorkflowEvent };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
@@ -133,6 +146,21 @@ export default function VoiceControls({
   }, []);
 
   const endSession = useCallback((nextStatus, nextNotice = "") => {
+    const traceAction = traceActionRef.current;
+    if (traceAction?.enabled) {
+      if (["idle", "disconnected", "expired"].includes(nextStatus)) {
+        recordApiTraceEvent(
+          "realtime.disconnected",
+          { connection_state: nextStatus, transport: "webrtc" },
+          { action: traceAction, status: nextStatus },
+        );
+      }
+      traceAction.end(nextStatus === "idle" ? "completed" : "failed", {
+        connection_state: nextStatus,
+        transport: "webrtc",
+      });
+    }
+    traceActionRef.current = null;
     generationRef.current += 1;
     clearResources();
     resetBackendSession();
@@ -141,6 +169,12 @@ export default function VoiceControls({
   }, [clearResources, resetBackendSession]);
 
   useEffect(() => () => {
+    traceActionRef.current?.end("cancelled", {
+      cancelled: true,
+      connection_state: "unmounted",
+      transport: "webrtc",
+    });
+    traceActionRef.current = null;
     generationRef.current += 1;
     clearResources();
   }, [clearResources]);
@@ -230,6 +264,11 @@ export default function VoiceControls({
         void executeToolCall(event, activeWorkflowId, generation);
         break;
       case "error":
+        recordApiTraceEvent(
+          "realtime.error",
+          { error_code: "provider_event", transport: "webrtc" },
+          { action: traceActionRef.current, status: "failed" },
+        );
         endSession("error");
         break;
       default:
@@ -239,6 +278,11 @@ export default function VoiceControls({
 
   const startSession = async () => {
     if (disabled || realtimeCapability?.configured === false || ACTIVE_STATES.has(status)) return;
+    traceActionRef.current?.end("cancelled", { cancelled: true });
+    traceActionRef.current = startAction("Start Realtime voice session", {
+      surface: "catalog-studio",
+      attributes: { workflow_id: workflowId || "pending" },
+    });
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     clearResources();
@@ -285,18 +329,32 @@ export default function VoiceControls({
       const channel = peer.createDataChannel("oai-events");
       channelRef.current = channel;
       channel.addEventListener("open", () => {
-        if (generationRef.current === generation) setStatus("listening");
+        if (generationRef.current === generation) {
+          recordApiTraceEvent(
+            "realtime.connected",
+            { connection_state: "open", transport: "webrtc" },
+            { action: traceActionRef.current, status: "connected" },
+          );
+          setStatus("listening");
+        }
       });
       channel.addEventListener("message", (messageEvent) => {
         try {
           handleRealtimeEvent(JSON.parse(messageEvent.data), activeWorkflowId, generation);
         } catch {
+          recordApiTraceEvent(
+            "realtime.error",
+            { error_code: "event_parse_failed", transport: "webrtc" },
+            { action: traceActionRef.current, status: "failed" },
+          );
           setNotice("A voice event could not be read. The session remains available.");
         }
       });
       peer.onconnectionstatechange = () => {
         if (generationRef.current !== generation) return;
-        if (["failed", "disconnected", "closed"].includes(peer.connectionState)) endSession("disconnected");
+        if (["failed", "disconnected", "closed"].includes(peer.connectionState)) {
+          endSession("disconnected");
+        }
       };
 
       const offer = await peer.createOffer();
@@ -315,6 +373,11 @@ export default function VoiceControls({
     } catch (error) {
       if (generationRef.current !== generation) return;
       const code = realtimeErrorCode(error);
+      recordApiTraceEvent(
+        "realtime.error",
+        { error_code: code || "connection_failed", transport: "webrtc" },
+        { action: traceActionRef.current, status: "failed" },
+      );
       const unsupported = code === "realtime_unsupported";
       const denied = error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError";
       const nextStatus = unsupported

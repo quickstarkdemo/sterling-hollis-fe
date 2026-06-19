@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { ChakraProvider, createSystem, defaultConfig } from "@chakra-ui/react";
 
 import ClerkBoundary from "./components/ClerkBoundary";
+import ApiTraceProvider from "./components/ApiTraceProvider";
 import { initDatadog } from "./utils/datadog";
 import "./styles.css";
 
@@ -62,7 +63,9 @@ const app = (
   <React.StrictMode>
     <ChakraProvider value={system}>
       <BrowserRouter>
-        <ClerkBoundary />
+        <ApiTraceProvider>
+          <ClerkBoundary />
+        </ApiTraceProvider>
       </BrowserRouter>
     </ChakraProvider>
   </React.StrictMode>

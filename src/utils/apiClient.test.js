@@ -5,7 +5,10 @@ const client = vi.hoisted(() => ({
   delete: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
-  interceptors: { request: { use: vi.fn() } },
+  interceptors: {
+    request: { use: vi.fn() },
+    response: { use: vi.fn() },
+  },
 }));
 
 vi.mock("axios", () => ({
@@ -43,11 +46,13 @@ import {
   publishAdminCatalogProduct,
   publishAdminCatalogProductV2,
   publishAdminCatalogProductV3,
+  postApiTraceEvent,
   promoteCatalogSourceAsset,
   resetDemoObservabilityState,
   saveAdminCatalogProductDraft,
   saveAdminCatalogProductDraftV2,
   saveAdminCatalogProductDraftV3,
+  setAuthTokenGetter,
   startCatalogWorkflow,
   startAdminCatalogProductRevision,
   startAdminCatalogProductRevisionV2,
@@ -286,6 +291,40 @@ it("uses only protected browser API routes for administrator operations", async 
   expect(client.post).toHaveBeenNthCalledWith(2, "/api/demo/observability/reset", undefined, undefined);
   expect(client.get.mock.calls.flat().join(" ")).not.toContain("/admin/demo");
   expect(client.post.mock.calls.flat().join(" ")).not.toContain("/admin/demo");
+});
+
+it("posts trace events through the untraced authenticated client", async () => {
+  const event = {
+    event_id: "evt_one",
+    event_type: "ui.completed",
+    name: "Action completed",
+    occurred_at: "2026-06-19T21:00:00Z",
+    attributes: {},
+  };
+
+  await postApiTraceEvent("trace/one", event);
+
+  expect(client.post).toHaveBeenCalledWith(
+    "/api/admin/traces/trace%2Fone/events",
+    event,
+    { apiTrace: false, timeout: 5000 },
+  );
+});
+
+it("preserves trace headers when the Clerk interceptor attaches authorization", async () => {
+  setAuthTokenGetter(() => Promise.resolve("clerk-token"));
+  const attachAuth = client.interceptors.request.use.mock.calls[0][0];
+  const traceparent = `00-${"1".repeat(32)}-${"2".repeat(16)}-01`;
+  try {
+    const config = await attachAuth({ headers: { traceparent } });
+
+    expect(config.headers).toEqual({
+      Authorization: "Bearer clerk-token",
+      traceparent,
+    });
+  } finally {
+    setAuthTokenGetter(null);
+  }
 });
 
 it("uses production Catalog Workflow routes for guided creation and images", async () => {
