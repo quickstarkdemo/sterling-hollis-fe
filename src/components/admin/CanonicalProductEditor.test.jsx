@@ -13,13 +13,19 @@ const api = vi.hoisted(() => ({
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
   getAdminCatalogProductV2: vi.fn(),
+  getAdminCatalogProductV3: vi.fn(),
+  getAdminCatalogProductPreviewV3: vi.fn(),
+  getAdminCatalogProductReadinessV3: vi.fn(),
   getCatalogImageJob: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
   publishAdminCatalogProductV2: vi.fn(),
+  publishAdminCatalogProductV3: vi.fn(),
   saveAdminCatalogProductDraft: vi.fn(),
   saveAdminCatalogProductDraftV2: vi.fn(),
+  saveAdminCatalogProductDraftV3: vi.fn(),
   startAdminCatalogProductRevision: vi.fn(),
   startAdminCatalogProductRevisionV2: vi.fn(),
+  startAdminCatalogProductRevisionV3: vi.fn(),
   startCatalogWorkflow: vi.fn(),
   submitCatalogMediaCommand: vi.fn(),
 }));
@@ -188,5 +194,54 @@ describe("ProductEditor v2 merchandiser workflow", () => {
     expect(screen.getByDisplayValue("Locally Edited Pillow")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "scene image variant 3" })).toHaveAttribute("src", "https://example.com/scene.jpg");
     expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
+  });
+});
+
+describe("ProductEditor v3 structured authoring", () => {
+  beforeEach(() => {
+    const fixture = canonicalDetail();
+    fixture.current_draft.product = {
+      ...fixture.current_draft.product,
+      schema_version: 3,
+      benefits: ["Comfortable texture"],
+      specifications: [{ name: "material", value: "Linen" }],
+      care_instructions: ["Spot clean"],
+      content_details: ["Knife-edge finish"],
+      seo: { title: "Black linen pillow", description: "A substantial black linen pillow.", keywords: ["linen pillow"] },
+      source_references: [],
+      readiness_inputs: { required_specifications: ["material"] },
+      media: fixture.current_draft.product.media.map((item) => ({ ...item, alt_text: "Black linen pillow" })),
+    };
+    fixture.current_draft.readiness = { ready: false, blocking_errors: [{ code: "blocked", field_path: "/media", message: "Approve all media." }], recommendations: [] };
+    api.getAdminCatalogProductV3.mockReset().mockResolvedValue(fixture);
+    api.saveAdminCatalogProductDraftV2.mockReset();
+    api.saveAdminCatalogProductDraftV3.mockReset().mockResolvedValue(fixture.current_draft.revision);
+    api.getAdminCatalogProductReadinessV3.mockReset().mockResolvedValue(fixture.current_draft.readiness);
+    api.getAdminCatalogProductPreviewV3.mockReset().mockResolvedValue({ draft_version: 3, preview: fixture.current_draft.product, readiness: fixture.current_draft.readiness });
+  });
+
+  it("saves structured copy through v3 and renders canonical preview plus readiness", async () => {
+    renderWithProviders(<ProductEditor productId="cat_pillow" authoringSchemaVersion={3} references={references} referencesStatus="ready" />);
+
+    const benefits = await screen.findByLabelText("Product benefits");
+    fireEvent.change(benefits, { target: { value: "Comfortable texture\nLayer-friendly styling" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => expect(api.saveAdminCatalogProductDraftV3).toHaveBeenCalledWith(
+      "cat_pillow",
+      expect.objectContaining({
+        product: expect.objectContaining({
+          schema_version: 3,
+          benefits: ["Comfortable texture", "Layer-friendly styling"],
+          specifications: [{ name: "material", value: "Linen" }],
+          seo: expect.objectContaining({ title: "Black linen pillow" }),
+        }),
+      }),
+      "save-v3-draft-key",
+    ));
+    expect(api.saveAdminCatalogProductDraftV2).not.toHaveBeenCalled();
+    expect(screen.getByText("Canonical storefront projection")).toBeInTheDocument();
+    expect(screen.getByText("Approve all media.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Publish draft/i })).toBeDisabled();
   });
 });

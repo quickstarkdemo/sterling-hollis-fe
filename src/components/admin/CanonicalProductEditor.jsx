@@ -8,17 +8,25 @@ import {
   createAdminCatalogBrand,
   createIdempotencyKey,
   getAdminCatalogProductV2,
+  getAdminCatalogProductV3,
+  getAdminCatalogProductPreviewV3,
+  getAdminCatalogProductReadinessV3,
   getCatalogImageJob,
   saveAdminCatalogProductDraftV2,
+  saveAdminCatalogProductDraftV3,
   startAdminCatalogProductRevisionV2,
+  startAdminCatalogProductRevisionV3,
   startCatalogWorkflow,
   submitCatalogMediaCommand,
 } from "../../utils/apiClient";
 import BrandSelect from "./BrandSelect";
 import DeveloperLens from "./DeveloperLens";
 import ProductInventoryEditor from "./ProductInventoryEditor";
+import ProductContentEditor from "./ProductContentEditor";
+import ProductDraftPreview from "./ProductDraftPreview";
 import ProductLifecycleActions from "./ProductLifecycleActions";
 import ProductMediaEditor from "./ProductMediaEditor";
+import ProductReadinessPanel from "./ProductReadinessPanel";
 
 const emptyReferences = { brands: [], stores: [], categories: [], availability: [] };
 
@@ -30,11 +38,11 @@ const blankInventory = () => ({
   metadata: {},
 });
 
-function editableProduct(detail) {
+function editableProduct(detail, schemaVersion = 2) {
   const snapshot = detail?.current_draft?.product || detail?.published_snapshot;
   if (snapshot) return structuredClone(snapshot);
   return {
-    schema_version: 2,
+    schema_version: schemaVersion,
     product_id: detail?.product_id || null,
     seed_run_id: "catalog_studio",
     title: detail?.title || "",
@@ -52,14 +60,23 @@ function editableProduct(detail) {
     metadata: detail?.metadata || {},
     media: [],
     inventory: [blankInventory()],
+    ...(schemaVersion >= 3 ? {
+      benefits: [],
+      specifications: [],
+      care_instructions: [],
+      content_details: [],
+      seo: { title: null, description: null, keywords: [] },
+      source_references: [],
+      readiness_inputs: { required_specifications: [] },
+    } : {}),
   };
 }
 
-function normalizedPayload(product) {
+function normalizedPayload(product, schemaVersion = 2) {
   const optional = (value) => String(value || "").trim() || null;
-  return {
+  const normalized = {
     ...product,
-    schema_version: 2,
+    schema_version: schemaVersion,
     link: optional(product.link),
     color: optional(product.color),
     material: optional(product.material),
@@ -74,10 +91,29 @@ function normalizedPayload(product) {
       metadata: row.metadata || {},
     })),
   };
+  if (schemaVersion >= 3) {
+    normalized.benefits = (product.benefits || []).map((value) => String(value).trim()).filter(Boolean);
+    normalized.specifications = (product.specifications || [])
+      .map((item) => ({ name: String(item.name || "").trim(), value: String(item.value || "").trim() }))
+      .filter((item) => item.name || item.value);
+    normalized.care_instructions = (product.care_instructions || []).map((value) => String(value).trim()).filter(Boolean);
+    normalized.content_details = (product.content_details || []).map((value) => String(value).trim()).filter(Boolean);
+    normalized.seo = {
+      title: optional(product.seo?.title),
+      description: optional(product.seo?.description),
+      keywords: (product.seo?.keywords || []).map((value) => String(value).trim()).filter(Boolean),
+    };
+    normalized.source_references = product.source_references || [];
+    normalized.readiness_inputs = {
+      required_specifications: (product.readiness_inputs?.required_specifications || []).map((value) => String(value).trim()).filter(Boolean),
+    };
+    normalized.media = (product.media || []).map((item) => ({ ...item, alt_text: optional(item.alt_text) }));
+  }
+  return normalized;
 }
 
-function comparisonSnapshot(product) {
-  return JSON.stringify(normalizedPayload(product));
+function comparisonSnapshot(product, schemaVersion = 2) {
+  return JSON.stringify(normalizedPayload(product, schemaVersion));
 }
 
 function validate(product, references, referencesReady) {
@@ -152,7 +188,14 @@ export default function CanonicalProductEditor({
   onRetryReferences,
   onBrandAdded,
   onDetailChange,
+  authoringSchemaVersion = 2,
+  activeVoiceTarget = "",
+  aiBusyTarget = "",
+  onFieldVoiceRequest,
+  onFieldAiRequest,
+  fieldActionsDisabled = false,
 }) {
+  const schemaVersion = Number(authoringSchemaVersion) >= 3 ? 3 : 2;
   const references = providedReferences || emptyReferences;
   const [detail, setDetail] = useState(null);
   const [product, setProduct] = useState(null);
@@ -166,6 +209,10 @@ export default function CanonicalProductEditor({
   const [notice, setNotice] = useState("");
   const [mediaJob, setMediaJob] = useState(null);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [readiness, setReadiness] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [projectionLoading, setProjectionLoading] = useState(false);
+  const [projectionError, setProjectionError] = useState("");
   const saveInFlight = useRef(false);
   const idempotencyKeys = useRef({});
 
@@ -179,16 +226,16 @@ export default function CanonicalProductEditor({
   };
 
   const applyDetail = useCallback((nextDetail) => {
-    const nextProduct = editableProduct(nextDetail);
+    const nextProduct = editableProduct(nextDetail, schemaVersion);
     setDetail(nextDetail);
     setProduct(nextProduct);
-    setBaseline(comparisonSnapshot(nextProduct));
+    setBaseline(comparisonSnapshot(nextProduct, schemaVersion));
     setErrors({});
     setServerErrors([]);
     setConflict(false);
     setError(null);
     onDetailChange?.(nextDetail);
-  }, [onDetailChange]);
+  }, [onDetailChange, schemaVersion]);
 
   const load = useCallback(async () => {
     if (!productId) return null;
@@ -196,7 +243,8 @@ export default function CanonicalProductEditor({
     setError(null);
     setNotice("");
     try {
-      const nextDetail = await getAdminCatalogProductV2(productId);
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const nextDetail = await getProduct(productId);
       applyDetail(nextDetail);
       return nextDetail;
     } catch (nextError) {
@@ -205,11 +253,37 @@ export default function CanonicalProductEditor({
     } finally {
       setLoading(false);
     }
-  }, [applyDetail, productId]);
+  }, [applyDetail, productId, schemaVersion]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const dirty = useMemo(() => Boolean(product && baseline && comparisonSnapshot(product) !== baseline), [baseline, product]);
+  const loadProjection = useCallback(async () => {
+    const draftId = detail?.current_draft?.revision?.id;
+    if (schemaVersion < 3 || !detail?.product_id || !draftId) {
+      setReadiness(null);
+      setPreview(null);
+      setProjectionError("");
+      return;
+    }
+    setProjectionLoading(true);
+    setProjectionError("");
+    try {
+      const [nextReadiness, nextPreview] = await Promise.all([
+        getAdminCatalogProductReadinessV3(detail.product_id, draftId),
+        getAdminCatalogProductPreviewV3(detail.product_id, draftId),
+      ]);
+      setReadiness(nextReadiness);
+      setPreview(nextPreview);
+    } catch {
+      setProjectionError("Readiness and preview could not be loaded. Your draft remains available.");
+    } finally {
+      setProjectionLoading(false);
+    }
+  }, [detail?.current_draft?.revision?.id, detail?.product_id, schemaVersion]);
+
+  useEffect(() => { void loadProjection(); }, [loadProjection]);
+
+  const dirty = useMemo(() => Boolean(product && baseline && comparisonSnapshot(product, schemaVersion) !== baseline), [baseline, product, schemaVersion]);
   const mediaCandidateActive = Boolean(mediaJob && ["queued", "running", "succeeded"].includes(mediaJob.status));
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => {
@@ -223,6 +297,7 @@ export default function CanonicalProductEditor({
     setProduct((current) => ({ ...current, [field]: event.target.value }));
     setNotice("");
   };
+  const updateContent = (nextProduct) => { setProduct(nextProduct); setNotice(""); };
   const updateMedia = (media) => { setProduct((current) => ({ ...current, media })); setNotice(""); };
   const updateInventory = (inventory) => { setProduct((current) => ({ ...current, inventory })); setNotice(""); };
 
@@ -243,20 +318,23 @@ export default function CanonicalProductEditor({
       let currentDraft = detail.current_draft;
       if (!currentDraft) {
         const revisionPayload = { expected_version: detail.version };
-        currentDraft = await startAdminCatalogProductRevisionV2(detail.product_id, revisionPayload, mutationKey("start-v2-revision", revisionPayload));
+        const startRevision = schemaVersion >= 3 ? startAdminCatalogProductRevisionV3 : startAdminCatalogProductRevisionV2;
+        currentDraft = await startRevision(detail.product_id, revisionPayload, mutationKey(`start-v${schemaVersion}-revision`, revisionPayload));
         setDetail((current) => ({ ...current, current_draft: currentDraft }));
-        delete idempotencyKeys.current["start-v2-revision"];
+        delete idempotencyKeys.current[`start-v${schemaVersion}-revision`];
       }
       const draftPayload = {
         expected_version: detail.version,
         current_draft_id: currentDraft.revision.id,
         expected_draft_version: currentDraft.draft_version,
         moderation_state: currentDraft.revision.moderation_state || "approved",
-        product: normalizedPayload(product),
+        product: normalizedPayload(product, schemaVersion),
       };
-      await saveAdminCatalogProductDraftV2(detail.product_id, draftPayload, mutationKey("save-v2-draft", draftPayload));
-      delete idempotencyKeys.current["save-v2-draft"];
-      const nextDetail = await getAdminCatalogProductV2(detail.product_id);
+      const saveDraft = schemaVersion >= 3 ? saveAdminCatalogProductDraftV3 : saveAdminCatalogProductDraftV2;
+      await saveDraft(detail.product_id, draftPayload, mutationKey(`save-v${schemaVersion}-draft`, draftPayload));
+      delete idempotencyKeys.current[`save-v${schemaVersion}-draft`];
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const nextDetail = await getProduct(detail.product_id);
       applyDetail(nextDetail);
       setNotice("Draft saved. The published catalog remains unchanged until publication.");
       onCatalogChanged?.(nextDetail);
@@ -327,13 +405,14 @@ export default function CanonicalProductEditor({
         expected_draft_version: detail.current_draft.draft_version,
         ...approval,
       }, createIdempotencyKey("approve-media"));
-      const nextDetail = await getAdminCatalogProductV2(detail.product_id);
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const nextDetail = await getProduct(detail.product_id);
       setMediaJob(null);
       if (preserveLocalEdits) {
-        const serverProduct = editableProduct(nextDetail);
+        const serverProduct = editableProduct(nextDetail, schemaVersion);
         setDetail(nextDetail);
         setProduct({ ...localProduct, media: serverProduct.media });
-        setBaseline(comparisonSnapshot(serverProduct));
+        setBaseline(comparisonSnapshot(serverProduct, schemaVersion));
         setErrors({});
         setServerErrors([]);
         setConflict(false);
@@ -417,17 +496,48 @@ export default function CanonicalProductEditor({
           <Box><Text className="filter-label">Minimum price</Text><Input aria-label="Minimum price" type="number" min="0" step="0.01" value={product.price_min} onChange={updateProduct("price_min")} /><FieldError message={errors.price_min} /></Box>
           <Box><Text className="filter-label">Maximum price</Text><Input aria-label="Maximum price" type="number" min="0" step="0.01" value={product.price_max} onChange={updateProduct("price_max")} /><FieldError message={errors.price_max} /></Box>
         </SimpleGrid>
-        <Box mt={4}><Text className="filter-label">Description</Text><Textarea aria-label="Product description" value={product.description} onChange={updateProduct("description")} rows={4} /><FieldError message={errors.description} /></Box>
+        {schemaVersion < 3 ? <Box mt={4}><Text className="filter-label">Description</Text><Textarea aria-label="Product description" value={product.description} onChange={updateProduct("description")} rows={4} /><FieldError message={errors.description} /></Box> : null}
         <SimpleGrid columns={{ base: 1, md: 2, xl: 4 }} gap={3} mt={4}>
           {["color", "material", "gender", "season"].map((field) => <Box key={field}><Text className="filter-label">{field}</Text><Input aria-label={`Product ${field}`} value={product[field] || ""} onChange={updateProduct(field)} /></Box>)}
         </SimpleGrid>
       </Box>
 
-      <ProductMediaEditor media={product.media || []} busy={mediaBusy} job={mediaJob} mutationsDisabled={mediaCandidateActive} onChange={updateMedia} onGenerate={generateMedia} onApprove={approveMedia} />
+      {schemaVersion >= 3 ? (
+        <ProductContentEditor
+          product={product}
+          onChange={updateContent}
+          activeVoiceTarget={activeVoiceTarget}
+          aiBusyTarget={aiBusyTarget}
+          onVoiceRequest={onFieldVoiceRequest}
+          onAiRequest={onFieldAiRequest}
+          actionsDisabled={fieldActionsDisabled}
+        />
+      ) : null}
+      <ProductMediaEditor
+        media={product.media || []}
+        busy={mediaBusy}
+        job={mediaJob}
+        mutationsDisabled={mediaCandidateActive}
+        onChange={updateMedia}
+        onGenerate={generateMedia}
+        onApprove={approveMedia}
+        enableAltText={schemaVersion >= 3}
+        activeVoiceTarget={activeVoiceTarget}
+        aiBusyTarget={aiBusyTarget}
+        onVoiceRequest={onFieldVoiceRequest}
+        onAiRequest={onFieldAiRequest}
+        fieldActionsDisabled={fieldActionsDisabled}
+      />
       <ProductInventoryEditor inventory={product.inventory || []} stores={references.stores} availability={references.availability} referencesReady={referencesReady} errors={errors} onChange={updateInventory} />
       <FieldError message={errors.inventory} />
+      {schemaVersion >= 3 && detail.current_draft ? (
+        <>
+          <ProductDraftPreview payload={preview} loading={projectionLoading} error={projectionError} dirty={dirty} onRetry={loadProjection} />
+          <ProductReadinessPanel readiness={readiness} loading={projectionLoading} error={projectionError} dirty={dirty} onRetry={loadProjection} />
+        </>
+      ) : null}
       <DeveloperLens catalogContext={technicalContext} />
-      <ProductLifecycleActions product={detail} dirty={dirty} authoringSchemaVersion={2} onChanged={lifecycleChanged} />
+      <ProductLifecycleActions product={detail} dirty={dirty} authoringSchemaVersion={schemaVersion} readiness={readiness} onChanged={lifecycleChanged} />
     </VStack>
   );
 }

@@ -108,6 +108,37 @@ describe("VoiceControls", () => {
     expect(document.body).not.toHaveTextContent("ephemeral-secret");
   });
 
+  it("starts the shared microphone when an inline field control selects a pinned target", async () => {
+    const channel = new FakeDataChannel();
+    const peer = new FakePeerConnection(channel);
+    const media = microphone();
+    const requestMicrophone = vi.fn().mockResolvedValue(media.stream);
+
+    function Harness() {
+      const [startSignal, setStartSignal] = useState(0);
+      return (
+        <>
+          <button type="button" onClick={() => setStartSignal((current) => current + 1)}>Use voice for description</button>
+          <VoiceControls
+            workflowId="workflow_1"
+            startSignal={startSignal}
+            sessionContext={{ mode: "field", product_id: "cat_coat", draft_id: "draft_1", expected_draft_version: 2, target_path: "/description" }}
+            contextLabel="Description"
+            createPeerConnection={() => peer}
+            requestMicrophone={requestMicrophone}
+            exchangeSdp={() => Promise.resolve("answer-sdp")}
+            now={() => 0}
+          />
+        </>
+      );
+    }
+
+    renderWithProviders(<Harness />);
+    await userEvent.click(screen.getByRole("button", { name: "Use voice for description" }));
+    await waitFor(() => expect(requestMicrophone).toHaveBeenCalledTimes(1));
+    expect(api.createCatalogRealtimeSession).toHaveBeenCalledWith("workflow_1", expect.objectContaining({ mode: "field", target_path: "/description" }));
+  });
+
   it.each([
     ["feature_disabled", /disabled in this environment/i],
     ["missing_api_key", /OpenAI API key/i],

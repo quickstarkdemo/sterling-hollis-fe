@@ -185,6 +185,9 @@ const catalogProductPath = (productId, suffix = "") =>
 const catalogProductV2Path = (productId, suffix = "") =>
   `/api/admin/catalog/v2/products/${encodeURIComponent(productId)}${suffix}`;
 
+const catalogProductV3Path = (productId, suffix = "") =>
+  `/api/admin/catalog/v3/products/${encodeURIComponent(productId)}${suffix}`;
+
 const idempotencyConfig = (idempotencyKey) => ({
   headers: { "Idempotency-Key": idempotencyKey },
 });
@@ -232,6 +235,30 @@ export function publishAdminCatalogProductV2(productId, payload, idempotencyKey)
 
 export function archiveAdminCatalogProductV2(productId, payload, idempotencyKey) {
   return post(catalogProductV2Path(productId, "/archive"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function getAdminCatalogProductV3(productId) {
+  return get(catalogProductV3Path(productId));
+}
+
+export function startAdminCatalogProductRevisionV3(productId, payload, idempotencyKey) {
+  return post(catalogProductV3Path(productId, "/revisions"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function saveAdminCatalogProductDraftV3(productId, payload, idempotencyKey) {
+  return put(catalogProductV3Path(productId, "/draft"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function publishAdminCatalogProductV3(productId, payload, idempotencyKey) {
+  return post(catalogProductV3Path(productId, "/publish"), payload, idempotencyConfig(idempotencyKey));
+}
+
+export function getAdminCatalogProductReadinessV3(productId, draftId) {
+  return get(catalogProductV3Path(productId, `/drafts/${encodeURIComponent(draftId)}/readiness`));
+}
+
+export function getAdminCatalogProductPreviewV3(productId, draftId) {
+  return get(catalogProductV3Path(productId, `/drafts/${encodeURIComponent(draftId)}/preview`));
 }
 
 export function startAdminCatalogProductRevision(productId, payload, idempotencyKey) {
