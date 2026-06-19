@@ -96,6 +96,7 @@ export default function ProductPage() {
   }
 
   const inventory = product.inventory_summary || {};
+  const reviews = product.reviews || [];
 
   return (
     <Container maxW="1280px" py={10}>
@@ -192,6 +193,40 @@ export default function ProductPage() {
               </Box>
             ))}
           </SimpleGrid>
+        </Box>
+      ) : null}
+
+      {reviews.length ? (
+        <Box as="section" mt={14} aria-labelledby="customer-reviews-title">
+          <HStack justify="space-between" gap={3} mb={5} flexWrap="wrap">
+            <Box>
+              <Text className="section-kicker">Customer feedback</Text>
+              <Text as="h2" id="customer-reviews-title" className="section-title">Customer reviews</Text>
+            </Box>
+            <Badge className="soft-badge">{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</Badge>
+          </HStack>
+          <VStack align="stretch" gap={4} className="public-review-list">
+            {reviews.map((review) => (
+              <Box as="article" key={review.id} className="public-review-card">
+                <HStack justify="space-between" align="start" gap={3} flexWrap="wrap">
+                  <Box>
+                    <Text className="store-availability-title">{review.author_display_name}</Text>
+                    <Text className="muted-text">Verified customer review</Text>
+                  </Box>
+                  <Text className="product-review-rating" aria-label={`${review.rating} out of 5 stars`}>
+                    {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                  </Text>
+                </HStack>
+                <Text mt={4} whiteSpace="pre-wrap">{review.body}</Text>
+                {review.merchant_response ? (
+                  <Box className="public-merchant-response" mt={4}>
+                    <Text className="filter-label">Sterling Hollis response</Text>
+                    <Text mt={1} whiteSpace="pre-wrap">{review.merchant_response}</Text>
+                  </Box>
+                ) : null}
+              </Box>
+            ))}
+          </VStack>
         </Box>
       ) : null}
 

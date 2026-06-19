@@ -80,4 +80,29 @@ describe("ProductPage media gallery", () => {
     expect(await screen.findByText("Product unavailable")).toBeInTheDocument();
     expect(screen.queryByText(product.title)).not.toBeInTheDocument();
   });
+
+  it("renders approved customer reviews and published merchant responses without private moderation fields", async () => {
+    api.getProduct.mockResolvedValueOnce({
+      ...product,
+      reviews: [{
+        id: "review_public",
+        author_display_name: "Maya R.",
+        body: "The material feels substantial and the finish is beautiful.",
+        rating: 5,
+        submitted_at: "2026-06-19T12:00:00Z",
+        merchant_response: "We appreciate your thoughtful review.",
+        merchant_responded_at: "2026-06-19T12:10:00Z",
+        external_review_id: "never-render-external-id",
+        moderation: "never-render-private-moderation",
+      }],
+    });
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Customer reviews" })).toBeInTheDocument();
+    expect(screen.getByText("Maya R.")).toBeInTheDocument();
+    expect(screen.getByLabelText("5 out of 5 stars")).toBeInTheDocument();
+    expect(screen.getByText("We appreciate your thoughtful review.")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("never-render-external-id");
+    expect(document.body).not.toHaveTextContent("never-render-private-moderation");
+  });
 });

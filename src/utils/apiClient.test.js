@@ -15,13 +15,16 @@ vi.mock("axios", () => ({
 import {
   archiveAdminCatalogProduct,
   archiveAdminCatalogProductV2,
+  assistCatalogProductReview,
   approveCatalogImageJob,
   createAdminCatalogBrand,
   createCatalogRealtimeSession,
   decideCatalogSuggestionSet,
+  decideCatalogProductReview,
   deleteCatalogSourceAsset,
   generateCatalogSuggestionSet,
   getAdminCatalogProduct,
+  getAdminCatalogProductReviews,
   getAdminCatalogProductV2,
   getAdminCatalogProductV3,
   getAdminCatalogProductPreviewV3,
@@ -105,6 +108,33 @@ it("uses private source and versioned suggestion contracts", async () => {
   expect(client.post).toHaveBeenCalledWith(
     "/api/admin/catalog/v3/products/cat%2Fone/suggestion-sets/set%2Fone/decisions",
     { action: "accept" },
+    { headers: { "Idempotency-Key": "decision-key" } },
+  );
+});
+
+it("uses protected versioned product-review moderation contracts", async () => {
+  await getAdminCatalogProductReviews("cat/one");
+  await assistCatalogProductReview("cat/one", "review/one", { expected_version: 1 }, "assist-key");
+  await decideCatalogProductReview("cat/one", "review/one", {
+    action: "approve",
+    expected_version: 2,
+    reason: "Verified customer feedback.",
+  }, "decision-key");
+
+  expect(client.get).toHaveBeenCalledWith(
+    "/api/admin/catalog/products/cat%2Fone/reviews",
+    { params: {} },
+  );
+  expect(client.post).toHaveBeenNthCalledWith(
+    1,
+    "/api/admin/catalog/products/cat%2Fone/reviews/review%2Fone/assist",
+    { expected_version: 1 },
+    { headers: { "Idempotency-Key": "assist-key" } },
+  );
+  expect(client.post).toHaveBeenNthCalledWith(
+    2,
+    "/api/admin/catalog/products/cat%2Fone/reviews/review%2Fone/decisions",
+    { action: "approve", expected_version: 2, reason: "Verified customer feedback." },
     { headers: { "Idempotency-Key": "decision-key" } },
   );
 });

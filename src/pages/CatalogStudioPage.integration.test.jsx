@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,8 +12,12 @@ const clerk = vi.hoisted(() => ({
 }));
 const api = vi.hoisted(() => ({
   approveCatalogImageJob: vi.fn(),
+  assistCatalogProductReview: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
+  decideCatalogProductReview: vi.fn(),
+  generateCatalogSuggestionSet: vi.fn(),
   getAdminCatalogProduct: vi.fn(),
+  getAdminCatalogProductReviews: vi.fn(),
   getAdminCatalogProducts: vi.fn(),
   getAdminCatalogReferences: vi.fn(),
   getCatalogImageJob: vi.fn(),
@@ -30,13 +34,16 @@ vi.mock("../utils/apiClient", () => api);
 vi.mock("../utils/clerkConfig", () => ({ CLERK_ENABLED: true }));
 vi.mock("../utils/datadog", () => telemetry);
 vi.mock("../components/admin/ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged, onDetailChange, refreshKey }) => (
+  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged, onDetailChange, onFieldVoiceRequest, activeVoiceTarget, refreshKey }) => (
     <div data-testid="contract-product-editor">
       Product editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}; refresh {refreshKey}
+      <span>Manual details, media, inventory, and readiness remain available</span>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>
         Publish contract product
       </button>
       <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Contract Coat", current_draft: { revision: { id: "draft_contract" }, draft_version: 1 } })}>Load supplier authoring</button>
+      <button type="button" onClick={() => onFieldVoiceRequest?.({ targetPath: "/description", label: "Description" })}>Use voice for description</button>
+      <span>Active voice target: {activeVoiceTarget || "none"}</span>
     </div>
   ),
 }));
@@ -47,9 +54,16 @@ vi.mock("../components/admin/SuggestionReviewPanel", () => ({
   default: ({ productId, refreshSignal, onDraftChanged }) => <div data-testid="contract-suggestion-review">Suggestion review for {productId}; refresh {refreshSignal}<button type="button" onClick={() => onDraftChanged?.({ draft: { draft_version: 2 } })}>Accept supplier description</button></div>,
 }));
 vi.mock("../components/admin/VoiceControls", () => ({
-  default: ({ onToolResult, realtimeCapability, workflowId }) => (
+  default: ({ onToolResult, realtimeCapability, sessionContext, workflowId }) => (
     <div>
       <span>Realtime capability: {realtimeCapability?.reason || (realtimeCapability?.configured ? "ready" : "unknown")}</span>
+      <span>Voice context: {sessionContext?.mode || "none"}</span>
+      <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Dallas has two units; no product state changed." }, workflowId)}>
+        Ask grounded inventory question
+      </button>
+      <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Description voice proposal is ready.", suggestion_set: { id: "voice_set" } }, workflowId)}>
+        Complete field voice proposal
+      </button>
       <button type="button" onClick={() => onToolResult?.({ status: "failed", message: "Voice is unavailable; continue with text." }, workflowId)}>
         Simulate voice failure
       </button>
@@ -100,6 +114,32 @@ const session = {
   ),
 };
 
+const customerReview = {
+  id: "review_contract",
+  product_id: "cat_contract_coat",
+  source: "synthetic_fixture",
+  external_review_id: "review-one",
+  author_display_name: "Maya R.",
+  body: "The material feels substantial and the finish is beautiful.",
+  rating: 5,
+  submitted_at: "2026-06-19T12:00:00Z",
+  moderation: {
+    version: 1,
+    state: "pending",
+    ai_categories: [],
+    ai_theme_summary: null,
+    ai_suggested_action: null,
+    ai_provider_metadata: {},
+    response_draft: null,
+    response_published: null,
+    response_published_at: null,
+    decided_by: null,
+    decided_at: null,
+    decision_reason: null,
+  },
+  actions: [],
+};
+
 function renderStudio() {
   return renderWithProviders(
     <CatalogStudioAccessProvider>
@@ -124,6 +164,13 @@ describe("Catalog Studio contract journey", () => {
     api.getCatalogImageJob.mockReset();
     api.approveCatalogImageJob.mockReset();
     api.getAdminCatalogProduct.mockReset();
+    api.getAdminCatalogProductReviews.mockReset().mockResolvedValue({ items: [customerReview] });
+    api.assistCatalogProductReview.mockReset();
+    api.decideCatalogProductReview.mockReset().mockResolvedValue({
+      ...customerReview,
+      moderation: { ...customerReview.moderation, version: 2, state: "approved" },
+    });
+    api.generateCatalogSuggestionSet.mockReset();
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
     api.getAdminCatalogReferences.mockReset().mockResolvedValue({ stores: [{ id: "1001", name: "Dallas" }], brands: [], categories: [], availability: [] });
     session.capabilities.catalog.authoring_schema_version = 1;
@@ -210,10 +257,31 @@ describe("Catalog Studio contract journey", () => {
 
     expect(screen.getByTestId("contract-source-tray")).toHaveTextContent("cat_contract_coat");
     expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 0");
-    await userEvent.click(screen.getByRole("button", { name: "Analyze supplier handoff" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Ask grounded inventory question" }));
+    expect(await screen.findByText("Dallas has two units; no product state changed.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Use voice for description" }));
+    expect(screen.getByText("Voice context: field")).toBeInTheDocument();
+    expect(screen.getByText("Active voice target: /description")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Complete field voice proposal" }));
+    expect(await screen.findByText("Description voice proposal is ready.")).toBeInTheDocument();
     expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Analyze supplier handoff" }));
+    expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 2");
     await userEvent.click(screen.getByRole("button", { name: "Accept supplier description" }));
     expect(screen.getByTestId("contract-product-editor")).toHaveTextContent("refresh 2");
+
+    expect(await screen.findByText(customerReview.body)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Decision reason for Maya R."), "Verified customer feedback.");
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(api.decideCatalogProductReview).toHaveBeenCalledWith(
+      "cat_contract_coat",
+      "review_contract",
+      { action: "approve", expected_version: 1, reason: "Verified customer feedback." },
+      "review-approve-key",
+    ));
+    expect(screen.getByText("Manual details, media, inventory, and readiness remain available")).toBeInTheDocument();
   });
 
   it("preserves the draft when text, image, or voice capabilities fail", async () => {

@@ -15,11 +15,15 @@ the durable image worker, object storage, or ChatGPT discovery.
 
 1. Start on the public storefront and point out that shopping remains anonymous.
 2. Sign in and open **Catalog Studio** from the header or Clerk user menu.
-3. Describe one product outcome and create the draft.
-4. Explain the business timeline: Responses structures the product, Moderation
-   enforces policy, and the draft remains private.
-5. Generate and approve an image, then publish explicitly.
-6. Open the published product and find its stable catalog ID through ChatGPT.
+3. Open one product and upload its known-good supplier image bundle.
+4. Accept one evidence-backed suggestion and reject another, explaining that AI
+   proposals do not become product data until a merchant accepts them.
+5. Ask the workbench voice assistant which store is low on stock. Then use the
+   description microphone to stage a warmer rewrite and accept the proposal.
+6. Review readiness, moderate one synthetic customer review, and publish a
+   merchant response only after approving the review.
+7. Publish the product explicitly, open it on the storefront, and confirm the
+   approved customer review and published response appear there.
 
 Keep the developer lens off. Emphasize human approval, one catalog record, and
 safe recovery rather than implementation details.
@@ -84,15 +88,32 @@ credentials or Clerk tokens.
 ### 5. Voice
 
 - Grant microphone access and start a short-lived voice session.
-- Speak one bounded refinement and confirm it updates the same workflow and draft.
-- Stop voice and confirm the draft remains editable with text.
+- Ask: **Which store is lowest on stock for this product?** Confirm the answer is
+  grounded in the authorized inventory projection and changes no product state.
+- Focus the description field and ask for a warmer rewrite. Confirm the target
+  remains pinned to description and the result appears as a pending before/after
+  proposal rather than changing the saved draft.
+- Accept or reject the field proposal explicitly, then stop voice and confirm the
+  draft remains editable with text.
 - If Realtime fails, continue with text; do not spend meeting time debugging the
   microphone, SDP exchange, or ephemeral token.
 
-### 6. Publication and cross-surface discovery
+### 6. Review moderation
+
+- Open **Reviews** and select the synthetic five-star fixture from Maya R.
+- Run **Analyze review** and explain that the theme, categories, suggested action,
+  and response draft are proposals only. Confirm the customer text and rating
+  have no edit controls.
+- Enter a merchant reason and approve the review.
+- Edit the merchant response if needed, enter a publication reason, and publish
+  it separately. A failed or stale action must leave product edits and the prior
+  public review state unchanged.
+
+### 7. Publication and cross-surface discovery
 
 - Publish only the approved disposable product.
-- Open **View published product** and verify the stable `cat_...` ID.
+- Open **View published product**, verify the stable `cat_...` ID, and confirm
+  only the approved review and published merchant response are visible.
 - Search for that ID or exact title in storefront chat.
 - In the configured ChatGPT/App experience, use the existing product search and
   detail tools to find the same product. Confirm no draft, workflow event, or
@@ -108,6 +129,8 @@ credentials or Clerk tokens.
 | Image generation fails | Retry the same action or show the fallback product | Draft and approved published image |
 | Image polling expires | Retry status; do not create a second job | Existing worker job and draft |
 | Realtime fails | Stop voice and continue with text | Same workflow and draft |
+| Review assistance fails | Continue with a manual merchant decision or retry | Customer text, product edits, and prior public state |
+| Review decision is stale | Refresh reviews and repeat the decision against the current version | Customer text, product edits, and prior public state |
 | Publication fails | Keep the draft private and retry after checking health | Last published product |
 | ChatGPT discovery fails | Show the public PDP and preflight evidence | Published catalog record |
 
@@ -121,6 +144,24 @@ live APIs succeeded during the meeting; say so when using it.
 
 Never reuse a private draft ID as the fallback. The value is exposed publicly in
 `/config.json` for presenter recovery.
+
+Use `scripts/seed_product_reviews.py` in the backend repository to attach the
+synthetic review fixtures to the rehearsal product. Do not use live customer
+reviews for the scripted moderation path.
+
+## Coverage boundary
+
+The frontend suite mocks authorization, supplier upload handoff, suggestion
+review, grounded voice Q&A, field voice proposals, manual editing, media,
+inventory, readiness, review decisions, publication handoff, and public review
+rendering. It verifies that private source IDs and moderation fields are not
+rendered publicly.
+
+The deployed preflight is still required for Clerk authorization, OpenAI
+Responses and Moderation, the image worker and object storage, Realtime WebRTC,
+database migrations and seeded fixtures, publication, storefront reload, chat,
+and ChatGPT/MCP discovery. Record those results separately; a mocked test is not
+evidence that a provider or deployed worker succeeded.
 
 ## Evidence and observability
 

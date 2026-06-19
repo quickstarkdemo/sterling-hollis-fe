@@ -365,6 +365,26 @@ export function decideCatalogSuggestionSet(productId, suggestionSetId, payload, 
   );
 }
 
+export function getAdminCatalogProductReviews(productId) {
+  return get(catalogProductPath(productId, "/reviews"));
+}
+
+export function assistCatalogProductReview(productId, reviewId, payload, idempotencyKey) {
+  return post(
+    catalogProductPath(productId, `/reviews/${encodeURIComponent(reviewId)}/assist`),
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
+export function decideCatalogProductReview(productId, reviewId, payload, idempotencyKey) {
+  return post(
+    catalogProductPath(productId, `/reviews/${encodeURIComponent(reviewId)}/decisions`),
+    payload,
+    idempotencyConfig(idempotencyKey),
+  );
+}
+
 export function submitCatalogImageCommand(workflowId, payload, idempotencyKey) {
   return post(catalogWorkflowPath(workflowId, "/image-commands"), payload, idempotencyConfig(idempotencyKey));
 }
