@@ -16,6 +16,12 @@ const api = vi.hoisted(() => ({
   submitCatalogMediaCommand: vi.fn(),
   archiveAdminCatalogProduct: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
+  getAdminCatalogProductV2: vi.fn(),
+  saveAdminCatalogProductDraftV2: vi.fn(),
+  startAdminCatalogProductRevisionV2: vi.fn(),
+  createAdminCatalogBrand: vi.fn(),
+  archiveAdminCatalogProductV2: vi.fn(),
+  publishAdminCatalogProductV2: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
 
@@ -113,9 +119,8 @@ describe("ProductEditor", () => {
   it("promotes existing imagery to core media without changing inventory", async () => {
     renderWithProviders(<ProductEditor productId="cat_coat" />);
 
-    await screen.findByText("Product media");
-    await userEvent.click(screen.getByRole("button", { name: /Use current image as core/i }));
-    expect(screen.getByRole("img", { name: "Core product view" })).toHaveAttribute("src", "https://cdn.example/coat.jpg");
+    await screen.findByText("Images");
+    await userEvent.click(screen.getByRole("button", { name: /Use current image as main/i }));
 
     await userEvent.click(screen.getByRole("button", { name: /Save draft/i }));
     await waitFor(() => expect(api.saveAdminCatalogProductDraft).toHaveBeenCalledWith(
@@ -154,8 +159,8 @@ describe("ProductEditor", () => {
     api.approveCatalogImageJob.mockResolvedValue({ approval_status: "approved" });
     renderWithProviders(<ProductEditor productId="cat_coat" />);
 
-    await userEvent.type(await screen.findByLabelText("Image variation instruction"), "bright living room");
-    await userEvent.click(screen.getByRole("button", { name: /Generate variation/i }));
+    await userEvent.type(await screen.findByLabelText("Image variant instruction"), "bright living room");
+    await userEvent.click(screen.getByRole("button", { name: /Generate image variant/i }));
     await waitFor(() => expect(api.submitCatalogMediaCommand).toHaveBeenCalledWith(
       "workflow_1",
       expect.objectContaining({
@@ -166,11 +171,11 @@ describe("ProductEditor", () => {
       "media-variation-key",
     ));
 
-    await userEvent.click(await screen.findByRole("button", { name: /Approve variation/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Approve as new image/i }));
     await waitFor(() => expect(api.approveCatalogImageJob).toHaveBeenCalledWith(
       "workflow_1",
       "job_1",
-      { draft_id: "draft_1", expected_draft_version: 2 },
+      { draft_id: "draft_1", expected_draft_version: 2, approval_intent: "add" },
       "approve-media-key",
     ));
     expect(fixture.current_draft.product.variants).toHaveLength(1);

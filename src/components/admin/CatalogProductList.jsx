@@ -3,12 +3,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FiChevronLeft, FiChevronRight, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
 
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
-import { getAdminCatalogProducts, getCategories } from "../../utils/apiClient";
+import { getAdminCatalogProducts, getAdminCatalogProductsV2, getCategories } from "../../utils/apiClient";
 import { titleize } from "../../utils/format";
 
 const PAGE_SIZE = 12;
 
-export default function CatalogProductList({ selectedProductId, onSelect, refreshKey = 0 }) {
+export default function CatalogProductList({
+  selectedProductId,
+  onSelect,
+  refreshKey = 0,
+  authoringSchemaVersion = 1,
+  referenceCategories,
+}) {
   const [query, setQuery] = useState("");
   const [lifecycleStatus, setLifecycleStatus] = useState("");
   const [category, setCategory] = useState("");
@@ -26,7 +32,10 @@ export default function CatalogProductList({ selectedProductId, onSelect, refres
     setLoading(true);
     setError(null);
     try {
-      const nextPayload = await getAdminCatalogProducts({
+      const listProducts = authoringSchemaVersion >= 2
+        ? getAdminCatalogProductsV2
+        : getAdminCatalogProducts;
+      const nextPayload = await listProducts({
         q: query,
         lifecycle_status: lifecycleStatus,
         category,
@@ -40,7 +49,7 @@ export default function CatalogProductList({ selectedProductId, onSelect, refres
     } finally {
       if (requestId.current === currentRequestId) setLoading(false);
     }
-  }, [brand, category, lifecycleStatus, page, query]);
+  }, [authoringSchemaVersion, brand, category, lifecycleStatus, page, query]);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -56,12 +65,16 @@ export default function CatalogProductList({ selectedProductId, onSelect, refres
   }, [load, refreshKey]);
 
   useEffect(() => {
+    if (authoringSchemaVersion >= 2) {
+      setCategories(referenceCategories || []);
+      return;
+    }
     loadCategories();
-  }, [loadCategories, refreshKey]);
+  }, [authoringSchemaVersion, loadCategories, referenceCategories, refreshKey]);
 
   const refresh = () => {
     load();
-    loadCategories();
+    if (authoringSchemaVersion < 2) loadCategories();
   };
 
   const updateFilter = (setter) => (event) => {

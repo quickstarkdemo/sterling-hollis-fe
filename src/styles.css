@@ -1326,6 +1326,17 @@ a {
   background: #fffaf0;
 }
 
+.catalog-image-card.selected-source {
+  border-color: rgba(96, 114, 77, 0.68);
+  box-shadow: 0 0 0 2px rgba(96, 114, 77, 0.12);
+}
+
+.catalog-image-card button:focus-visible,
+.catalog-inventory-row button:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+}
+
 .catalog-select {
   min-height: 40px;
   width: 100%;
@@ -1368,6 +1379,39 @@ a {
   padding: 16px;
 }
 
+.catalog-media-command {
+  padding: 18px;
+  border-top: 1px solid rgba(23, 19, 15, 0.1);
+  background: rgba(238, 232, 220, 0.34);
+}
+
+.catalog-media-job {
+  padding: 12px;
+  border-left: 3px solid var(--saffron);
+  background: rgba(170, 117, 45, 0.08);
+}
+
+.catalog-undo-bar {
+  padding: 10px 12px;
+  border: 1px solid rgba(96, 114, 77, 0.24);
+  border-radius: 6px;
+  background: rgba(96, 114, 77, 0.08);
+}
+
+.catalog-dialog {
+  width: min(92vw, 520px) !important;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf0 !important;
+  box-shadow: 0 24px 70px rgba(23, 19, 15, 0.24);
+}
+
+.brand-select,
+.product-inventory-editor,
+.catalog-inventory-row > div {
+  min-width: 0;
+}
+
 .editor-section input,
 .editor-section textarea,
 .catalog-product-list input {
@@ -1387,6 +1431,10 @@ a {
   border: 1px solid rgba(23, 19, 15, 0.08);
   border-radius: 6px;
   background: rgba(238, 232, 220, 0.4);
+}
+
+.catalog-inventory-row button {
+  white-space: normal;
 }
 
 .danger-button {
@@ -1472,6 +1520,20 @@ a {
 
   .catalog-image-card {
     grid-template-columns: 1fr;
+  }
+
+  .product-editor,
+  .catalog-product-list {
+    padding: 16px;
+  }
+
+  .catalog-image-controls,
+  .catalog-media-command {
+    padding: 14px;
+  }
+
+  .catalog-undo-bar {
+    align-items: flex-start !important;
   }
 
   .catalog-editor-image {

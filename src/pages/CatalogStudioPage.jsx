@@ -1,18 +1,51 @@
 import { Box, Button, Container, Flex, HStack, Text } from "@chakra-ui/react";
 import { FiCode, FiEye } from "react-icons/fi";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDeveloperLens } from "../components/DeveloperLensContext";
+import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
 import CatalogProductList from "../components/admin/CatalogProductList";
 import ProductCreationWorkspace from "../components/admin/ProductCreationWorkspace";
 import ProductEditor from "../components/admin/ProductEditor";
+import { getAdminCatalogReferences } from "../utils/apiClient";
 
 export default function CatalogStudioPage() {
   const { enabled: developerLensEnabled, toggle } = useDeveloperLens();
+  const { session } = useCatalogStudioAccess();
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [studioMode, setStudioMode] = useState("create");
+  const [references, setReferences] = useState(null);
+  const [referencesStatus, setReferencesStatus] = useState("idle");
+  const loadedReferenceVersion = useRef(0);
+  const authoringSchemaVersion = Number(session?.capabilities?.catalog?.authoring_schema_version || 1);
+
+  const loadReferences = useCallback(async () => {
+    if (authoringSchemaVersion < 2) return;
+    setReferencesStatus("loading");
+    try {
+      setReferences(await getAdminCatalogReferences());
+      setReferencesStatus("ready");
+    } catch {
+      setReferencesStatus("error");
+    }
+  }, [authoringSchemaVersion]);
+
+  useEffect(() => {
+    if (authoringSchemaVersion < 2 || loadedReferenceVersion.current === authoringSchemaVersion) return;
+    loadedReferenceVersion.current = authoringSchemaVersion;
+    loadReferences();
+  }, [authoringSchemaVersion, loadReferences]);
+
+  const brandAdded = useCallback((brand) => {
+    setReferences((current) => ({
+      ...(current || { stores: [], categories: [], availability: [] }),
+      brands: [...(current?.brands || []).filter((item) => item.id !== brand.id), brand]
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    }));
+    setReferencesStatus("ready");
+  }, []);
 
   const selectProduct = useCallback((productId) => {
     if (productId === selectedProductId) return;
@@ -86,6 +119,8 @@ export default function CatalogStudioPage() {
               selectedProductId={selectedProductId}
               onSelect={selectProduct}
               refreshKey={catalogRefreshKey}
+              authoringSchemaVersion={authoringSchemaVersion}
+              referenceCategories={references?.categories}
             />
             <Box minW={0}>
               <ProductEditor
@@ -93,6 +128,11 @@ export default function CatalogStudioPage() {
                 productId={selectedProductId}
                 onDirtyChange={setEditorDirty}
                 onCatalogChanged={catalogChanged}
+                authoringSchemaVersion={authoringSchemaVersion}
+                references={references}
+                referencesStatus={referencesStatus}
+                onRetryReferences={loadReferences}
+                onBrandAdded={brandAdded}
               />
             </Box>
           </Box>

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,9 @@ const api = vi.hoisted(() => ({
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
   getAdminCatalogProducts: vi.fn(),
+  getAdminCatalogProductV2: vi.fn(),
+  getAdminCatalogProductsV2: vi.fn(),
+  getAdminCatalogReferences: vi.fn(),
   getCategories: vi.fn(),
   getCatalogStudioSession: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
@@ -73,6 +76,8 @@ describe("CatalogStudioPage", () => {
     };
     api.getCatalogStudioSession.mockReset().mockResolvedValue(session);
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getAdminCatalogReferences.mockReset().mockResolvedValue({ brands: [], stores: [], categories: [], availability: [] });
     api.getCategories.mockReset().mockResolvedValue({ categories: [] });
     api.getAdminCatalogProduct.mockReset();
   });
@@ -98,6 +103,19 @@ describe("CatalogStudioPage", () => {
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
+  });
+
+  it("loads v2 reference data once and uses the canonical product list when capability is advertised", async () => {
+    api.getCatalogStudioSession.mockResolvedValueOnce({
+      authorized: true,
+      capabilities: { catalog: { configured: true, authoring_schema_version: 2 } },
+    });
+    renderStudio();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Manage catalog" }));
+    await waitFor(() => expect(api.getAdminCatalogReferences).toHaveBeenCalledTimes(1));
+    expect(api.getAdminCatalogProductsV2).toHaveBeenCalled();
+    expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
   });
 
   it("persists the developer lens for the browser session", async () => {

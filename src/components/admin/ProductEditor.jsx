@@ -15,6 +15,7 @@ import {
 } from "../../utils/apiClient";
 import ProductMediaEditor from "./ProductMediaEditor";
 import ProductLifecycleActions from "./ProductLifecycleActions";
+import CanonicalProductEditor from "./CanonicalProductEditor";
 
 const blankInventory = () => ({
   store_id: "",
@@ -165,7 +166,7 @@ function variantImageUrl(variant) {
     || "";
 }
 
-export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange, onCatalogChanged, onLifecycleChanged }) {
+export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyChange, onCatalogChanged, onLifecycleChanged }) {
   const [detail, setDetail] = useState(null);
   const [product, setProduct] = useState(null);
   const [metadataText, setMetadataText] = useState("{}");
@@ -411,7 +412,7 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
     }
   };
 
-  const approveMedia = async () => {
+  const approveMedia = async (approval = {}) => {
     if (!mediaJob || !detail.current_draft) return;
     setMediaBusy(true);
     try {
@@ -421,6 +422,7 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
         {
           draft_id: detail.current_draft.revision.id,
           expected_draft_version: detail.current_draft.draft_version,
+          ...approval,
         },
         createIdempotencyKey("approve-media"),
       );
@@ -547,4 +549,11 @@ export default function ProductEditor({ productId, refreshKey = 0, onDirtyChange
       <ProductLifecycleActions product={detail} dirty={dirty} onChanged={lifecycleChanged} />
     </VStack>
   );
+}
+
+export default function ProductEditor(props) {
+  if (Number(props.authoringSchemaVersion || 1) >= 2) {
+    return <CanonicalProductEditor {...props} />;
+  }
+  return <CompatibilityProductEditor {...props} />;
 }

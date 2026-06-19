@@ -4,7 +4,7 @@ import { FiCode } from "react-icons/fi";
 import { useDeveloperLens } from "../DeveloperLensContext";
 import SanitizedJsonViewer from "./SanitizedJsonViewer";
 
-export default function DeveloperLens({ events = [] }) {
+export default function DeveloperLens({ events = [], catalogContext = null }) {
   const { enabled } = useDeveloperLens();
   if (!enabled) return null;
 
@@ -19,9 +19,21 @@ export default function DeveloperLens({ events = [] }) {
           <Text className="panel-title">Sanitized API metadata</Text>
         </Box>
       </HStack>
-      {!developerEvents.length ? (
+      {catalogContext ? (
+        <Box className="developer-event-card" mb={developerEvents.length ? 4 : 0}>
+          <Text className="panel-title" mb={1}>Catalog technical context</Text>
+          <Text className="muted-text" mb={4}>Read-only identifiers, provenance, and metadata for troubleshooting.</Text>
+          <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} mb={4} className="developer-metadata-grid">
+            <Box><Text className="filter-label">Schema</Text><Text>{catalogContext.schema_version || "Not reported"}</Text></Box>
+            <Box><Text className="filter-label">Product ID</Text><Text>{catalogContext.product_id || "Not reported"}</Text></Box>
+            <Box><Text className="filter-label">Draft ID</Text><Text>{catalogContext.draft_id || "No active draft"}</Text></Box>
+          </SimpleGrid>
+          <SanitizedJsonViewer label="Catalog provenance" value={catalogContext} maxChars={6000} />
+        </Box>
+      ) : null}
+      {!developerEvents.length && !catalogContext ? (
         <Text className="muted-text">No developer projections are available for this workflow yet.</Text>
-      ) : (
+      ) : developerEvents.length ? (
         <VStack align="stretch" gap={4}>
           {developerEvents.map((event) => {
             const developer = event.developer || {};
@@ -51,7 +63,7 @@ export default function DeveloperLens({ events = [] }) {
             );
           })}
         </VStack>
-      )}
+      ) : null}
     </Box>
   );
 }
