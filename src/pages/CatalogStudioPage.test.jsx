@@ -97,7 +97,10 @@ describe("CatalogStudioPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Build and manage the product catalog" })).toBeInTheDocument();
     expect(screen.getAllByText("Catalog Studio").length).toBeGreaterThan(1);
-    expect(screen.getByRole("heading", { name: "Describe the product outcome" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create product" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New product" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "Create with OpenAI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage catalog" })).not.toBeInTheDocument();
     expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Developer lens off" })).toHaveAttribute("aria-pressed", "false");
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
@@ -112,7 +115,6 @@ describe("CatalogStudioPage", () => {
     });
     renderStudio();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Manage catalog" }));
     await waitFor(() => expect(api.getAdminCatalogReferences).toHaveBeenCalledTimes(1));
     expect(api.getAdminCatalogProductsV2).toHaveBeenCalled();
     expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
@@ -163,7 +165,6 @@ describe("CatalogStudioPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderStudio();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Manage catalog" }));
     await userEvent.click(await screen.findByRole("button", { name: /First Coat/i }));
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);

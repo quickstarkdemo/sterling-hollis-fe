@@ -44,7 +44,8 @@ function safeErrorMessage(error, fallback) {
   return fallback;
 }
 
-export default function ProductCreationWorkspace({
+export default function ProductWorkbench({
+  activeProductId = "",
   onDirtyChange,
   onCatalogChanged,
   authoringSchemaVersion = 1,
@@ -53,7 +54,7 @@ export default function ProductCreationWorkspace({
   onRetryReferences,
   onBrandAdded,
 }) {
-  const initial = useMemo(restoredState, []);
+  const initial = useMemo(() => activeProductId ? {} : restoredState(), [activeProductId]);
   const { enabled: developerLensEnabled } = useDeveloperLens();
   const { session: catalogStudioSession } = useCatalogStudioAccess();
   const [instruction, setInstruction] = useState("");
@@ -71,6 +72,7 @@ export default function ProductCreationWorkspace({
   const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [editorDirty, setEditorDirty] = useState(false);
   const [voiceResetKey, setVoiceResetKey] = useState(0);
+  const [activeDetail, setActiveDetail] = useState(null);
   const commandInFlight = useRef(false);
   const workflowStartPromise = useRef(null);
   const imageInFlight = useRef(false);
@@ -119,7 +121,7 @@ export default function ProductCreationWorkspace({
       return nextWorkflow;
     } catch (error) {
       if (workflowRequestId.current !== currentRequestId) return null;
-      if (error?.response?.status === 404) {
+      if (error?.response?.status === 404 && !activeProductId) {
         try {
           sessionStorage.removeItem(STORAGE_KEY);
         } catch {
@@ -135,20 +137,25 @@ export default function ProductCreationWorkspace({
       });
       return null;
     }
-  }, [developerLensEnabled, workflowId]);
+  }, [activeProductId, developerLensEnabled, workflowId]);
 
   useEffect(() => {
     if (workflowId) refreshWorkflow(workflowId);
   }, [developerLensEnabled, refreshWorkflow, workflowId]);
 
   useEffect(() => {
-    onDirtyChange?.(Boolean(instruction.trim()) || editorDirty);
-  }, [editorDirty, instruction, onDirtyChange]);
+    onDirtyChange?.(Boolean(!activeProductId && instruction.trim()) || editorDirty);
+  }, [activeProductId, editorDirty, instruction, onDirtyChange]);
 
   const ensureWorkflow = async () => {
     if (workflowId) return workflowId;
     if (workflowStartPromise.current) return workflowStartPromise.current;
-    const workflowPayload = {
+    const activeDraft = activeDetail?.current_draft;
+    const workflowPayload = activeProductId && activeDraft ? {
+      title: `Catalog Studio workbench for ${activeDetail.title || activeProductId}`,
+      business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
+      draft_id: activeDraft.revision.id,
+    } : {
       title: "Catalog Studio product creation",
       business_summary: "Text-guided catalog product creation workflow.",
     };
@@ -158,7 +165,7 @@ export default function ProductCreationWorkspace({
     ).then((started) => {
       setWorkflowId(started.id);
       setWorkflow(started);
-      persist(started.id, null);
+      if (!activeProductId) persist(started.id, null);
       delete mutationKeys.current["start-workflow"];
       trackCatalogStudioMilestone("workflow_started", { workflow_id: started.id });
       return started.id;
@@ -440,10 +447,13 @@ export default function ProductCreationWorkspace({
   };
 
   const lifecycleChanged = async (action, detail) => {
+    setActiveDetail(detail || null);
     if (detail?.current_draft) {
-      const nextDraft = { ...draft, id: detail.current_draft.revision.id, draft_version: detail.current_draft.draft_version };
-      setDraft(nextDraft);
-      persist(workflowId, nextDraft);
+      if (!activeProductId) {
+        const nextDraft = { ...draft, id: detail.current_draft.revision.id, draft_version: detail.current_draft.draft_version };
+        setDraft(nextDraft);
+        persist(workflowId, nextDraft);
+      }
     }
     await refreshWorkflow();
     onCatalogChanged?.();
@@ -458,6 +468,11 @@ export default function ProductCreationWorkspace({
   };
 
   const editorChanged = (detail) => {
+    setActiveDetail(detail || null);
+    if (activeProductId) {
+      onCatalogChanged?.();
+      return;
+    }
     if (detail?.current_draft) {
       const nextDraft = {
         ...draft,
@@ -478,18 +493,47 @@ export default function ProductCreationWorkspace({
     onCatalogChanged?.();
   };
 
+  const editorProductId = activeProductId || draft?.product_id || "";
+  const contextualDraft = activeDetail?.current_draft;
+  const voiceContext = contextualDraft ? {
+    mode: "workbench",
+    product_id: activeDetail.product_id,
+    draft_id: contextualDraft.revision.id,
+    expected_draft_version: contextualDraft.draft_version,
+    query_scopes: ["product", "catalog", "inventory", "readiness"],
+  } : null;
+  const voiceContextKey = voiceContext
+    ? `${voiceContext.product_id}:${voiceContext.draft_id}:${voiceContext.expected_draft_version}`
+    : "new-product";
+  const previousVoiceContextKey = useRef(voiceContextKey);
+  useEffect(() => {
+    if (previousVoiceContextKey.current === voiceContextKey) return;
+    previousVoiceContextKey.current = voiceContextKey;
+    setVoiceResetKey((current) => current + 1);
+  }, [voiceContextKey]);
+
   return (
-    <VStack align="stretch" gap={7} className="product-creation-workspace">
+    <VStack align="stretch" gap={7} className="product-workbench">
       <HStack justify="space-between" gap={4} align="start" flexWrap="wrap">
         <Box>
-          <Text className="section-kicker">Guided creation</Text>
-          <Text as="h2" className="studio-column-title">Describe the product outcome</Text>
-          <Text className="muted-text" mt={2}>Responses structures the draft, Moderation enforces policy, and every backend stage remains visible.</Text>
+          <Text className="section-kicker">Product workbench</Text>
+          <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
+          <Text className="muted-text" mt={2}>Product details, media, inventory, readiness, and AI assistance stay in one workspace.</Text>
         </Box>
-        {workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new workflow</Button> : null}
+        {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
+      </HStack>
+
+      <HStack as="nav" aria-label="Product sections" className="product-workbench-sections" gap={2} flexWrap="wrap">
+        <Button as="a" href="#workbench-product" size="sm" className="secondary-button">Product details</Button>
+        <Button as="a" href="#workbench-media" size="sm" className="secondary-button">Media</Button>
+        <Button as="a" href="#workbench-inventory" size="sm" className="secondary-button">Inventory</Button>
+        <Button as="a" href="#workbench-readiness" size="sm" className="secondary-button">Preview & readiness</Button>
       </HStack>
 
       <Box className="workflow-prompt-panel">
+        <Text className="section-kicker">AI assistant</Text>
+        <Text className="panel-title">{activeProductId ? "Ask about this product" : "Describe the product outcome"}</Text>
+        {!activeProductId ? <>
         <Textarea
           aria-label="Catalog product instruction"
           value={instruction}
@@ -505,12 +549,14 @@ export default function ProductCreationWorkspace({
             <FiSend /> {submitting ? "Working…" : draft ? "Refine draft" : "Create draft"}
           </Button>
         </HStack>
+        </> : <Text className="muted-text" mt={2}>Use voice to ask about the active product, inventory, catalog context, or publish readiness. Manual editing remains available at all times.</Text>}
         <VoiceControls
           workflowId={workflowId}
           ensureWorkflow={ensureWorkflow}
-          disabled={Boolean(publishedProductId) || submitting || imageBusy}
+          disabled={Boolean(publishedProductId) || submitting || imageBusy || Boolean(activeProductId && !voiceContext)}
           realtimeCapability={catalogStudioSession?.capabilities?.realtime}
           resetSignal={voiceResetKey}
+          sessionContext={voiceContext}
           onToolResult={voiceToolResult}
           onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
         />
@@ -539,7 +585,7 @@ export default function ProductCreationWorkspace({
       ) : null}
 
       <SimpleGrid columns={{ base: 1, xl: usesCanonicalEditor ? 1 : 2 }} gap={6} alignItems="start">
-        <Box className="workflow-stage-panel">
+        <Box id="workbench-readiness" className="workflow-stage-panel">
           <Text className="section-kicker">API stages</Text>
           <Text className="panel-title" mb={4}>Business timeline</Text>
           <ApiStageTimeline events={workflow?.events || []} />
@@ -572,13 +618,13 @@ export default function ProductCreationWorkspace({
 
       <DeveloperLens events={workflow?.events || []} />
 
-      {draft?.product_id && !publishedProductId ? (
-        <Box>
+      {editorProductId && !publishedProductId ? (
+        <Box id="workbench-product">
           <HStack justify="space-between" gap={3} mb={4} flexWrap="wrap">
-            <Box><Text className="section-kicker">Review</Text><Text className="panel-title">Edit and publish the generated draft</Text></Box>
+            <Box><Text className="section-kicker">Product details</Text><Text className="panel-title">Edit and publish the product draft</Text></Box>
           </HStack>
           <ProductEditor
-            productId={draft.product_id}
+            productId={editorProductId}
             refreshKey={editorRefreshKey}
             onDirtyChange={setEditorDirty}
             onCatalogChanged={editorChanged}
@@ -588,6 +634,7 @@ export default function ProductCreationWorkspace({
             referencesStatus={referencesStatus}
             onRetryReferences={onRetryReferences}
             onBrandAdded={onBrandAdded}
+            onDetailChange={setActiveDetail}
           />
         </Box>
       ) : null}

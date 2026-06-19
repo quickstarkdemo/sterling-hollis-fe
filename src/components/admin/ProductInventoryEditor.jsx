@@ -48,7 +48,7 @@ export default function ProductInventoryEditor({
   const defaultAvailability = availability[0]?.id || "in stock";
 
   return (
-    <Box className="editor-section product-inventory-editor">
+    <Box id="workbench-inventory" className="editor-section product-inventory-editor">
       <HStack justify="space-between" gap={3} align="start" flexWrap="wrap" mb={4}>
         <Box>
           <Text className="panel-title">Store inventory</Text>

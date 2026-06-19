@@ -9,6 +9,7 @@ import VoiceControls from "./VoiceControls";
 const api = vi.hoisted(() => ({
   createCatalogRealtimeSession: vi.fn(),
   submitCatalogRealtimeToolCall: vi.fn(),
+  submitCatalogRealtimeV3ToolCall: vi.fn(),
 }));
 
 vi.mock("../../utils/apiClient", () => api);
@@ -85,6 +86,11 @@ describe("VoiceControls", () => {
       message: "Draft refined.",
       retryable: false,
       draft: { id: "draft_1", draft_version: 2 },
+    });
+    api.submitCatalogRealtimeV3ToolCall.mockReset().mockResolvedValue({
+      mutation: false,
+      message: "Dallas is low on stock.",
+      citations: [],
     });
   });
 
@@ -231,6 +237,38 @@ describe("VoiceControls", () => {
     expect(onToolResult).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("function_call_output"));
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("response.create"));
+  });
+
+  it("pins workbench voice calls to the active product session", async () => {
+    const context = {
+      mode: "workbench",
+      product_id: "cat_one",
+      draft_id: "draft_one",
+      expected_draft_version: 3,
+      query_scopes: ["product", "catalog", "inventory", "readiness"],
+    };
+    api.createCatalogRealtimeSession.mockResolvedValueOnce(session({
+      session_id: "realtime_session_one",
+      tool_names: ["read_inventory_status"],
+    }));
+    const { channel } = renderVoice({ props: { sessionContext: context } });
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    act(() => channel.message({
+      type: "response.function_call_arguments.done",
+      call_id: "call_inventory",
+      name: "read_inventory_status",
+      arguments: JSON.stringify({ question: "Which store is low on stock?" }),
+    }));
+
+    expect(api.createCatalogRealtimeSession).toHaveBeenCalledWith("workflow_1", context);
+    await waitFor(() => expect(api.submitCatalogRealtimeV3ToolCall).toHaveBeenCalledWith(
+      "workflow_1",
+      expect.objectContaining({ session_id: "realtime_session_one", name: "read_inventory_status" }),
+      "voice-tool-call_inventory",
+    ));
+    expect(api.submitCatalogRealtimeToolCall).not.toHaveBeenCalled();
   });
 
   it("uses current workflow callbacks for events arriving after a parent rerender", async () => {

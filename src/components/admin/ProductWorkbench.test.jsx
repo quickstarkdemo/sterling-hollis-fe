@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DeveloperLensProvider from "../DeveloperLensProvider";
 import { renderWithProviders } from "../../test/render";
-import ProductCreationWorkspace from "./ProductCreationWorkspace";
+import ProductWorkbench from "./ProductWorkbench";
 
 const api = vi.hoisted(() => ({
   approveCatalogImageJob: vi.fn(),
@@ -72,10 +72,10 @@ const draft = {
 };
 
 function renderWorkspace(props = {}) {
-  return renderWithProviders(<DeveloperLensProvider><ProductCreationWorkspace {...props} /></DeveloperLensProvider>, { route: "/catalog-studio" });
+  return renderWithProviders(<DeveloperLensProvider><ProductWorkbench {...props} /></DeveloperLensProvider>, { route: "/catalog-studio" });
 }
 
-describe("ProductCreationWorkspace", () => {
+describe("ProductWorkbench", () => {
   beforeEach(() => {
     api.startCatalogWorkflow.mockReset().mockResolvedValue({ ...baseWorkflow, events: [] });
     api.getCatalogWorkflow.mockReset().mockResolvedValue(baseWorkflow);

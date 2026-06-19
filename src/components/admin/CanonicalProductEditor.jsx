@@ -151,6 +151,7 @@ export default function CanonicalProductEditor({
   referencesError,
   onRetryReferences,
   onBrandAdded,
+  onDetailChange,
 }) {
   const references = providedReferences || emptyReferences;
   const [detail, setDetail] = useState(null);
@@ -186,7 +187,8 @@ export default function CanonicalProductEditor({
     setServerErrors([]);
     setConflict(false);
     setError(null);
-  }, []);
+    onDetailChange?.(nextDetail);
+  }, [onDetailChange]);
 
   const load = useCallback(async () => {
     if (!productId) return null;

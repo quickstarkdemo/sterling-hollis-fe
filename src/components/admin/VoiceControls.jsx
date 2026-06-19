@@ -2,14 +2,10 @@ import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FiMic, FiMicOff, FiRefreshCw } from "react-icons/fi";
 
-import {
-  createCatalogRealtimeSession,
-  submitCatalogRealtimeToolCall,
-} from "../../utils/apiClient";
+import useCatalogRealtimeSession from "../../hooks/useCatalogRealtimeSession";
 import RealtimeTranscript from "./RealtimeTranscript";
 
 const ACTIVE_STATES = new Set(["requesting", "connecting", "listening"]);
-const ALLOWED_TOOLS = new Set(["create_catalog_draft", "refine_catalog_draft"]);
 const REALTIME_WEBRTC_URL = "https://api.openai.com/v1/realtime/calls";
 const MAX_TRANSCRIPT_ENTRIES = 24;
 const MAX_TRANSCRIPT_CHARS = 4000;
@@ -90,6 +86,7 @@ export default function VoiceControls({
   onToolResult,
   onWorkflowEvent,
   resetSignal = 0,
+  sessionContext,
   createPeerConnection = defaultPeerConnection,
   requestMicrophone = defaultMicrophoneRequest,
   exchangeSdp = defaultSdpExchange,
@@ -114,6 +111,7 @@ export default function VoiceControls({
   const resetSignalRef = useRef(resetSignal);
   const callbacksRef = useRef({ onToolResult, onWorkflowEvent });
   callbacksRef.current = { onToolResult, onWorkflowEvent };
+  const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
   const clearResources = useCallback(() => {
     if (expiryRef.current) clearTimeout(expiryRef.current);
@@ -133,9 +131,10 @@ export default function VoiceControls({
   const endSession = useCallback((nextStatus, nextNotice = "") => {
     generationRef.current += 1;
     clearResources();
+    resetBackendSession();
     setStatus(nextStatus);
     setNotice(nextNotice);
-  }, [clearResources]);
+  }, [clearResources, resetBackendSession]);
 
   useEffect(() => () => {
     generationRef.current += 1;
@@ -179,13 +178,7 @@ export default function VoiceControls({
     handledCallsRef.current.add(callId);
 
     try {
-      if (!ALLOWED_TOOLS.has(event.name)) throw new Error("unsupported_tool");
-      const argumentsPayload = JSON.parse(event.arguments || "{}");
-      const result = await submitCatalogRealtimeToolCall(activeWorkflowId, {
-        call_id: callId,
-        name: event.name,
-        arguments: argumentsPayload,
-      }, voiceIdempotencyKey(callId));
+      const result = await submitToolCall(activeWorkflowId, event, voiceIdempotencyKey(callId));
       if (generationRef.current !== generation) return;
       callbacksRef.current.onToolResult?.(result, activeWorkflowId);
       callbacksRef.current.onWorkflowEvent?.(activeWorkflowId);
@@ -265,7 +258,7 @@ export default function VoiceControls({
       const activeWorkflowId = workflowId || await ensureWorkflow?.();
       if (generationRef.current !== generation) return;
       if (!activeWorkflowId) throw new Error("workflow_unavailable");
-      const session = await createCatalogRealtimeSession(activeWorkflowId);
+      const session = await startBackendSession(activeWorkflowId);
       if (generationRef.current !== generation) return;
       callbacksRef.current.onWorkflowEvent?.(activeWorkflowId);
 

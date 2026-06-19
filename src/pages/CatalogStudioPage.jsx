@@ -1,12 +1,11 @@
-import { Box, Button, Container, Flex, HStack, Text } from "@chakra-ui/react";
-import { FiCode, FiEye } from "react-icons/fi";
+import { Box, Button, Container, Flex, Text } from "@chakra-ui/react";
+import { FiCode, FiEye, FiPlus } from "react-icons/fi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDeveloperLens } from "../components/DeveloperLensContext";
 import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
 import CatalogProductList from "../components/admin/CatalogProductList";
-import ProductCreationWorkspace from "../components/admin/ProductCreationWorkspace";
-import ProductEditor from "../components/admin/ProductEditor";
+import ProductWorkbench from "../components/admin/ProductWorkbench";
 import { getAdminCatalogReferences } from "../utils/apiClient";
 
 export default function CatalogStudioPage() {
@@ -15,7 +14,6 @@ export default function CatalogStudioPage() {
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
-  const [studioMode, setStudioMode] = useState("create");
   const [references, setReferences] = useState(null);
   const [referencesStatus, setReferencesStatus] = useState("idle");
   const loadedReferenceVersion = useRef(0);
@@ -58,12 +56,12 @@ export default function CatalogStudioPage() {
     setCatalogRefreshKey((current) => current + 1);
   }, []);
 
-  const switchMode = useCallback((nextMode) => {
-    if (nextMode === studioMode) return;
-    if (editorDirty && !window.confirm("Discard unsaved changes and switch Catalog Studio modes?")) return;
+  const createProduct = useCallback(() => {
+    if (!selectedProductId) return;
+    if (editorDirty && !window.confirm("Discard unsaved changes and start a new product?")) return;
+    setSelectedProductId("");
     setEditorDirty(false);
-    setStudioMode(nextMode);
-  }, [editorDirty, studioMode]);
+  }, [editorDirty, selectedProductId]);
 
   useEffect(() => {
     if (!editorDirty) return undefined;
@@ -106,13 +104,22 @@ export default function CatalogStudioPage() {
       </Box>
 
       <Container maxW="1440px" py={{ base: 6, md: 8 }}>
-        <HStack className="studio-mode-switcher" gap={2} mb={6}>
-          <Button type="button" className={studioMode === "create" ? "primary-button" : "secondary-button"} onClick={() => switchMode("create")}>Create with OpenAI</Button>
-          <Button type="button" className={studioMode === "manage" ? "primary-button" : "secondary-button"} onClick={() => switchMode("manage")}>Manage catalog</Button>
-        </HStack>
-
-        {studioMode === "create" ? (
-          <ProductCreationWorkspace
+        <Box className="catalog-workbench-layout">
+          <Box className="catalog-workbench-navigation">
+            <Button type="button" className="primary-button catalog-new-product" onClick={createProduct} aria-pressed={!selectedProductId}>
+              <FiPlus /> New product
+            </Button>
+            <CatalogProductList
+              selectedProductId={selectedProductId}
+              onSelect={selectProduct}
+              refreshKey={catalogRefreshKey}
+              authoringSchemaVersion={authoringSchemaVersion}
+              referenceCategories={references?.categories}
+            />
+          </Box>
+          <ProductWorkbench
+            key={selectedProductId || "new-product"}
+            activeProductId={selectedProductId}
             onDirtyChange={setEditorDirty}
             onCatalogChanged={catalogChanged}
             authoringSchemaVersion={authoringSchemaVersion}
@@ -121,30 +128,7 @@ export default function CatalogStudioPage() {
             onRetryReferences={loadReferences}
             onBrandAdded={brandAdded}
           />
-        ) : (
-          <Box className="catalog-management-layout">
-            <CatalogProductList
-              selectedProductId={selectedProductId}
-              onSelect={selectProduct}
-              refreshKey={catalogRefreshKey}
-              authoringSchemaVersion={authoringSchemaVersion}
-              referenceCategories={references?.categories}
-            />
-            <Box minW={0}>
-              <ProductEditor
-                key={selectedProductId || "empty-editor"}
-                productId={selectedProductId}
-                onDirtyChange={setEditorDirty}
-                onCatalogChanged={catalogChanged}
-                authoringSchemaVersion={authoringSchemaVersion}
-                references={references}
-                referencesStatus={referencesStatus}
-                onRetryReferences={loadReferences}
-                onBrandAdded={brandAdded}
-              />
-            </Box>
-          </Box>
-        )}
+        </Box>
       </Container>
     </Box>
   );

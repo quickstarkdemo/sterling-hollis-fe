@@ -118,7 +118,7 @@ export default function ProductMediaEditor({
   };
 
   return (
-    <Box className="editor-section product-media-editor">
+    <Box id="workbench-media" className="editor-section product-media-editor">
       <HStack justify="space-between" gap={3} mb={4} align="start" flexWrap="wrap">
         <Box>
           <Text className="panel-title">Images</Text>
