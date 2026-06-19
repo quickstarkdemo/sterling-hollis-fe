@@ -2,6 +2,8 @@ import { datadogLogs } from "@datadog/browser-logs";
 import { datadogRum } from "@datadog/browser-rum";
 import { reactPlugin } from "@datadog/browser-rum-react";
 
+import { isApiTracePropagationActive } from "./apiTraceClient";
+
 const STERLING_HOLLIS_API_ORIGIN = "https://sterling-hollis-be.quickstark.com";
 const DATADOG_STATE_KEY = "__STERLING_HOLLIS_DATADOG__";
 const datadogState = (globalThis[DATADOG_STATE_KEY] ||= {
@@ -46,15 +48,22 @@ function toTracingPrefix(origin) {
   return origin ? `${origin}/` : "";
 }
 
-function getAllowedTracingUrls() {
+export function getAllowedTracingUrls() {
   const apiUrl = normalizeOrigin(import.meta.env.VITE_API_URL);
   const apiProxyTarget = normalizeOrigin(import.meta.env.VITE_API_PROXY_TARGET);
   const browserOrigin = normalizeOrigin(window.location.origin);
 
-  return [
+  const matches = [
     ...uniqueTruthy([STERLING_HOLLIS_API_ORIGIN, apiProxyTarget, apiUrl, browserOrigin]).map(toTracingPrefix),
     isLocalDevelopmentUrl,
   ];
+  return matches.map((match) => ({
+    match: (url) => !isApiTracePropagationActive()
+      && (typeof match === "function" ? match(url) : String(url).startsWith(match)),
+    // W3C preserves Datadog distributed tracing while avoiding x-datadog CORS
+    // headers. During an app trace, the app runtime owns this header exclusively.
+    propagatorTypes: ["tracecontext"],
+  }));
 }
 
 function getSampleRate(value, fallback) {

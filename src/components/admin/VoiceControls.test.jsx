@@ -4,6 +4,11 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../test/render";
+import {
+  configureApiTraceRuntime,
+  resetApiTraceRuntimeForTests,
+  subscribeApiTraceEvents,
+} from "../../utils/apiTraceClient";
 import VoiceControls from "./VoiceControls";
 
 const api = vi.hoisted(() => ({
@@ -80,6 +85,12 @@ function renderVoice(overrides = {}) {
 
 describe("VoiceControls", () => {
   beforeEach(() => {
+    resetApiTraceRuntimeForTests();
+    configureApiTraceRuntime({
+      authorized: true,
+      enabled: true,
+      surface: "catalog-studio",
+    });
     api.createCatalogRealtimeSession.mockReset().mockResolvedValue(session());
     api.submitCatalogRealtimeToolCall.mockReset().mockResolvedValue({
       status: "succeeded",
@@ -106,6 +117,34 @@ describe("VoiceControls", () => {
     expect(await screen.findByText("listening")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop voice" })).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent("ephemeral-secret");
+  });
+
+  it("records bounded Realtime lifecycle events without audio, credentials, SDP, or transcript text", async () => {
+    const events = [];
+    const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
+    const { channel } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    act(() => channel.message({
+      type: "conversation.item.input_audio_transcription.completed",
+      transcript: "private spoken product instruction",
+      raw_audio: "private-audio",
+    }));
+    await userEvent.click(await screen.findByRole("button", { name: "Stop voice" }));
+    unsubscribe();
+
+    expect(events.map((event) => event.event_type)).toEqual(expect.arrayContaining([
+      "ui.started",
+      "realtime.connected",
+      "realtime.disconnected",
+      "ui.completed",
+    ]));
+    const encoded = JSON.stringify(events);
+    expect(encoded).not.toContain("private spoken product instruction");
+    expect(encoded).not.toContain("private-audio");
+    expect(encoded).not.toContain("ephemeral-secret");
+    expect(encoded).not.toContain("offer-sdp");
   });
 
   it("starts the shared microphone when an inline field control selects a pinned target", async () => {

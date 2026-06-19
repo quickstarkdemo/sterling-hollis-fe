@@ -10,12 +10,14 @@ import StyleFinderPage from "./pages/StyleFinderPage";
 import ChatContextProvider from "./components/ChatContextProvider";
 import AdminRoute, { CatalogStudioAccessProvider } from "./components/AdminRoute";
 import DeveloperLensProvider from "./components/DeveloperLensProvider";
+import { ApiTraceCapabilityBridge } from "./components/ApiTraceProvider";
 import Shell from "./components/Shell";
 
 export default function App() {
   return (
     <CatalogStudioAccessProvider>
       <DeveloperLensProvider>
+        <ApiTraceCapabilityBridge />
         <ChatContextProvider>
           <Shell>
             <Routes>
