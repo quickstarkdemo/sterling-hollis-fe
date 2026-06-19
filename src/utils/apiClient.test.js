@@ -39,6 +39,7 @@ import {
   submitCatalogImageCommand,
   submitCatalogMediaCommand,
   submitCatalogRealtimeToolCall,
+  submitCatalogRealtimeV3ToolCall,
   updateDemoObservabilityState,
 } from "./apiClient";
 
@@ -220,7 +221,8 @@ it("uses production Catalog Workflow routes for guided creation and images", asy
 });
 
 it("uses workflow-bound Realtime routes without exposing provider credentials", async () => {
-  await createCatalogRealtimeSession("workflow/one");
+  const context = { mode: "workbench", product_id: "cat_1", draft_id: "draft_1", expected_draft_version: 1, query_scopes: ["product"] };
+  await createCatalogRealtimeSession("workflow/one", context);
   await submitCatalogRealtimeToolCall("workflow/one", {
     call_id: "call_1",
     name: "refine_catalog_draft",
@@ -230,12 +232,24 @@ it("uses workflow-bound Realtime routes without exposing provider credentials", 
       expected_draft_version: 1,
     },
   }, "voice-call-key");
+  await submitCatalogRealtimeV3ToolCall("workflow/one", {
+    session_id: "session_1",
+    call_id: "call_2",
+    name: "read_product_summary",
+    arguments: { question: "What product is active?" },
+  }, "voice-v3-key");
 
   expect(client.post).toHaveBeenNthCalledWith(
     1,
     "/api/admin/catalog/workflows/workflow%2Fone/realtime/sessions",
+    context,
     undefined,
-    undefined,
+  );
+  expect(client.post).toHaveBeenNthCalledWith(
+    3,
+    "/api/admin/catalog/workflows/workflow%2Fone/realtime/v3/tool-calls",
+    expect.objectContaining({ session_id: "session_1", name: "read_product_summary" }),
+    { headers: { "Idempotency-Key": "voice-v3-key" } },
   );
   expect(client.post).toHaveBeenNthCalledWith(
     2,

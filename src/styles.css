@@ -996,6 +996,37 @@ a {
   align-items: start;
 }
 
+.catalog-workbench-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.catalog-workbench-navigation {
+  position: sticky;
+  top: 88px;
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-new-product {
+  width: 100%;
+}
+
+.product-workbench {
+  min-width: 0;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.84);
+}
+
+.product-workbench-sections {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
 .studio-mode-switcher {
   padding: 6px;
   width: fit-content;
@@ -1526,6 +1557,14 @@ a {
 
   .catalog-management-layout {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-workbench-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-workbench-navigation {
+    position: static;
   }
 
   .catalog-product-list {

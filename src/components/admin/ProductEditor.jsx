@@ -166,7 +166,7 @@ function variantImageUrl(variant) {
     || "";
 }
 
-export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyChange, onCatalogChanged, onLifecycleChanged }) {
+export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyChange, onCatalogChanged, onLifecycleChanged, onDetailChange }) {
   const [detail, setDetail] = useState(null);
   const [product, setProduct] = useState(null);
   const [metadataText, setMetadataText] = useState("{}");
@@ -203,7 +203,8 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
     setServerErrors([]);
     setConflict(false);
     setError(null);
-  }, []);
+    onDetailChange?.(nextDetail);
+  }, [onDetailChange]);
 
   const load = useCallback(async () => {
     if (!productId) return;
