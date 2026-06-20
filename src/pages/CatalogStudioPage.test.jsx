@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   getAdminCatalogReferences: vi.fn(),
   getCategories: vi.fn(),
   getCatalogStudioSession: vi.fn(),
+  queryCatalogAssistant: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
   saveAdminCatalogProductDraft: vi.fn(),
   startAdminCatalogProductRevision: vi.fn(),

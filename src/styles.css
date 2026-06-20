@@ -2060,6 +2060,48 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   border-top: 1px solid rgba(23, 19, 15, 0.12);
 }
 
+.catalog-global-assistant {
+  padding: 18px;
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.catalog-assistant-thread {
+  display: grid;
+  gap: 12px;
+  max-height: 352px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(23, 19, 15, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.catalog-assistant-message {
+  max-width: min(100%, 768px);
+  padding: 12px;
+  border: 1px solid rgba(23, 19, 15, 0.1);
+  border-radius: 8px;
+  background: var(--paper-deep);
+}
+
+.catalog-assistant-message.user {
+  justify-self: end;
+  background: rgba(194, 128, 66, 0.1);
+}
+
+.catalog-assistant-message.system {
+  justify-self: center;
+  background: rgba(96, 114, 77, 0.08);
+}
+
+.catalog-assistant-citations .workflow-status {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
 .realtime-transcript {
   padding: 14px;
   border: 1px solid rgba(23, 19, 15, 0.1);

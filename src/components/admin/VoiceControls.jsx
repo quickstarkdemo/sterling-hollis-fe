@@ -92,6 +92,7 @@ function voiceIdempotencyKey(callId) {
 export default function VoiceControls({
   workflowId,
   disabled = false,
+  assistantMode = "edit",
   realtimeCapability,
   ensureWorkflow,
   onToolResult,
@@ -405,12 +406,18 @@ export default function VoiceControls({
   const active = ACTIVE_STATES.has(status);
   const configurationUnavailable = realtimeCapability?.configured === false;
   const displayStatus = configurationUnavailable ? "unavailable" : status;
+  const idleContextCopy = assistantMode === "read"
+    ? `Voice is scoped to ${contextLabel}. Start a session to ask a bounded catalog question.`
+    : `Voice is scoped to ${contextLabel}. Start a session to dictate or request a refinement.`;
+  const listeningContextCopy = assistantMode === "read"
+    ? `Listening for questions about ${contextLabel}. Answers are read-only and cited.`
+    : `Listening for changes to ${contextLabel}. The result will be staged for review.`;
   const displayCopy = configurationUnavailable
     ? configurationCopy[realtimeCapability.reason] || "Voice is not configured in this environment. Use text or ask an operator to review the backend settings."
     : contextLabel && status === "idle"
-      ? `Voice is scoped to ${contextLabel}. Start a session to dictate or request a refinement.`
+      ? idleContextCopy
       : contextLabel && status === "listening"
-        ? `Listening for changes to ${contextLabel}. The result will be staged for review.`
+        ? listeningContextCopy
         : statusCopy[status];
 
   return (

@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   generateCatalogSuggestionSet: vi.fn(),
   getCatalogImageJob: vi.fn(),
   getCatalogWorkflow: vi.fn(),
+  queryCatalogAssistant: vi.fn(),
   startCatalogWorkflow: vi.fn(),
   submitCatalogDraftCommand: vi.fn(),
   submitCatalogImageCommand: vi.fn(),
@@ -24,7 +25,26 @@ vi.mock("./ProductEditor", () => ({
       Editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onCatalogChanged?.({ product_id: productId, current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Simulate editor save</button>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>Simulate publication</button>
-      <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Studio Coat", current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Load authoring draft</button>
+      <button type="button" onClick={() => onDetailChange?.({
+        product_id: productId,
+        title: "Studio Coat",
+        current_draft: {
+          revision: { id: "draft_1" },
+          draft_version: 2,
+          product: {
+            product_id: productId,
+            title: "Studio Coat",
+            description: "A structured coat.",
+            brand: "Sterling Hollis",
+            category: "womens_apparel",
+            variants: [{
+              variant_id: "var_black",
+              color: "Black",
+              inventory: [{ store_id: "1001", size: "M", availability: "low stock", inventory_qty: 3 }],
+            }],
+          },
+        },
+      })}>Load authoring draft</button>
     </div>
   ),
 }));
@@ -38,15 +58,16 @@ vi.mock("./ProductReviewPanel", () => ({
   default: ({ productId, manualEditsPending }) => <div data-testid="product-review-panel">Reviews for {productId}; edits {manualEditsPending ? "pending" : "saved"}</div>,
 }));
 vi.mock("./VoiceControls", () => ({
-  default: ({ ensureWorkflow, onToolResult, sessionContext, contextLabel }) => (
-    <div data-testid="voice-controls">
-      <button type="button" onClick={() => { void ensureWorkflow?.(); }}>Start voice workflow</button>
+  default: ({ assistantMode = "edit", ensureWorkflow, onToolResult, sessionContext, contextLabel }) => (
+    <div data-testid={assistantMode === "read" ? "catalog-assistant-voice-controls" : "voice-controls"}>
+      <button type="button" onClick={() => { void ensureWorkflow?.(); }}>{assistantMode === "read" ? "Start assistant voice" : "Start voice workflow"}</button>
       <button type="button" onClick={() => onToolResult?.({
         status: "succeeded",
-        message: "Draft updated by voice.",
+        message: assistantMode === "read" ? "Low stock appears across the catalog." : "Draft updated by voice.",
+        citations: assistantMode === "read" ? [{ kind: "inventory", source_id: "cat:1001:M", label: "Dallas", value: { store_name: "Dallas", inventory_qty: 2 } }] : [],
         draft: { id: "draft_1", product_id: "cat_coat", draft_version: 2 },
         workflow: baseWorkflow,
-      }, "workflow_1")}>Simulate voice result</button>
+      }, "workflow_1")}>{assistantMode === "read" ? "Simulate assistant voice result" : "Simulate voice result"}</button>
       <span>Voice mode {sessionContext?.mode || "none"}; target {sessionContext?.target_path || "none"}; label {contextLabel || "none"}</span>
     </div>
   ),
@@ -95,6 +116,11 @@ describe("ProductWorkbench", () => {
   beforeEach(() => {
     api.startCatalogWorkflow.mockReset().mockResolvedValue({ ...baseWorkflow, events: [] });
     api.getCatalogWorkflow.mockReset().mockResolvedValue(baseWorkflow);
+    api.queryCatalogAssistant.mockReset().mockResolvedValue({
+      message: "Low stock appears across the catalog: Dallas has 2 unit(s) of Studio Coat.",
+      citations: [{ kind: "inventory", source_id: "cat:1001:M", label: "Dallas: Studio Coat", value: { store_name: "Dallas", inventory_qty: 2 } }],
+      mutation: false,
+    });
     api.submitCatalogDraftCommand.mockReset().mockResolvedValue({ status: "succeeded", message: "Draft created.", retryable: false, replayed: false, draft, workflow: baseWorkflow });
     api.submitCatalogImageCommand.mockReset();
     api.getCatalogImageJob.mockReset();
@@ -167,6 +193,46 @@ describe("ProductWorkbench", () => {
     expect(await screen.findByText("Draft updated by voice.")).toBeInTheDocument();
     expect(screen.getByText("Draft version 2")).toBeInTheDocument();
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat; schema 2; stores 1");
+  });
+
+  it("answers store-wide assistant text questions with bounded citations", async () => {
+    renderWorkspace();
+
+    await userEvent.type(screen.getByLabelText("Catalog assistant question"), "Which stores have low stock?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    await waitFor(() => expect(api.queryCatalogAssistant).toHaveBeenCalledWith({
+      question: "Which stores have low stock?",
+      query_scopes: ["catalog", "inventory"],
+    }));
+    expect(await screen.findByText(/Low stock appears across the catalog/i)).toBeInTheDocument();
+    expect(screen.getByText(/inventory: Dallas: 2 unit/i)).toBeInTheDocument();
+    expect(api.submitCatalogDraftCommand).not.toHaveBeenCalled();
+  });
+
+  it("starts a read-only store-wide voice workflow without product context", async () => {
+    renderWorkspace();
+
+    expect(screen.getByTestId("catalog-assistant-voice-controls")).toHaveTextContent("Voice mode workbench; target none; label entire catalog and inventory");
+    await userEvent.click(screen.getByRole("button", { name: "Start assistant voice" }));
+
+    await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
+      title: "Product Catalog assistant",
+      business_summary: "Read-only catalog and inventory assistant workflow.",
+    }, "start-workflow-key"));
+  });
+
+  it("enables current-product assistant drill-down only after product detail loads", async () => {
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+    expect(screen.getByRole("button", { name: "Current product" })).toBeDisabled();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
+    await userEvent.click(screen.getByRole("button", { name: "Current product" }));
+    await userEvent.type(screen.getByLabelText("Catalog assistant question"), "What is low stock for this product?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    expect(await screen.findByText(/Studio Coat inventory: 1001 has 3 unit/i)).toBeInTheDocument();
+    expect(api.queryCatalogAssistant).not.toHaveBeenCalled();
   });
 
   it("uses one product chat for product-wide voice context", async () => {

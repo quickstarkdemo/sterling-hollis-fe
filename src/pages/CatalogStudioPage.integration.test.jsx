@@ -23,6 +23,7 @@ const api = vi.hoisted(() => ({
   getCatalogImageJob: vi.fn(),
   getCatalogStudioSession: vi.fn(),
   getCatalogWorkflow: vi.fn(),
+  queryCatalogAssistant: vi.fn(),
   startCatalogWorkflow: vi.fn(),
   submitCatalogDraftCommand: vi.fn(),
   submitCatalogImageCommand: vi.fn(),
@@ -52,18 +53,18 @@ vi.mock("../components/admin/SuggestionReviewPanel", () => ({
   default: ({ productId, refreshSignal, onDraftChanged }) => <div data-testid="contract-suggestion-review">Suggestion review for {productId}; refresh {refreshSignal}<button type="button" onClick={() => onDraftChanged?.({ draft: { draft_version: 2 } })}>Accept supplier description</button></div>,
 }));
 vi.mock("../components/admin/VoiceControls", () => ({
-  default: ({ onToolResult, realtimeCapability, sessionContext, workflowId }) => (
+  default: ({ assistantMode = "edit", onToolResult, realtimeCapability, sessionContext, workflowId }) => (
     <div>
-      <span>Realtime capability: {realtimeCapability?.reason || (realtimeCapability?.configured ? "ready" : "unknown")}</span>
-      <span>Voice context: {sessionContext?.mode || "none"}</span>
+      <span>{assistantMode === "read" ? "Assistant realtime capability" : "Realtime capability"}: {realtimeCapability?.reason || (realtimeCapability?.configured ? "ready" : "unknown")}</span>
+      <span>{assistantMode === "read" ? "Assistant voice context" : "Voice context"}: {sessionContext?.mode || "none"}</span>
       <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Dallas has two units; no product state changed." }, workflowId)}>
-        Ask grounded inventory question
+        {assistantMode === "read" ? "Ask assistant inventory question" : "Ask grounded inventory question"}
       </button>
       <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Product voice proposal is ready.", suggestion_set: { id: "voice_set" } }, workflowId)}>
-        Complete product voice proposal
+        {assistantMode === "read" ? "Complete assistant voice answer" : "Complete product voice proposal"}
       </button>
       <button type="button" onClick={() => onToolResult?.({ status: "failed", message: "Voice is unavailable; continue with text." }, workflowId)}>
-        Simulate voice failure
+        {assistantMode === "read" ? "Simulate assistant voice failure" : "Simulate voice failure"}
       </button>
     </div>
   ),

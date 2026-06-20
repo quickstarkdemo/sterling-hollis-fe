@@ -1,0 +1,268 @@
+import { Badge, Box, Button, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiChevronDown, FiChevronUp, FiSend } from "react-icons/fi";
+
+import { queryCatalogAssistant } from "../../utils/apiClient";
+import VoiceControls from "./VoiceControls";
+
+const MAX_MESSAGES = 12;
+
+function productSnapshot(detail) {
+  return detail?.current_draft?.product || detail?.published_snapshot || null;
+}
+
+function productInventoryRows(product) {
+  return (product?.variants || []).flatMap((variant) =>
+    (variant.inventory || []).map((row) => ({
+      ...row,
+      variant_id: variant.variant_id,
+      color: variant.color,
+      size: row.size || variant.size || "",
+    })),
+  );
+}
+
+function productAnswer(detail, question) {
+  const product = productSnapshot(detail);
+  if (!product) {
+    return {
+      message: "Select a product with a loaded draft before asking for current-product drill-down.",
+      citations: [],
+    };
+  }
+  const inventory = productInventoryRows(product);
+  const lowStock = inventory.filter((row) =>
+    String(row.availability || "").toLowerCase() === "low stock" || Number(row.inventory_qty || 0) <= 5,
+  );
+  const inventoryFocus = /stock|inventory|store|unit|available|availability/i.test(question);
+  const citations = [
+    {
+      kind: "product",
+      source_id: product.product_id || detail.product_id,
+      label: product.title || detail.title || "Current product",
+      value: {
+        product_id: product.product_id || detail.product_id,
+        title: product.title || detail.title,
+        brand: product.brand,
+        category: product.category,
+      },
+    },
+    ...inventory.slice(0, 5).map((row) => ({
+      kind: "inventory",
+      source_id: `${product.product_id || detail.product_id}:${row.store_id}:${row.variant_id || row.size || "inventory"}`,
+      label: `${row.store_id || "Store"}${row.size ? ` ${row.size}` : ""}`,
+      value: {
+        store_id: row.store_id,
+        size: row.size,
+        color: row.color,
+        availability: row.availability,
+        inventory_qty: row.inventory_qty,
+      },
+    })),
+  ];
+  if (inventoryFocus) {
+    const rows = lowStock.length ? lowStock : inventory;
+    const preview = rows.slice(0, 3).map((row) =>
+      `${row.store_id || "store"} has ${Number(row.inventory_qty || 0)} unit(s)${row.size ? ` in ${row.size}` : ""}`,
+    ).join("; ");
+    return {
+      message: preview
+        ? `${product.title || detail.title} inventory: ${preview}.`
+        : `${product.title || detail.title} has no inventory rows in the loaded draft.`,
+      citations,
+    };
+  }
+  return {
+    message: `${product.title || detail.title} is ${product.brand || "an unbranded item"} in ${product.category || "the catalog"}. ${product.description || "No description is available in the loaded draft."}`,
+    citations,
+  };
+}
+
+function citationLabel(citation) {
+  const value = citation.value || {};
+  if (citation.kind === "inventory") {
+    const qty = value.inventory_qty ?? "";
+    const store = value.store_name || value.store_id || citation.label;
+    return `${store}${qty !== "" ? `: ${qty} unit(s)` : ""}`;
+  }
+  return citation.label || citation.kind;
+}
+
+export default function CatalogGlobalAssistant({
+  activeDetail,
+  ensureWorkflow,
+  onWorkflowEvent,
+  productVoiceContext,
+  realtimeCapability,
+  resetSignal = 0,
+  workflowId,
+}) {
+  const [open, setOpen] = useState(true);
+  const [scope, setScope] = useState("catalog");
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const previousProductId = useRef(activeDetail?.product_id || "");
+  const hasProductScope = Boolean(productSnapshot(activeDetail));
+  const scopeLabel = scope === "product" && hasProductScope
+    ? activeDetail?.title || activeDetail?.product_id || "current product"
+    : "entire catalog and inventory";
+  const voiceContext = scope === "product" && productVoiceContext
+    ? productVoiceContext
+    : { mode: "workbench", query_scopes: ["catalog", "inventory"] };
+
+  useEffect(() => {
+    const nextProductId = activeDetail?.product_id || "";
+    if (previousProductId.current === nextProductId) return;
+    previousProductId.current = nextProductId;
+    if (scope === "product") setScope("catalog");
+    setMessages((current) => [
+      ...current,
+      {
+        id: `context-${Date.now()}`,
+        role: "system",
+        message: "Product context changed. Scope reset to entire catalog and inventory.",
+        citations: [],
+      },
+    ].slice(-MAX_MESSAGES));
+  }, [activeDetail?.product_id, scope]);
+
+  const starters = useMemo(() => [
+    "Which stores have low stock?",
+    "Summarize catalog inventory risk.",
+    ...(hasProductScope ? ["What should I know about this product?"] : []),
+  ], [hasProductScope]);
+
+  const addMessage = (message) => {
+    setMessages((current) => [...current, { id: `${Date.now()}-${current.length}`, ...message }].slice(-MAX_MESSAGES));
+  };
+
+  const submitQuestion = async (event) => {
+    event?.preventDefault();
+    const nextQuestion = question.trim();
+    if (!nextQuestion || busy) return;
+    setQuestion("");
+    setBusy(true);
+    setError("");
+    addMessage({ role: "user", message: nextQuestion, citations: [], scope });
+    try {
+      const result = scope === "product"
+        ? productAnswer(activeDetail, nextQuestion)
+        : await queryCatalogAssistant({
+          question: nextQuestion,
+          query_scopes: ["catalog", "inventory"],
+        });
+      addMessage({
+        role: "assistant",
+        message: result.message || "No answer was returned.",
+        citations: result.citations || [],
+        scope,
+      });
+    } catch (requestError) {
+      setError(
+        [502, 503, 504].includes(requestError?.response?.status)
+          ? "The assistant backend is temporarily unavailable. Product edits are preserved and text entry remains available."
+          : "The assistant could not answer that question. Product edits are preserved.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const voiceToolResult = (result) => {
+    addMessage({
+      role: "assistant",
+      message: result?.message || "The voice answer finished.",
+      citations: result?.citations || [],
+      scope,
+    });
+  };
+
+  return (
+    <Box className="catalog-global-assistant">
+      <HStack justify="space-between" gap={3} flexWrap="wrap">
+        <Box>
+          <Text className="section-kicker">Catalog assistant</Text>
+          <Text className="panel-title">Ask across products, stores, and inventory</Text>
+          <Text className="muted-text" mt={1}>Active scope: {scopeLabel}</Text>
+        </Box>
+        <Button type="button" className="secondary-button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+          {open ? <FiChevronUp /> : <FiChevronDown />} {open ? "Collapse" : "Open"}
+        </Button>
+      </HStack>
+
+      {open ? (
+        <VStack align="stretch" gap={4} mt={4}>
+          <HStack className="catalog-assistant-scope" role="radiogroup" aria-label="Assistant scope" gap={2} flexWrap="wrap">
+            <Button type="button" size="sm" className={scope === "catalog" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "catalog"} onClick={() => setScope("catalog")}>
+              Entire catalog & inventory
+            </Button>
+            <Button type="button" size="sm" className={scope === "product" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "product"} disabled={!hasProductScope} onClick={() => setScope("product")}>
+              Current product
+            </Button>
+          </HStack>
+
+          <Box className="catalog-assistant-thread" aria-live="polite">
+            {messages.length ? messages.map((item) => (
+              <Box key={item.id} className={`catalog-assistant-message ${item.role}`}>
+                <HStack gap={2} mb={1}>
+                  <Badge className="soft-badge">{item.role === "user" ? "You" : item.role === "system" ? "Context" : "Assistant"}</Badge>
+                  {item.scope ? <Text className="muted-text">{item.scope === "product" ? "Current product" : "Catalog"}</Text> : null}
+                </HStack>
+                <Text>{item.message}</Text>
+                {item.citations?.length ? (
+                  <HStack className="catalog-assistant-citations" gap={2} flexWrap="wrap" mt={2}>
+                    {item.citations.slice(0, 6).map((citation) => (
+                      <Badge key={`${citation.kind}-${citation.source_id}-${citation.label}`} className="workflow-status succeeded">
+                        {citation.kind}: {citationLabel(citation)}
+                      </Badge>
+                    ))}
+                  </HStack>
+                ) : null}
+              </Box>
+            )) : <Text className="muted-text">Ask about low stock, store coverage, assortment risk, or the selected product.</Text>}
+          </Box>
+
+          <HStack className="chat-starters" gap={2} flexWrap="wrap">
+            {starters.map((starter) => (
+              <button key={starter} type="button" className="suggestion-chip" onClick={() => setQuestion(starter)}>
+                {starter}
+              </button>
+            ))}
+          </HStack>
+
+          <Box as="form" onSubmit={submitQuestion}>
+            <Textarea
+              aria-label="Catalog assistant question"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Ask which stores have low stock, or what changed for the selected product..."
+              rows={3}
+              maxLength={1000}
+            />
+            <HStack justify="space-between" gap={3} mt={3} flexWrap="wrap">
+              <Text className="muted-text">Answers are read-only and cited. Field dictation stays in targeted product controls.</Text>
+              <Button type="submit" className="primary-button" disabled={!question.trim() || busy}>
+                <FiSend /> {busy ? "Asking..." : "Ask"}
+              </Button>
+            </HStack>
+          </Box>
+          {error ? <Text className="catalog-action-hint" role="alert">{error}</Text> : null}
+
+          <VoiceControls
+            workflowId={workflowId}
+            ensureWorkflow={ensureWorkflow}
+            assistantMode="read"
+            realtimeCapability={realtimeCapability}
+            resetSignal={resetSignal}
+            sessionContext={voiceContext}
+            contextLabel={scopeLabel}
+            onToolResult={voiceToolResult}
+            onWorkflowEvent={onWorkflowEvent}
+          />
+        </VStack>
+      ) : null}
+    </Box>
+  );
+}

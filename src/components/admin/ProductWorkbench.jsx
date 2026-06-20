@@ -17,6 +17,7 @@ import {
   submitCatalogImageCommand,
 } from "../../utils/apiClient";
 import { trackCatalogStudioMilestone } from "../../utils/datadog";
+import CatalogGlobalAssistant from "./CatalogGlobalAssistant";
 import ProductEditor from "./ProductEditor";
 import ProductReviewPanel from "./ProductReviewPanel";
 import ProductSourceTray from "./ProductSourceTray";
@@ -174,14 +175,18 @@ export default function ProductWorkbench({
     setActiveWorkbenchTab(activeProductId ? "product" : "chat");
   }, [activeProductId]);
 
-  const ensureWorkflow = async () => {
+  const ensureWorkflow = async (options = {}) => {
     if (workflowId) return workflowId;
     if (workflowStartPromise.current) return workflowStartPromise.current;
     const activeDraft = activeDetail?.current_draft;
+    const assistantOnly = options?.purpose === "assistant";
     const workflowPayload = activeProductId && activeDraft ? {
       title: `Product Catalog workbench for ${activeDetail.title || activeProductId}`,
       business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
       draft_id: activeDraft.revision.id,
+    } : assistantOnly ? {
+      title: "Product Catalog assistant",
+      business_summary: "Read-only catalog and inventory assistant workflow.",
     } : {
       title: "Product Catalog product creation",
       business_summary: "Text-guided product creation workflow.",
@@ -636,6 +641,16 @@ export default function ProductWorkbench({
         </Box>
         {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
       </HStack>
+
+      <CatalogGlobalAssistant
+        activeDetail={activeDetail}
+        workflowId={workflowId}
+        ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
+        realtimeCapability={catalogStudioSession?.capabilities?.realtime}
+        resetSignal={voiceResetKey}
+        productVoiceContext={voiceContext}
+        onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
+      />
 
       <HStack role="tablist" aria-label="Product workbench" className="product-workbench-tabs" gap={1} flexWrap="wrap">
         {availableTabs.map((tab) => (

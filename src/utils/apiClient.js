@@ -398,6 +398,10 @@ export function submitCatalogDraftCommand(workflowId, payload, idempotencyKey) {
   return post(catalogWorkflowPath(workflowId, "/draft-commands"), payload, idempotencyConfig(idempotencyKey));
 }
 
+export function queryCatalogAssistant(payload) {
+  return post("/api/admin/catalog/assistant/query", payload);
+}
+
 export function createCatalogRealtimeSession(workflowId, context) {
   return post(catalogWorkflowPath(workflowId, "/realtime/sessions"), context);
 }
