@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiRefreshCw, FiSave } from "react-icons/fi";
 
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
+import { useApiTrace } from "../ApiTraceContext";
 import {
   approveCatalogImageJob,
   createAdminCatalogBrand,
@@ -212,6 +213,7 @@ export default function CanonicalProductEditor({
   const [preview, setPreview] = useState(null);
   const [projectionLoading, setProjectionLoading] = useState(false);
   const [projectionError, setProjectionError] = useState("");
+  const { startAction } = useApiTrace();
   const saveInFlight = useRef(false);
   const idempotencyKeys = useRef({});
 
@@ -313,6 +315,14 @@ export default function CanonicalProductEditor({
 
     saveInFlight.current = true;
     setSaving(true);
+    const traceAction = startAction("Save catalog product draft", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "product_draft_save",
+        draft_id: detail.current_draft?.revision?.id || "",
+        product_id: detail.product_id,
+      },
+    });
     try {
       let currentDraft = detail.current_draft;
       if (!currentDraft) {
@@ -337,6 +347,10 @@ export default function CanonicalProductEditor({
       applyDetail(nextDetail);
       setNotice("Draft saved. The published catalog remains unchanged until publication.");
       onCatalogChanged?.(nextDetail);
+      traceAction.end("completed", {
+        draft_id: nextDetail.current_draft?.revision?.id || currentDraft.revision.id,
+        product_id: detail.product_id,
+      });
     } catch (nextError) {
       if (nextError?.response?.status === 409) setConflict(true);
       else if (nextError?.response?.status === 422) {
@@ -344,6 +358,11 @@ export default function CanonicalProductEditor({
         setServerErrors(validation.messages);
         setErrors((current) => ({ ...current, ...validation.fields }));
       } else setError(nextError);
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "draft_save_error",
+        draft_id: detail.current_draft?.revision?.id || "",
+        product_id: detail.product_id,
+      });
     } finally {
       saveInFlight.current = false;
       setSaving(false);
@@ -363,6 +382,15 @@ export default function CanonicalProductEditor({
     if (!currentDraft) { setNotice("Start and save a private draft before generating an image variant."); return; }
     setMediaBusy(true);
     setNotice("");
+    const traceAction = startAction("Generate catalog image variant", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "media_generate",
+        draft_id: currentDraft.revision.id,
+        product_id: detail.product_id,
+        workflow_id: currentDraft.workflow_id || "",
+      },
+    });
     try {
       let workflowId = currentDraft.workflow_id;
       if (!workflowId) {
@@ -386,8 +414,20 @@ export default function CanonicalProductEditor({
       }
       if (job.status === "failed") setNotice("The image variant failed. Product details and inventory are unchanged.");
       if (["queued", "running"].includes(job.status)) setNotice("The image variant is still processing. Refresh the product to check its status.");
-    } catch {
+      traceAction.end(job.status === "failed" ? "failed" : "completed", {
+        draft_id: currentDraft.revision.id,
+        job_id: job.id,
+        product_id: detail.product_id,
+        workflow_id: workflowId,
+      });
+    } catch (error) {
       setNotice("The image variant could not be created. Product details and inventory are unchanged.");
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "media_generate_error",
+        draft_id: currentDraft.revision.id,
+        product_id: detail.product_id,
+        workflow_id: currentDraft.workflow_id || "",
+      });
     } finally {
       setMediaBusy(false);
     }
@@ -398,6 +438,16 @@ export default function CanonicalProductEditor({
     const localProduct = product;
     const preserveLocalEdits = dirty;
     setMediaBusy(true);
+    const traceAction = startAction("Approve catalog image variant", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "media_approve",
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      },
+    });
     try {
       await approveCatalogImageJob(mediaJob.workflow_id, mediaJob.id, {
         draft_id: detail.current_draft.revision.id,
@@ -420,8 +470,21 @@ export default function CanonicalProductEditor({
         applyDetail(nextDetail);
       }
       setNotice(approval.approval_intent === "replace" ? "Replacement approved for the next publication." : "Image variant added to the next publication.");
-    } catch {
+      traceAction.end("completed", {
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      });
+    } catch (error) {
       setNotice("The image variant could not be approved. Try again with the current draft.");
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "media_approve_error",
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      });
     } finally {
       setMediaBusy(false);
     }

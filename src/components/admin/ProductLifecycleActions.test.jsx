@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../test/render";
 import ProductLifecycleActions from "./ProductLifecycleActions";
+import {
+  configureApiTraceRuntime,
+  resetApiTraceRuntimeForTests,
+  subscribeApiTraceEvents,
+} from "../../utils/apiTraceClient";
 
 const api = vi.hoisted(() => ({
   archiveAdminCatalogProduct: vi.fn(),
@@ -24,6 +29,7 @@ const product = {
 
 describe("ProductLifecycleActions", () => {
   beforeEach(() => {
+    resetApiTraceRuntimeForTests();
     api.publishAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     api.archiveAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
     api.archiveAdminCatalogProductV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
@@ -43,6 +49,26 @@ describe("ProductLifecycleActions", () => {
       "publish-product-key",
     );
     expect(api.publishAdminCatalogProduct).not.toHaveBeenCalled();
+  });
+
+  it("registers publish actions with the selected API trace", async () => {
+    configureApiTraceRuntime({ authorized: true, enabled: true, surface: "catalog-studio" });
+    const events = [];
+    subscribeApiTraceEvents((event) => events.push(event));
+    renderWithProviders(<ProductLifecycleActions product={product} dirty={false} onChanged={() => {}} authoringSchemaVersion={2} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Publish draft/i }));
+
+    await waitFor(() => expect(events.map((event) => event.event_type)).toContain("ui.completed"));
+    expect(events[0]).toMatchObject({
+      event_type: "ui.started",
+      attributes: expect.objectContaining({
+        action: "product_publish",
+        draft_id: "draft_1",
+        product_id: "cat_coat",
+        surface: "catalog-studio",
+      }),
+    });
   });
 
   it("uses v3 publish and blocks it only for deterministic readiness errors", async () => {

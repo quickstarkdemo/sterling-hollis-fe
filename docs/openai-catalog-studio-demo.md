@@ -44,6 +44,32 @@ usage, and safe request/response summaries. State explicitly that credentials,
 system instructions, private reasoning, raw audio, and unbounded provider
 payloads are not sent to the browser and cannot be copied from this view.
 
+### Trace path (15 minutes)
+
+Use this path when the shared API trace capability is configured. Turn on
+**Developer tools** from the persistent bottom launcher, then perform these
+actions in order:
+
+1. Create or refine a product draft from the Product Catalog workbench.
+2. Upload supplier sources, generate suggestions, and accept or reject one
+   proposal.
+3. Generate and approve one reviewed image variant.
+4. Publish the draft.
+5. Open the public product page and send one storefront chat turn about the same
+   product.
+
+For each action, select the most recent trace in the dock and confirm the root
+span name matches the user action, with child HTTP spans for the backend calls.
+The selected trace should show only bounded IDs, endpoints, statuses, and
+operational metadata. It must not show prompts, credentials, raw review text,
+supplier file contents, audio, or private provider payloads.
+
+For an offline walkthrough, load the sanitized scripted projection in
+`docs/fixtures/catalog-chat-trace-replay.json` into the trace replay tooling or
+use it as the source fixture for screenshots. The fixture contains stable demo
+IDs only; it is not evidence that the live backend, stream, worker, or provider
+paths succeeded.
+
 ## Deployed-system preflight
 
 Run this checklist on the production origin no more than a few hours before the
@@ -169,6 +195,13 @@ Datadog receives high-level `catalog_studio.milestone` actions for workflow
 start, text/voice completion, image lifecycle, publication, and recoverable
 errors. Context is allowlisted to operational status and stable IDs; prompts,
 draft payloads, credentials, and provider responses are excluded.
+
+The in-app API trace dock captures selected user actions while Developer tools
+are enabled and the authorized session advertises `api_traces.configured`.
+Catalog draft, supplier source, suggestion, media, lifecycle, Realtime voice, and
+storefront chat turns register explicit UI root spans so live and replay demos
+can correlate the action, HTTP calls, events, and sanitized artifacts without
+turning every background refresh into a primary trace.
 
 Capture these items in meeting notes:
 

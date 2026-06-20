@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiExternalLink, FiLock, FiMessageCircle, FiRefreshCw, FiSend } from "react-icons/fi";
 
 import { useChatContext } from "./ChatContext";
+import { useApiTrace } from "./ApiTraceContext";
 import { sendChat } from "../utils/apiClient";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
 import { imageFor, money } from "../utils/format";
@@ -103,6 +104,7 @@ function formatChatError(err) {
 
 export default function ChatWidget({ title = "Storefront chat", showDiagnostics = false }) {
   const chatContext = useChatContext();
+  const { startAction } = useApiTrace();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -138,6 +140,14 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
     setInput("");
     setMessages((current) => [...current, { role: "user", content: message, cards: [], actions: [] }]);
     setLoading(true);
+    const traceAction = startAction("Storefront chat turn", {
+      surface: "storefront-chat",
+      attributes: {
+        action: "chat_turn",
+        conversation_id: conversationId || "",
+        product_id: chatContext.current_product?.id || chatContext.current_product?.product_id || "",
+      },
+    });
     try {
       const response = await sendChat({
         message,
@@ -159,8 +169,14 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
           identityStatus: response.identity_status,
         },
       ]);
+      traceAction.end("completed", {
+        conversation_id: response.conversation_id || conversationId || "",
+      });
     } catch (err) {
       setError(formatChatError(err));
+      traceAction.end("failed", {
+        error_code: err?.response?.status || err?.code || err?.name || "chat_error",
+      });
     } finally {
       setLoading(false);
     }

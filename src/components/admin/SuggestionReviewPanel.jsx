@@ -7,6 +7,7 @@ import {
   decideCatalogSuggestionSet,
   getCatalogSuggestionSets,
 } from "../../utils/apiClient";
+import { useApiTrace } from "../ApiTraceContext";
 
 function displayValue(value) {
   if (value === null || value === undefined || value === "") return "Not provided";
@@ -37,6 +38,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
   const keys = useRef({});
   const loadRequestId = useRef(0);
   const decisionInFlight = useRef(false);
+  const { startAction } = useApiTrace();
 
   const load = useCallback(async () => {
     if (!productId) return;
@@ -73,6 +75,14 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
     setBusyKey(key);
     setError("");
     setNotice("");
+    const traceAction = startAction(`${action === "accept" ? "Accept" : "Reject"} catalog suggestion`, {
+      surface: "catalog-studio",
+      attributes: {
+        action: `suggestion_${action}`,
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      },
+    });
     try {
       const result = await decideCatalogSuggestionSet(productId, set.id, {
         action,
@@ -85,8 +95,17 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
       setSets((current) => current.map((item) => item.id === set.id ? result.suggestion_set : item));
       setNotice(action === "accept" ? "Suggestion accepted into a new private draft version." : "Suggestion rejected. The product draft was not changed.");
       if (result.draft) onDraftChanged?.(result);
+      traceAction.end("completed", {
+        draft_id: result.draft?.revision?.id || draft?.revision?.id || "",
+        product_id: productId,
+      });
     } catch (nextError) {
       setError(decisionError(nextError));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "suggestion_decision_error",
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      });
     } finally {
       decisionInFlight.current = false;
       setBusyKey("");

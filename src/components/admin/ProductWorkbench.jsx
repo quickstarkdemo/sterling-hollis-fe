@@ -5,6 +5,7 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { useDeveloperLens } from "../DeveloperLensContext";
 import { useCatalogStudioAccess } from "../CatalogStudioAccessContext";
+import { useApiTrace } from "../ApiTraceContext";
 import {
   approveCatalogImageJob,
   createIdempotencyKey,
@@ -73,6 +74,7 @@ export default function ProductWorkbench({
   const initial = useMemo(() => activeProductId ? {} : restoredState(), [activeProductId]);
   const { enabled: developerLensEnabled } = useDeveloperLens();
   const { session: catalogStudioSession } = useCatalogStudioAccess();
+  const { startAction } = useApiTrace();
   const [instruction, setInstruction] = useState("");
   const [workflow, setWorkflow] = useState(null);
   const [workflowId, setWorkflowId] = useState(initial.workflowId || "");
@@ -210,6 +212,15 @@ export default function ProductWorkbench({
     setSubmitting(true);
     setActionError(null);
     setMessage("");
+    const traceAction = startAction(draft ? "Refine catalog product draft" : "Create catalog product draft", {
+      surface: "catalog-studio",
+      attributes: {
+        action: draft ? "draft_refine" : "draft_create",
+        draft_id: draft?.id || "",
+        product_id: draft?.product_id || activeProductId || "",
+        workflow_id: workflowId,
+      },
+    });
 
     try {
       const activeWorkflowId = await ensureWorkflow();
@@ -241,6 +252,11 @@ export default function ProductWorkbench({
         workflow_id: activeWorkflowId,
       });
       await refreshWorkflow(activeWorkflowId);
+      traceAction.end(result.status === "succeeded" ? "completed" : "failed", {
+        draft_id: result.draft?.id || draft?.id || "",
+        product_id: result.draft?.product_id || draft?.product_id || activeProductId || "",
+        workflow_id: activeWorkflowId,
+      });
     } catch (error) {
       const retryable = retryableError(error);
       setActionError({
@@ -255,6 +271,10 @@ export default function ProductWorkbench({
         status: error?.response?.status || "error",
         workflow_id: workflowId,
       });
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "draft_command_error",
+        workflow_id: workflowId,
+      });
     } finally {
       commandInFlight.current = false;
       setSubmitting(false);
@@ -267,6 +287,15 @@ export default function ProductWorkbench({
     setImageBusy(true);
     setActionError(null);
     setPollExpired(false);
+    const traceAction = startAction(action === "refine" ? "Refine catalog image" : "Generate catalog image", {
+      surface: "catalog-studio",
+      attributes: {
+        action: `image_${action}`,
+        draft_id: draft.id,
+        product_id: draft.product_id || activeProductId || "",
+        workflow_id: workflowId,
+      },
+    });
     try {
       const payload = overridePayload || {
           action,
@@ -296,6 +325,12 @@ export default function ProductWorkbench({
         workflow_id: workflowId,
       });
       await refreshWorkflow();
+      traceAction.end("completed", {
+        draft_id: draft.id,
+        job_id: nextJob.id,
+        product_id: draft.product_id || activeProductId || "",
+        workflow_id: workflowId,
+      });
     } catch (error) {
       const retryable = retryableError(error);
       setActionError({
@@ -309,6 +344,10 @@ export default function ProductWorkbench({
         capability: "image_generation",
         retryable,
         status: error?.response?.status || "error",
+        workflow_id: workflowId,
+      });
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "image_command_error",
         workflow_id: workflowId,
       });
     } finally {
@@ -380,6 +419,16 @@ export default function ProductWorkbench({
     imageInFlight.current = true;
     setImageBusy(true);
     setActionError(null);
+    const traceAction = startAction("Approve catalog image", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "image_approve",
+        draft_id: draft.id,
+        job_id: imageJob.id,
+        product_id: draft.product_id || activeProductId || "",
+        workflow_id: workflowId,
+      },
+    });
     try {
       const payload = { draft_id: draft.id, expected_draft_version: draft.draft_version };
       await approveCatalogImageJob(
@@ -408,11 +457,21 @@ export default function ProductWorkbench({
         workflow_id: workflowId,
       });
       await refreshWorkflow();
+      traceAction.end("completed", {
+        draft_id: recoveryDraft?.id || draft.id,
+        job_id: imageJob.id,
+        product_id: recoveryDraft?.product_id || draft.product_id || activeProductId || "",
+        workflow_id: workflowId,
+      });
     } catch (error) {
       setActionError({
         kind: "image-approval",
         retryable: retryableError(error),
         message: safeErrorMessage(error, "The image could not be approved. The previous draft state is preserved."),
+      });
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "image_approval_error",
+        workflow_id: workflowId,
       });
     } finally {
       imageInFlight.current = false;
@@ -574,6 +633,15 @@ export default function ProductWorkbench({
     }
     setFieldAiBusyTarget(target.targetPath);
     setActionError(null);
+    const traceAction = startAction(`Generate ${target.label} proposal`, {
+      surface: "catalog-studio",
+      attributes: {
+        action: "field_ai_proposal",
+        draft_id: contextualDraft.revision.id,
+        product_id: editorProductId,
+        workflow_id: workflowId,
+      },
+    });
     try {
       const activeWorkflowId = await ensureWorkflow();
       const payload = {
@@ -593,11 +661,20 @@ export default function ProductWorkbench({
       delete mutationKeys.current["typed-field"];
       setMessage(result.message || `${target.label} proposal is ready for review.`);
       if (result.suggestion_set) setSuggestionRefreshKey((current) => current + 1);
+      traceAction.end("completed", {
+        draft_id: contextualDraft.revision.id,
+        product_id: editorProductId,
+        workflow_id: activeWorkflowId,
+      });
     } catch (error) {
       setActionError({
         kind: "field-ai",
         retryable: retryableError(error),
         message: safeErrorMessage(error, "The field proposal could not be generated. The current draft is unchanged."),
+      });
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "field_ai_error",
+        workflow_id: workflowId,
       });
     } finally {
       setFieldAiBusyTarget("");

@@ -11,6 +11,7 @@ import {
   publishAdminCatalogProductV2,
   publishAdminCatalogProductV3,
 } from "../../utils/apiClient";
+import { useApiTrace } from "../ApiTraceContext";
 
 function errorMessage(error, fallback) {
   const detail = error?.response?.data?.detail;
@@ -21,6 +22,7 @@ function errorMessage(error, fallback) {
 export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 1, readiness }) {
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
+  const { startAction } = useApiTrace();
   const inFlight = useRef(false);
   const mutationKeys = useRef({});
   const draftId = product?.current_draft?.revision?.id;
@@ -44,6 +46,14 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
     inFlight.current = true;
     setBusyAction("publish");
     setError("");
+    const traceAction = startAction("Publish catalog product", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "product_publish",
+        draft_id: draftId,
+        product_id: product.product_id,
+      },
+    });
     try {
       const payload = { draft_id: draftId, expected_version: product.version };
       const publishProduct = authoringSchemaVersion >= 3
@@ -58,8 +68,17 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
       );
       delete mutationKeys.current.publish;
       await onChanged?.("published");
+      traceAction.end("completed", {
+        draft_id: draftId,
+        product_id: product.product_id,
+      });
     } catch (nextError) {
       setError(errorMessage(nextError, "The product could not be published."));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "publish_error",
+        draft_id: draftId,
+        product_id: product.product_id,
+      });
     } finally {
       inFlight.current = false;
       setBusyAction("");
@@ -72,6 +91,13 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
     inFlight.current = true;
     setBusyAction("archive");
     setError("");
+    const traceAction = startAction("Archive catalog product", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "product_archive",
+        product_id: product.product_id,
+      },
+    });
     try {
       const payload = { expected_version: product.version };
       const archiveProduct = authoringSchemaVersion >= 2
@@ -84,8 +110,15 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
       );
       delete mutationKeys.current.archive;
       await onChanged?.("archived");
+      traceAction.end("completed", {
+        product_id: product.product_id,
+      });
     } catch (nextError) {
       setError(errorMessage(nextError, "The product could not be archived."));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "archive_error",
+        product_id: product.product_id,
+      });
     } finally {
       inFlight.current = false;
       setBusyAction("");

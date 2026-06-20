@@ -1,0 +1,156 @@
+{
+  "trace_id": "11111111111111111111111111111111",
+  "name": "Catalog product authoring and storefront chat replay",
+  "status": "completed",
+  "started_at": "2026-06-20T14:00:00.000Z",
+  "duration_ms": 4860,
+  "attributes": {
+    "surface": "catalog-studio",
+    "product_id": "cat_demo_trace",
+    "workflow_id": "workflow_demo_trace"
+  },
+  "spans": [
+    {
+      "span_id": "1111111111111111",
+      "parent_span_id": null,
+      "name": "Create catalog product draft",
+      "service": "sterling-hollis-fe",
+      "operation": "ui.action",
+      "status": "completed",
+      "started_at": "2026-06-20T14:00:00.000Z",
+      "duration_ms": 2310,
+      "attributes": {
+        "action": "draft_create",
+        "surface": "catalog-studio",
+        "product_id": "cat_demo_trace",
+        "workflow_id": "workflow_demo_trace"
+      }
+    },
+    {
+      "span_id": "2222222222222222",
+      "parent_span_id": "1111111111111111",
+      "name": "POST /api/admin/catalog/workflows",
+      "service": "browser",
+      "operation": "http.client",
+      "status": "completed",
+      "started_at": "2026-06-20T14:00:00.120Z",
+      "duration_ms": 420,
+      "attributes": {
+        "endpoint": "/api/admin/catalog/workflows",
+        "http_method": "POST",
+        "request_kind": "http",
+        "status_code": 201
+      }
+    },
+    {
+      "span_id": "3333333333333333",
+      "parent_span_id": "1111111111111111",
+      "name": "POST /api/admin/catalog/workflows/workflow_demo_trace/draft-commands",
+      "service": "browser",
+      "operation": "http.client",
+      "status": "completed",
+      "started_at": "2026-06-20T14:00:00.620Z",
+      "duration_ms": 1460,
+      "attributes": {
+        "endpoint": "/api/admin/catalog/workflows/workflow_demo_trace/draft-commands",
+        "http_method": "POST",
+        "request_kind": "http",
+        "status_code": 200
+      }
+    },
+    {
+      "span_id": "4444444444444444",
+      "parent_span_id": null,
+      "name": "Storefront chat turn",
+      "service": "sterling-hollis-fe",
+      "operation": "ui.action",
+      "status": "completed",
+      "started_at": "2026-06-20T14:00:03.000Z",
+      "duration_ms": 1860,
+      "attributes": {
+        "action": "chat_turn",
+        "conversation_id": "conv_demo_trace",
+        "surface": "storefront-chat",
+        "product_id": "cat_demo_trace"
+      }
+    },
+    {
+      "span_id": "5555555555555555",
+      "parent_span_id": "4444444444444444",
+      "name": "POST /api/chat",
+      "service": "browser",
+      "operation": "http.client",
+      "status": "completed",
+      "started_at": "2026-06-20T14:00:03.110Z",
+      "duration_ms": 1280,
+      "attributes": {
+        "endpoint": "/api/chat",
+        "http_method": "POST",
+        "request_kind": "http",
+        "status_code": 200
+      }
+    }
+  ],
+  "events": [
+    {
+      "event_id": "evt_demo_1",
+      "sequence": 0,
+      "span_id": "1111111111111111",
+      "name": "Create catalog product draft",
+      "event_type": "ui.started",
+      "status": "running",
+      "occurred_at": "2026-06-20T14:00:00.000Z",
+      "attributes": {
+        "action": "draft_create",
+        "surface": "catalog-studio",
+        "product_id": "cat_demo_trace",
+        "workflow_id": "workflow_demo_trace"
+      }
+    },
+    {
+      "event_id": "evt_demo_2",
+      "sequence": 1,
+      "span_id": "1111111111111111",
+      "name": "Create catalog product draft",
+      "event_type": "ui.completed",
+      "status": "completed",
+      "occurred_at": "2026-06-20T14:00:02.310Z",
+      "attributes": {
+        "draft_id": "draft_demo_trace",
+        "surface": "catalog-studio",
+        "product_id": "cat_demo_trace",
+        "workflow_id": "workflow_demo_trace"
+      }
+    },
+    {
+      "event_id": "evt_demo_3",
+      "sequence": 2,
+      "span_id": "4444444444444444",
+      "name": "Storefront chat turn",
+      "event_type": "ui.started",
+      "status": "running",
+      "occurred_at": "2026-06-20T14:00:03.000Z",
+      "attributes": {
+        "action": "chat_turn",
+        "surface": "storefront-chat",
+        "product_id": "cat_demo_trace"
+      }
+    },
+    {
+      "event_id": "evt_demo_4",
+      "sequence": 3,
+      "span_id": "4444444444444444",
+      "name": "Storefront chat turn",
+      "event_type": "ui.completed",
+      "status": "completed",
+      "occurred_at": "2026-06-20T14:00:04.860Z",
+      "attributes": {
+        "conversation_id": "conv_demo_trace",
+        "surface": "storefront-chat",
+        "product_id": "cat_demo_trace"
+      }
+    }
+  ],
+  "artifacts": [],
+  "links": []
+}
