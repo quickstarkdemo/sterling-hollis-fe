@@ -1813,29 +1813,45 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
 }
 
 .product-workbench-header,
-.product-workbench-sections {
+.product-workbench-tabs {
   order: 1;
 }
 
 .product-workbench-status {
-  order: 2;
-}
-
-#workbench-product {
-  order: 3;
-}
-
-#workbench-reviews {
   order: 4;
 }
 
-.catalog-disclosure {
-  order: 5;
+.product-workbench-panel {
+  order: 3;
 }
 
-.product-workbench-sections {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
+.product-workbench-tabs {
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(250, 248, 243, 0.78);
+}
+
+.product-workbench-tab {
+  min-height: 34px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+}
+
+.product-workbench-tab:hover,
+.product-workbench-tab:focus-visible {
+  background: rgba(23, 19, 15, 0.06) !important;
+  color: var(--ink) !important;
+}
+
+.product-workbench-tab.active {
+  background: var(--ink) !important;
+  color: #fffaf0 !important;
 }
 
 .catalog-disclosure {

@@ -9,7 +9,6 @@ import { useApiTrace } from "../ApiTraceContext";
 import {
   approveCatalogImageJob,
   createIdempotencyKey,
-  generateCatalogSuggestionSet,
   getAdminCatalogProduct,
   getCatalogImageJob,
   getCatalogWorkflow,
@@ -47,16 +46,17 @@ function safeErrorMessage(error, fallback) {
   return fallback;
 }
 
-function DisclosureSection({ id, kicker, title, children, defaultOpen = false }) {
+function WorkbenchTabPanel({ id, tabId, activeTab, children }) {
+  const active = activeTab === tabId;
   return (
-    <Box as="details" id={id} className="catalog-disclosure" open={defaultOpen}>
-      <Box as="summary" className="catalog-disclosure-summary">
-        <Box>
-          <Text className="section-kicker">{kicker}</Text>
-          <Text className="panel-title">{title}</Text>
-        </Box>
-      </Box>
-      <Box className="catalog-disclosure-body">{children}</Box>
+    <Box
+      id={id}
+      role="tabpanel"
+      aria-labelledby={`workbench-tab-${tabId}`}
+      className="product-workbench-panel"
+      hidden={!active}
+    >
+      {children}
     </Box>
   );
 }
@@ -90,11 +90,9 @@ export default function ProductWorkbench({
   const [editorRefreshKey, setEditorRefreshKey] = useState(0);
   const [editorDirty, setEditorDirty] = useState(false);
   const [voiceResetKey, setVoiceResetKey] = useState(0);
-  const [fieldVoiceStartKey, setFieldVoiceStartKey] = useState(0);
+  const [activeWorkbenchTab, setActiveWorkbenchTab] = useState(activeProductId ? "product" : "chat");
   const [activeDetail, setActiveDetail] = useState(null);
   const [suggestionRefreshKey, setSuggestionRefreshKey] = useState(0);
-  const [fieldVoiceTarget, setFieldVoiceTarget] = useState(null);
-  const [fieldAiBusyTarget, setFieldAiBusyTarget] = useState("");
   const commandInFlight = useRef(false);
   const workflowStartPromise = useRef(null);
   const imageInFlight = useRef(false);
@@ -172,8 +170,8 @@ export default function ProductWorkbench({
   useEffect(() => {
     setActiveDetail(null);
     setEditorDirty(false);
-    setFieldVoiceTarget(null);
     setVoiceResetKey((current) => current + 1);
+    setActiveWorkbenchTab(activeProductId ? "product" : "chat");
   }, [activeProductId]);
 
   const ensureWorkflow = async () => {
@@ -242,6 +240,7 @@ export default function ProductWorkbench({
         setDraft(result.draft);
         persist(activeWorkflowId, result.draft);
         setEditorRefreshKey((current) => current + 1);
+        setActiveWorkbenchTab("product");
         onCatalogChanged?.();
       }
       setWorkflow(result.workflow);
@@ -522,6 +521,7 @@ export default function ProductWorkbench({
       setDraft(result.draft);
       persist(activeWorkflowId, result.draft);
       setEditorRefreshKey((current) => current + 1);
+      setActiveWorkbenchTab("product");
       onCatalogChanged?.();
     }
     if (result.status === "succeeded" && result.suggestion_set) {
@@ -549,6 +549,7 @@ export default function ProductWorkbench({
     onCatalogChanged?.();
     if (action === "published") {
       setEditorDirty(false);
+      setActiveWorkbenchTab("chat");
       setMessage("The approved product is published. The workflow remains available as a read-only summary.");
       trackCatalogStudioMilestone("product_published", {
         product_id: detail?.product_id || draft?.product_id,
@@ -586,100 +587,21 @@ export default function ProductWorkbench({
   const editorProductId = activeProductId || draft?.product_id || "";
   const contextualDraft = activeDetail?.current_draft;
   const voiceContext = contextualDraft ? {
-    mode: fieldVoiceTarget ? "field" : "workbench",
+    mode: "workbench",
     product_id: activeDetail.product_id,
     draft_id: contextualDraft.revision.id,
     expected_draft_version: contextualDraft.draft_version,
-    ...(fieldVoiceTarget
-      ? { target_path: fieldVoiceTarget.targetPath }
-      : { query_scopes: ["product", "catalog", "inventory", "readiness"] }),
+    query_scopes: ["product", "catalog", "inventory", "readiness"],
   } : null;
   const voiceContextKey = voiceContext
-    ? `${voiceContext.product_id}:${voiceContext.draft_id}:${voiceContext.expected_draft_version}:${voiceContext.target_path || "workbench"}`
+    ? `${voiceContext.product_id}:${voiceContext.draft_id}:${voiceContext.expected_draft_version}:workbench`
     : "new-product";
   const previousVoiceContextKey = useRef(voiceContextKey);
   useEffect(() => {
     if (previousVoiceContextKey.current === voiceContextKey) return;
     previousVoiceContextKey.current = voiceContextKey;
     setVoiceResetKey((current) => current + 1);
-    if (fieldVoiceTarget) setFieldVoiceStartKey((current) => current + 1);
-  }, [fieldVoiceTarget, voiceContextKey]);
-
-  useEffect(() => {
-    setFieldVoiceTarget(null);
-    setFieldAiBusyTarget("");
-  }, [editorProductId, contextualDraft?.revision?.id]);
-
-  useEffect(() => {
-    if (!editorDirty || !fieldVoiceTarget) return;
-    setFieldVoiceTarget(null);
-    setMessage("Field voice was reset because the draft has unsaved manual edits. Your edits are preserved.");
-  }, [editorDirty, fieldVoiceTarget]);
-
-  const requestFieldVoice = (target) => {
-    if (editorDirty) {
-      setMessage("Save or discard manual edits before starting field voice so the proposal compares against the current draft.");
-      return;
-    }
-    setFieldVoiceTarget(target);
-    setMessage(`Starting voice for ${target.label}. Dictation or refinement will remain a proposal until accepted.`);
-  };
-
-  const requestFieldAi = async (target) => {
-    if (!editorProductId || !contextualDraft || fieldAiBusyTarget) return;
-    if (editorDirty) {
-      setMessage("Save or discard manual edits before generating a field proposal so the comparison uses the current draft.");
-      return;
-    }
-    setFieldAiBusyTarget(target.targetPath);
-    setActionError(null);
-    const traceAction = startAction(`Generate ${target.label} proposal`, {
-      surface: "catalog-studio",
-      attributes: {
-        action: "field_ai_proposal",
-        draft_id: contextualDraft.revision.id,
-        product_id: editorProductId,
-        workflow_id: workflowId,
-      },
-    });
-    try {
-      const activeWorkflowId = await ensureWorkflow();
-      const payload = {
-        draft_id: contextualDraft.revision.id,
-        expected_draft_version: contextualDraft.draft_version,
-        workflow_id: activeWorkflowId,
-        instruction: target.instruction,
-        input_origin: "typed_action",
-        source_asset_ids: [],
-        target_paths: [target.targetPath],
-      };
-      const result = await generateCatalogSuggestionSet(
-        editorProductId,
-        payload,
-        mutationKey("typed-field", payload),
-      );
-      delete mutationKeys.current["typed-field"];
-      setMessage(result.message || `${target.label} proposal is ready for review.`);
-      if (result.suggestion_set) setSuggestionRefreshKey((current) => current + 1);
-      traceAction.end("completed", {
-        draft_id: contextualDraft.revision.id,
-        product_id: editorProductId,
-        workflow_id: activeWorkflowId,
-      });
-    } catch (error) {
-      setActionError({
-        kind: "field-ai",
-        retryable: retryableError(error),
-        message: safeErrorMessage(error, "The field proposal could not be generated. The current draft is unchanged."),
-      });
-      traceAction.end("failed", {
-        error_code: error?.response?.status || error?.code || error?.name || "field_ai_error",
-        workflow_id: workflowId,
-      });
-    } finally {
-      setFieldAiBusyTarget("");
-    }
-  };
+  }, [voiceContextKey]);
 
   const authoringDraftChanged = () => {
     setEditorRefreshKey((current) => current + 1);
@@ -687,30 +609,59 @@ export default function ProductWorkbench({
     onCatalogChanged?.();
   };
 
+  const availableTabs = useMemo(() => [
+    ...(editorProductId && !publishedProductId ? [{ id: "product", label: "Product details" }] : []),
+    ...(editorProductId ? [{ id: "reviews", label: "Reviews" }] : []),
+    ...(usesStructuredSuggestions && editorProductId && contextualDraft ? [
+      { id: "sources", label: "Supplier import" },
+      { id: "suggestions", label: "Suggestions" },
+    ] : []),
+    { id: "chat", label: editorProductId ? "Product chat" : "Create with AI" },
+    ...(!usesCanonicalEditor && draft ? [{ id: "legacyImages", label: "Legacy images" }] : []),
+  ], [contextualDraft, draft, editorProductId, publishedProductId, usesCanonicalEditor, usesStructuredSuggestions]);
+  const activeTabIsAvailable = availableTabs.some((tab) => tab.id === activeWorkbenchTab);
+
+  useEffect(() => {
+    if (activeTabIsAvailable) return;
+    setActiveWorkbenchTab(availableTabs[0]?.id || "chat");
+  }, [activeTabIsAvailable, availableTabs]);
+
   return (
     <VStack align="stretch" gap={7} className="product-workbench">
       <HStack justify="space-between" gap={4} align="start" flexWrap="wrap" className="product-workbench-header">
         <Box>
           <Text className="section-kicker">Product workbench</Text>
           <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
-          <Text className="muted-text" mt={2}>Product details, media, price, and store inventory come first. Optional AI controls stay available below the form.</Text>
+          <Text className="muted-text" mt={2}>Edit the product directly, review related work, or use one product-wide chat for voice-assisted changes.</Text>
         </Box>
         {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
       </HStack>
 
-      <HStack as="nav" aria-label="Product sections" className="product-workbench-sections" gap={2} flexWrap="wrap">
-        <Button as="a" href="#workbench-product" size="sm" className="secondary-button">Product details</Button>
-        {editorProductId ? <Button as="a" href="#workbench-reviews" size="sm" className="secondary-button">Reviews</Button> : null}
-        {usesStructuredSuggestions ? <Button as="a" href="#workbench-sources" size="sm" className="secondary-button">Supplier import</Button> : null}
-        {usesStructuredSuggestions ? <Button as="a" href="#workbench-suggestions" size="sm" className="secondary-button">Suggestions</Button> : null}
-        <Button as="a" href="#workbench-ai" size="sm" className="secondary-button">AI controls</Button>
+      <HStack role="tablist" aria-label="Product workbench" className="product-workbench-tabs" gap={1} flexWrap="wrap">
+        {availableTabs.map((tab) => (
+          <Button
+            key={tab.id}
+            id={`workbench-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeWorkbenchTab === tab.id}
+            aria-controls={`workbench-${tab.id}`}
+            size="sm"
+            className={`product-workbench-tab ${activeWorkbenchTab === tab.id ? "active" : ""}`}
+            onClick={() => setActiveWorkbenchTab(tab.id)}
+          >
+            {tab.label}
+          </Button>
+        ))}
       </HStack>
 
-      {editorProductId && !publishedProductId ? (
-        <Box id="workbench-product">
+      <WorkbenchTabPanel id="workbench-product" tabId="product" activeTab={activeWorkbenchTab}>
+        {editorProductId && !publishedProductId ? (
           <HStack justify="space-between" gap={3} mb={4} flexWrap="wrap">
             <Box><Text className="section-kicker">Product details</Text><Text className="panel-title">Edit and publish the product draft</Text></Box>
           </HStack>
+        ) : null}
+        {editorProductId && !publishedProductId ? (
           <ProductEditor
             productId={editorProductId}
             refreshKey={editorRefreshKey}
@@ -723,31 +674,23 @@ export default function ProductWorkbench({
             onRetryReferences={onRetryReferences}
             onBrandAdded={onBrandAdded}
             onDetailChange={setActiveDetail}
-            activeVoiceTarget={fieldVoiceTarget?.targetPath || ""}
-            aiBusyTarget={fieldAiBusyTarget}
-            onFieldVoiceRequest={requestFieldVoice}
-            onFieldAiRequest={requestFieldAi}
-            fieldActionsDisabled={editorDirty}
           />
-        </Box>
-      ) : null}
+        ) : null}
+      </WorkbenchTabPanel>
 
+      <WorkbenchTabPanel id="workbench-reviews" tabId="reviews" activeTab={activeWorkbenchTab}>
       {editorProductId ? (
         <ProductReviewPanel
           productId={editorProductId}
           manualEditsPending={editorDirty}
         />
       ) : null}
+      </WorkbenchTabPanel>
 
-      <DisclosureSection
-        id="workbench-ai"
-        kicker="Optional AI controls"
-        title={activeProductId ? "Product questions and voice" : "AI product drafting"}
-        defaultOpen={!editorProductId || Boolean(fieldVoiceTarget)}
-      >
+      <WorkbenchTabPanel id="workbench-chat" tabId="chat" activeTab={activeWorkbenchTab}>
       <Box className="workflow-prompt-panel">
-        <Text className="section-kicker">AI assistant</Text>
-        <Text className="panel-title">{activeProductId ? "Ask about this product" : "Describe the product outcome"}</Text>
+        <Text className="section-kicker">{editorProductId ? "Product chat" : "AI product drafting"}</Text>
+        <Text className="panel-title">{editorProductId ? "Ask for product-wide changes" : "Describe the product outcome"}</Text>
         {!activeProductId ? <>
         <Textarea
           aria-label="Catalog product instruction"
@@ -764,27 +707,44 @@ export default function ProductWorkbench({
             <FiSend /> {submitting ? "Working…" : draft ? "Refine draft" : "Create draft"}
           </Button>
         </HStack>
-        </> : <Text className="muted-text" mt={2}>Use voice to ask about the active product, inventory, catalog context, or publish readiness. Manual editing remains available at all times.</Text>}
+        </> : <Text className="muted-text" mt={2}>Use voice to request changes across copy, SEO, imagery context, inventory, and publish readiness. Review generated suggestions before they affect the draft.</Text>}
         <VoiceControls
           workflowId={workflowId}
           ensureWorkflow={ensureWorkflow}
           disabled={Boolean(publishedProductId) || submitting || imageBusy || Boolean(activeProductId && !voiceContext)}
           realtimeCapability={catalogStudioSession?.capabilities?.realtime}
           resetSignal={voiceResetKey}
-          startSignal={fieldVoiceStartKey}
           sessionContext={voiceContext}
-          contextLabel={fieldVoiceTarget?.label || ""}
+          contextLabel={activeDetail?.title || activeProductId || ""}
           onToolResult={voiceToolResult}
           onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
         />
-        {fieldVoiceTarget ? (
-          <HStack mt={3} justify="space-between" gap={3} flexWrap="wrap" className="catalog-editor-guidance">
-            <Text>Field voice target: <strong>{fieldVoiceTarget.label}</strong>. The backend pins this field outside model-generated arguments.</Text>
-            <Button type="button" size="sm" className="secondary-button" onClick={() => setFieldVoiceTarget(null)}>Return to product questions</Button>
-          </HStack>
-        ) : null}
       </Box>
-      </DisclosureSection>
+      </WorkbenchTabPanel>
+
+      <WorkbenchTabPanel id="workbench-sources" tabId="sources" activeTab={activeWorkbenchTab}>
+        {usesStructuredSuggestions && editorProductId && contextualDraft ? (
+          <ProductSourceTray
+            productId={editorProductId}
+            draft={contextualDraft}
+            ensureWorkflow={ensureWorkflow}
+            onDraftChanged={authoringDraftChanged}
+            onSuggestionsChanged={() => setSuggestionRefreshKey((current) => current + 1)}
+          />
+        ) : null}
+      </WorkbenchTabPanel>
+
+      <WorkbenchTabPanel id="workbench-suggestions" tabId="suggestions" activeTab={activeWorkbenchTab}>
+        {usesStructuredSuggestions && editorProductId && contextualDraft ? (
+          <SuggestionReviewPanel
+            productId={editorProductId}
+            draft={contextualDraft}
+            refreshSignal={suggestionRefreshKey}
+            onDraftChanged={authoringDraftChanged}
+            manualEditsPending={editorDirty}
+          />
+        ) : null}
+      </WorkbenchTabPanel>
 
       {message ? <Box className="workflow-message product-workbench-status"><Text>{message}</Text></Box> : null}
       {publishedProductId ? (
@@ -808,8 +768,8 @@ export default function ProductWorkbench({
         </Box>
       ) : null}
 
-      {!usesCanonicalEditor ? (
-        <DisclosureSection id="workbench-legacy-images" kicker="Optional AI controls" title="Legacy image generation">
+      <WorkbenchTabPanel id="workbench-legacy-images" tabId="legacyImages" activeTab={activeWorkbenchTab}>
+      {!usesCanonicalEditor && draft ? (
         <Box className="workflow-image-panel">
           <HStack justify="space-between" gap={3} mb={4}>
             <Box><Text className="section-kicker">Image review</Text><Text className="panel-title">Version-bound imagery</Text></Box>
@@ -833,29 +793,8 @@ export default function ProductWorkbench({
             </VStack>
           ) : null}
         </Box>
-        </DisclosureSection>
       ) : null}
-
-      {usesStructuredSuggestions && editorProductId && contextualDraft ? (
-        <DisclosureSection id="workbench-ai-suggestions" kicker="Optional AI controls" title="Supplier import and field proposals">
-        <VStack align="stretch" gap={5}>
-          <ProductSourceTray
-            productId={editorProductId}
-            draft={contextualDraft}
-            ensureWorkflow={ensureWorkflow}
-            onDraftChanged={authoringDraftChanged}
-            onSuggestionsChanged={() => setSuggestionRefreshKey((current) => current + 1)}
-          />
-          <SuggestionReviewPanel
-            productId={editorProductId}
-            draft={contextualDraft}
-            refreshSignal={suggestionRefreshKey}
-            onDraftChanged={authoringDraftChanged}
-            manualEditsPending={editorDirty}
-          />
-        </VStack>
-        </DisclosureSection>
-      ) : null}
+      </WorkbenchTabPanel>
 
     </VStack>
   );
