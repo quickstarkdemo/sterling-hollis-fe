@@ -1,36 +1,14 @@
 import { Box, Button, HStack, Input, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 
-import FieldVoiceControl from "./FieldVoiceControl";
-
 const lines = (value) => (value || []).join("\n");
 const parseLines = (value) => value.split("\n");
 const keywords = (value) => (value || []).join(", ");
 const parseKeywords = (value) => value.split(",");
 
-function FieldActions({ label, targetPath, activeVoiceTarget, aiBusyTarget, onVoiceRequest, onAiRequest, showVoice = true, actionsDisabled = false }) {
-  return (
-    <FieldVoiceControl
-      label={label}
-      targetPath={targetPath}
-      active={activeVoiceTarget === targetPath}
-      aiBusy={aiBusyTarget === targetPath}
-      onVoiceRequest={onVoiceRequest}
-      onAiRequest={onAiRequest}
-      showVoice={showVoice}
-      disabled={actionsDisabled}
-    />
-  );
-}
-
 export default function ProductContentEditor({
   product,
   onChange,
-  activeVoiceTarget = "",
-  aiBusyTarget = "",
-  onVoiceRequest,
-  onAiRequest,
-  actionsDisabled = false,
 }) {
   const update = (field, value) => onChange?.({ ...product, [field]: value });
   const updateSeo = (field, value) => onChange?.({
@@ -41,33 +19,28 @@ export default function ProductContentEditor({
     "specifications",
     (product.specifications || []).map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
   );
-  const fieldActionProps = { activeVoiceTarget, aiBusyTarget, onVoiceRequest, onAiRequest, actionsDisabled };
-
   return (
     <Box className="editor-section product-content-editor">
       <Text className="panel-title">Selling content</Text>
-      <Text className="muted-text" mb={4}>Draft shopper-facing copy manually, by voice, or as an AI proposal that stays reviewable until accepted.</Text>
+      <Text className="muted-text" mb={4}>Draft shopper-facing copy manually here. Use Product chat for product-wide voice changes and reviewable suggestions.</Text>
 
       <VStack align="stretch" gap={5}>
         <Box>
-          <HStack justify="space-between" align="center" gap={2} flexWrap="wrap">
-            <Text className="filter-label">Description</Text>
-            <FieldActions label="Description" targetPath="/description" {...fieldActionProps} />
-          </HStack>
+          <Text className="filter-label">Description</Text>
           <Textarea aria-label="Product description" value={product.description || ""} onChange={(event) => update("description", event.target.value)} rows={5} />
         </Box>
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
           <Box>
-            <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">Benefits</Text><FieldActions label="Benefits" targetPath="/benefits" {...fieldActionProps} /></HStack>
+            <Text className="filter-label">Benefits</Text>
             <Textarea aria-label="Product benefits" value={lines(product.benefits)} onChange={(event) => update("benefits", parseLines(event.target.value))} rows={5} placeholder="One customer benefit per line" />
           </Box>
           <Box>
-            <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">Care instructions</Text><FieldActions label="Care instructions" targetPath="/care_instructions" showVoice={false} {...fieldActionProps} /></HStack>
+            <Text className="filter-label">Care instructions</Text>
             <Textarea aria-label="Product care instructions" value={lines(product.care_instructions)} onChange={(event) => update("care_instructions", parseLines(event.target.value))} rows={5} placeholder="One instruction per line" />
           </Box>
           <Box>
-            <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">Content details</Text><FieldActions label="Content details" targetPath="/content_details" showVoice={false} {...fieldActionProps} /></HStack>
+            <Text className="filter-label">Content details</Text>
             <Textarea aria-label="Product content details" value={lines(product.content_details)} onChange={(event) => update("content_details", parseLines(event.target.value))} rows={5} placeholder="One detail per line" />
           </Box>
           <Box>
@@ -81,7 +54,6 @@ export default function ProductContentEditor({
           <HStack justify="space-between" gap={2} flexWrap="wrap">
             <Box><Text className="filter-label">Specifications</Text><Text className="muted-text">Use stable attribute names so readiness checks can match them.</Text></Box>
             <HStack gap={2}>
-              <FieldActions label="Specifications" targetPath="/specifications" {...fieldActionProps} />
               <Button type="button" size="sm" className="secondary-button" onClick={() => update("specifications", [...(product.specifications || []), { name: "", value: "" }])}><FiPlus /> Add specification</Button>
             </HStack>
           </HStack>
@@ -101,15 +73,15 @@ export default function ProductContentEditor({
           <Text className="muted-text" mb={3}>SEO recommendations never block publication.</Text>
           <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
             <Box>
-              <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">SEO title</Text><FieldActions label="SEO title" targetPath="/seo/title" {...fieldActionProps} /></HStack>
+              <Text className="filter-label">SEO title</Text>
               <Input aria-label="SEO title" value={product.seo?.title || ""} onChange={(event) => updateSeo("title", event.target.value)} />
             </Box>
             <Box>
-              <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">SEO keywords</Text><FieldActions label="SEO keywords" targetPath="/seo/keywords" {...fieldActionProps} /></HStack>
+              <Text className="filter-label">SEO keywords</Text>
               <Input aria-label="SEO keywords" value={keywords(product.seo?.keywords)} onChange={(event) => updateSeo("keywords", parseKeywords(event.target.value))} placeholder="wool coat, outerwear" />
             </Box>
             <Box gridColumn={{ lg: "span 2" }}>
-              <HStack justify="space-between" gap={2} flexWrap="wrap"><Text className="filter-label">SEO description</Text><FieldActions label="SEO description" targetPath="/seo/description" {...fieldActionProps} /></HStack>
+              <Text className="filter-label">SEO description</Text>
               <Textarea aria-label="SEO description" value={product.seo?.description || ""} onChange={(event) => updateSeo("description", event.target.value)} rows={3} />
             </Box>
           </SimpleGrid>

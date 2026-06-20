@@ -189,11 +189,6 @@ export default function CanonicalProductEditor({
   onBrandAdded,
   onDetailChange,
   authoringSchemaVersion = 2,
-  activeVoiceTarget = "",
-  aiBusyTarget = "",
-  onFieldVoiceRequest,
-  onFieldAiRequest,
-  fieldActionsDisabled = false,
 }) {
   const schemaVersion = Number(authoringSchemaVersion) >= 3 ? 3 : 2;
   const references = providedReferences || emptyReferences;
@@ -559,11 +554,6 @@ export default function CanonicalProductEditor({
         <ProductContentEditor
           product={product}
           onChange={updateContent}
-          activeVoiceTarget={activeVoiceTarget}
-          aiBusyTarget={aiBusyTarget}
-          onVoiceRequest={onFieldVoiceRequest}
-          onAiRequest={onFieldAiRequest}
-          actionsDisabled={fieldActionsDisabled}
         />
       ) : null}
       <ProductMediaEditor
@@ -575,11 +565,6 @@ export default function CanonicalProductEditor({
         onGenerate={generateMedia}
         onApprove={approveMedia}
         enableAltText={schemaVersion >= 3}
-        activeVoiceTarget={activeVoiceTarget}
-        aiBusyTarget={aiBusyTarget}
-        onVoiceRequest={onFieldVoiceRequest}
-        onAiRequest={onFieldAiRequest}
-        fieldActionsDisabled={fieldActionsDisabled}
       />
       <ProductInventoryEditor inventory={product.inventory || []} stores={references.stores} availability={references.availability} referencesReady={referencesReady} errors={errors} onChange={updateInventory} />
       <FieldError message={errors.inventory} />

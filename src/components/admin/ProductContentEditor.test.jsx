@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 
 import { renderWithProviders } from "../../test/render";
 import ProductContentEditor from "./ProductContentEditor";
@@ -21,16 +21,13 @@ function Harness(props) {
   return <ProductContentEditor product={value} onChange={setValue} {...props} />;
 }
 
-it("edits structured product content and exposes voice only for eligible fields", async () => {
-  const onVoiceRequest = vi.fn();
-  renderWithProviders(<Harness onVoiceRequest={onVoiceRequest} />);
+it("edits structured product content without field-level voice controls", async () => {
+  renderWithProviders(<Harness />);
 
   await userEvent.clear(screen.getByLabelText("Product benefits"));
   await userEvent.type(screen.getByLabelText("Product benefits"), "Warm without bulk\nEasy to layer");
-  await userEvent.click(screen.getByRole("button", { name: "Use voice for SEO description" }));
 
   expect(screen.getByLabelText("Product benefits")).toHaveValue("Warm without bulk\nEasy to layer");
-  expect(onVoiceRequest).toHaveBeenCalledWith({ targetPath: "/seo/description", label: "SEO description" });
-  expect(screen.queryByRole("button", { name: /voice.*required product specifications/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Use voice for Care instructions" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /use voice/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /draft ai proposal/i })).not.toBeInTheDocument();
 });

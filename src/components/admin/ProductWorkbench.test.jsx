@@ -19,15 +19,12 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("../../utils/apiClient", () => api);
 vi.mock("./ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged, onDetailChange, onFieldVoiceRequest, onFieldAiRequest, activeVoiceTarget }) => (
+  default: ({ productId, authoringSchemaVersion, references, onCatalogChanged, onLifecycleChanged, onDetailChange }) => (
     <div data-testid="product-editor">
       Editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}
       <button type="button" onClick={() => onCatalogChanged?.({ product_id: productId, current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Simulate editor save</button>
       <button type="button" onClick={() => onLifecycleChanged?.("published", { product_id: productId, current_draft: null })}>Simulate publication</button>
       <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Studio Coat", current_draft: { revision: { id: "draft_1" }, draft_version: 2 } })}>Load authoring draft</button>
-      <button type="button" onClick={() => onFieldVoiceRequest?.({ targetPath: "/description", label: "Description" })}>Select description voice</button>
-      <button type="button" onClick={() => onFieldAiRequest?.({ targetPath: "/description", label: "Description", instruction: "Improve description" })}>Improve description</button>
-      <span>Voice target {activeVoiceTarget || "none"}</span>
     </div>
   ),
 }));
@@ -91,7 +88,7 @@ function renderWorkspace(props = {}) {
 }
 
 async function openLegacyImageGeneration(user = userEvent) {
-  await user.click(screen.getByText("Legacy image generation"));
+  await user.click(screen.getByRole("tab", { name: "Legacy images" }));
 }
 
 describe("ProductWorkbench", () => {
@@ -131,7 +128,8 @@ describe("ProductWorkbench", () => {
       status: "succeeded", message: "Draft refined.", retryable: false, replayed: false,
       draft: { ...draft, draft_version: 2 }, workflow: baseWorkflow,
     });
-    await userEvent.type(instruction, "Make it navy");
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
+    await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Make it navy");
     await userEvent.click(screen.getByRole("button", { name: "Refine draft" }));
     await waitFor(() => expect(api.submitCatalogDraftCommand).toHaveBeenLastCalledWith("workflow_1", {
       instruction: "Make it navy",
@@ -146,11 +144,11 @@ describe("ProductWorkbench", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
 
+    await userEvent.click(screen.getByRole("tab", { name: "Supplier import" }));
     expect(screen.getByTestId("source-tray")).toHaveTextContent("cat_coat v2");
-    expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 0");
-    expect(screen.getByTestId("product-review-panel")).toHaveTextContent("Reviews for cat_coat");
-    expect(screen.getByRole("link", { name: "Reviews" })).toHaveAttribute("href", "#workbench-reviews");
+    expect(screen.getByRole("tab", { name: "Reviews" })).toHaveAttribute("aria-selected", "false");
     await userEvent.click(screen.getByRole("button", { name: "Simulate supplier analysis" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Suggestions" }));
     expect(screen.getByTestId("suggestion-review")).toHaveTextContent("refresh 1");
   });
 
@@ -171,21 +169,20 @@ describe("ProductWorkbench", () => {
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat; schema 2; stores 1");
   });
 
-  it("pins field voice outside model arguments and stages typed AI as a proposal", async () => {
+  it("uses one product chat for product-wide voice context", async () => {
     renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
     await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
-    await userEvent.click(screen.getByRole("button", { name: "Select description voice" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
 
-    expect(screen.getByTestId("voice-controls")).toHaveTextContent("Voice mode field; target /description; label Description");
-    expect(screen.getByTestId("product-editor")).toHaveTextContent("Voice target /description");
+    expect(screen.getByTestId("voice-controls")).toHaveTextContent("Voice mode workbench; target none; label Studio Coat");
+    await userEvent.click(screen.getByRole("button", { name: "Start voice workflow" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Improve description" }));
-    await waitFor(() => expect(api.generateCatalogSuggestionSet).toHaveBeenCalledWith(
-      "cat_coat",
-      expect.objectContaining({ input_origin: "typed_action", target_paths: ["/description"], draft_id: "draft_1", expected_draft_version: 2 }),
-      "typed-field-key",
-    ));
-    expect(await screen.findByText("Proposal ready.")).toBeInTheDocument();
+    await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
+      title: "Catalog Studio workbench for Studio Coat",
+      business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
+      draft_id: "draft_1",
+    }, "start-workflow-key"));
+    expect(api.generateCatalogSuggestionSet).not.toHaveBeenCalled();
   });
 
   it("hands a v2 guided draft to the canonical editor with shared references", async () => {
@@ -244,7 +241,8 @@ describe("ProductWorkbench", () => {
     await screen.findByTestId("product-editor");
 
     api.submitCatalogDraftCommand.mockRejectedValueOnce({ response: { status: 503 } });
-    await userEvent.type(input, "Make it blue");
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
+    await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Make it blue");
     await userEvent.click(screen.getByRole("button", { name: "Refine draft" }));
 
     expect(await screen.findByText(/temporarily unavailable/i)).toBeInTheDocument();

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { FiArrowDown, FiArrowUp, FiCheck, FiImage, FiPlus, FiRotateCcw, FiStar, FiTrash2 } from "react-icons/fi";
 
 import ProductImage from "../ProductImage";
-import FieldVoiceControl from "./FieldVoiceControl";
 
 const INTENTS = ["color", "angle", "scene", "scale", "people", "freeform"];
 
@@ -36,11 +35,6 @@ export default function ProductMediaEditor({
   onApprove,
   mutationsDisabled = false,
   enableAltText = false,
-  activeVoiceTarget = "",
-  aiBusyTarget = "",
-  onVoiceRequest,
-  onAiRequest,
-  fieldActionsDisabled = false,
 }) {
   const [intent, setIntent] = useState("scene");
   const [instruction, setInstruction] = useState("");
@@ -175,18 +169,7 @@ export default function ProductMediaEditor({
                   </HStack>
                   {enableAltText ? (
                     <Box>
-                      <HStack justify="space-between" gap={2} flexWrap="wrap">
-                        <Text className="filter-label">Alt text</Text>
-                        <FieldVoiceControl
-                          label={`${label} alt text`}
-                          targetPath={`/media/${asset.media_id}/alt_text`}
-                          active={activeVoiceTarget === `/media/${asset.media_id}/alt_text`}
-                          aiBusy={aiBusyTarget === `/media/${asset.media_id}/alt_text`}
-                          onVoiceRequest={onVoiceRequest}
-                          onAiRequest={onAiRequest}
-                          disabled={fieldActionsDisabled}
-                        />
-                      </HStack>
+                      <Text className="filter-label">Alt text</Text>
                       <Input
                         aria-label={`${label} alt text`}
                         value={asset.alt_text || ""}

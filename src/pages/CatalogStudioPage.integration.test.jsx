@@ -34,7 +34,7 @@ vi.mock("../utils/apiClient", () => api);
 vi.mock("../utils/clerkConfig", () => ({ CLERK_ENABLED: true }));
 vi.mock("../utils/datadog", () => telemetry);
 vi.mock("../components/admin/ProductEditor", () => ({
-  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged, onDetailChange, onFieldVoiceRequest, activeVoiceTarget, refreshKey }) => (
+  default: ({ productId, authoringSchemaVersion, references, onLifecycleChanged, onDetailChange, refreshKey }) => (
     <div data-testid="contract-product-editor">
       Product editor for {productId}; schema {authoringSchemaVersion}; stores {references?.stores?.length || 0}; refresh {refreshKey}
       <span>Manual details, media, inventory, and readiness remain available</span>
@@ -42,8 +42,6 @@ vi.mock("../components/admin/ProductEditor", () => ({
         Publish contract product
       </button>
       <button type="button" onClick={() => onDetailChange?.({ product_id: productId, title: "Contract Coat", current_draft: { revision: { id: "draft_contract" }, draft_version: 1 } })}>Load supplier authoring</button>
-      <button type="button" onClick={() => onFieldVoiceRequest?.({ targetPath: "/description", label: "Description" })}>Use voice for description</button>
-      <span>Active voice target: {activeVoiceTarget || "none"}</span>
     </div>
   ),
 }));
@@ -61,8 +59,8 @@ vi.mock("../components/admin/VoiceControls", () => ({
       <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Dallas has two units; no product state changed." }, workflowId)}>
         Ask grounded inventory question
       </button>
-      <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Description voice proposal is ready.", suggestion_set: { id: "voice_set" } }, workflowId)}>
-        Complete field voice proposal
+      <button type="button" onClick={() => onToolResult?.({ status: "succeeded", message: "Product voice proposal is ready.", suggestion_set: { id: "voice_set" } }, workflowId)}>
+        Complete product voice proposal
       </button>
       <button type="button" onClick={() => onToolResult?.({ status: "failed", message: "Voice is unavailable; continue with text." }, workflowId)}>
         Simulate voice failure
@@ -256,23 +254,29 @@ describe("Catalog Studio contract journey", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await userEvent.click(await screen.findByRole("button", { name: "Load supplier authoring" }));
 
+    await userEvent.click(screen.getByRole("tab", { name: "Supplier import" }));
     expect(screen.getByTestId("contract-source-tray")).toHaveTextContent("cat_contract_coat");
+    await userEvent.click(screen.getByRole("tab", { name: "Suggestions" }));
     expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 0");
 
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
     await userEvent.click(screen.getByRole("button", { name: "Ask grounded inventory question" }));
     expect(await screen.findByText("Dallas has two units; no product state changed.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Use voice for description" }));
-    expect(screen.getByText("Voice context: field")).toBeInTheDocument();
-    expect(screen.getByText("Active voice target: /description")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Complete field voice proposal" }));
-    expect(await screen.findByText("Description voice proposal is ready.")).toBeInTheDocument();
+    expect(screen.getByText("Voice context: workbench")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Complete product voice proposal" }));
+    expect(await screen.findByText("Product voice proposal is ready.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Suggestions" }));
     expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 1");
 
+    await userEvent.click(screen.getByRole("tab", { name: "Supplier import" }));
     await userEvent.click(screen.getByRole("button", { name: "Analyze supplier handoff" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Suggestions" }));
     expect(screen.getByTestId("contract-suggestion-review")).toHaveTextContent("refresh 2");
     await userEvent.click(screen.getByRole("button", { name: "Accept supplier description" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Product details" }));
     expect(screen.getByTestId("contract-product-editor")).toHaveTextContent("refresh 2");
 
+    await userEvent.click(screen.getByRole("tab", { name: "Reviews" }));
     expect(await screen.findByText(customerReview.body)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Decision reason for Maya R."), "Verified customer feedback.");
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
@@ -294,19 +298,24 @@ describe("Catalog Studio contract journey", () => {
     await screen.findByTestId("contract-product-editor");
 
     api.submitCatalogDraftCommand.mockRejectedValueOnce({ response: { status: 503 } });
-    await user.type(instruction, "Make it navy");
+    await user.click(screen.getByRole("tab", { name: "Product chat" }));
+    await user.type(screen.getByLabelText("Catalog product instruction"), "Make it navy");
     await user.click(screen.getByRole("button", { name: "Refine draft" }));
     expect(await screen.findByRole("button", { name: /Retry instruction/i })).toBeInTheDocument();
     expect(screen.getByTestId("contract-product-editor")).toBeInTheDocument();
 
     api.submitCatalogImageCommand.mockRejectedValueOnce({ response: { status: 503 } });
-    await user.click(screen.getByText("Legacy image generation"));
+    await user.click(screen.getByRole("tab", { name: "Product chat" }));
+    await user.click(screen.getByRole("tab", { name: "Legacy images" }));
     await user.click(screen.getByRole("button", { name: /Generate primary image/i }));
     expect(await screen.findByRole("button", { name: /Retry image action/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Product details" }));
     expect(screen.getByTestId("contract-product-editor")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("tab", { name: "Product chat" }));
     await user.click(screen.getByRole("button", { name: "Simulate voice failure" }));
     expect(await screen.findByText("Voice is unavailable; continue with text.")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Product details" }));
     expect(screen.getByTestId("contract-product-editor")).toBeInTheDocument();
   });
 
