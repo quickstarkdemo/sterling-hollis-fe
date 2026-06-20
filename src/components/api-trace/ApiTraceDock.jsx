@@ -1,5 +1,5 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FiActivity,
   FiCheck,
@@ -21,10 +21,14 @@ import {
 import TraceArtifactViewer from "./TraceArtifactViewer";
 import TraceEventLog from "./TraceEventLog";
 import TraceInspector from "./TraceInspector";
+import TraceReplayControls from "./TraceReplayControls";
 import TraceWaterfall from "./TraceWaterfall";
+import useTraceReplay from "../../hooks/useTraceReplay";
 
+const TraceGraph = lazy(() => import("./TraceGraph"));
 const STORAGE_KEY = "sterling-hollis:api-trace-dock:v1";
 const VIEWS = [
+  { id: "graph", label: "Graph" },
   { id: "waterfall", label: "Waterfall" },
   { id: "events", label: "Events" },
   { id: "artifacts", label: "Artifacts" },
@@ -37,10 +41,10 @@ function initialPreference() {
     return {
       expanded: stored.expanded !== false,
       height: Math.max(300, Math.min(720, Number(stored.height) || 430)),
-      view: VIEWS.some((view) => view.id === stored.view) ? stored.view : "waterfall",
+      view: VIEWS.some((view) => view.id === stored.view) ? stored.view : "graph",
     };
   } catch {
-    return { expanded: true, height: 430, view: "waterfall" };
+    return { expanded: true, height: 430, view: "graph" };
   }
 }
 
@@ -80,6 +84,8 @@ export default function ApiTraceDock() {
   const [selection, setSelection] = useState({ kind: "trace", id: "" });
   const [copied, setCopied] = useState(false);
   const [exportStatus, setExportStatus] = useState("idle");
+  const replay = useTraceReplay(selectedTrace);
+  const visibleTrace = replay.projection;
   const copyTimer = useRef(null);
   const dockRef = useRef(null);
   const collapsedButtonRef = useRef(null);
@@ -113,7 +119,7 @@ export default function ApiTraceDock() {
     });
   }, []);
 
-  const lifecycle = traceLifecycle(selectedTrace, traceStatus, connectionStatus);
+  const lifecycle = replay.active ? "replay" : traceLifecycle(selectedTrace, traceStatus, connectionStatus);
   const selectedSummary = useMemo(
     () => recentTraces.find((trace) => trace.trace_id === selectedTraceId),
     [recentTraces, selectedTraceId],
@@ -307,18 +313,24 @@ export default function ApiTraceDock() {
               >{view.label}</button>
             ))}
           </Box>
+          <TraceReplayControls replay={replay} disabled={!selectedTrace?.spans?.length} />
           <Box className="api-trace-view" role="tabpanel">
             {traceStatus === "loading" ? <Text className="api-trace-empty">Loading trace projection…</Text> : null}
             {traceStatus === "error" || traceStatus === "expired" ? <Box className={`api-trace-notice ${traceStatus}`}>{traceError || "This trace has expired."}</Box> : null}
-            {preference.view === "waterfall" ? <TraceWaterfall trace={selectedTrace} selection={selection} onSelect={setSelection} /> : null}
-            {preference.view === "events" ? <TraceEventLog events={selectedTrace?.events} selection={selection} onSelect={setSelection} /> : null}
-            {preference.view === "artifacts" ? <TraceArtifactViewer artifacts={selectedTrace?.artifacts} selection={selection} onSelect={setSelection} /> : null}
-            {preference.view === "inspector" ? <TraceInspector trace={selectedTrace} selection={selection} /> : null}
+            {preference.view === "graph" ? (
+              <Suspense fallback={<Text className="api-trace-empty">Loading system graph…</Text>}>
+                <TraceGraph trace={visibleTrace} selection={selection} onSelect={setSelection} />
+              </Suspense>
+            ) : null}
+            {preference.view === "waterfall" ? <TraceWaterfall trace={visibleTrace} selection={selection} onSelect={setSelection} /> : null}
+            {preference.view === "events" ? <TraceEventLog trace={visibleTrace} selection={selection} onSelect={setSelection} /> : null}
+            {preference.view === "artifacts" ? <TraceArtifactViewer artifacts={visibleTrace?.artifacts} selection={selection} onSelect={setSelection} /> : null}
+            {preference.view === "inspector" ? <TraceInspector trace={visibleTrace} selection={selection} /> : null}
           </Box>
         </Box>
 
         <Box className="api-trace-inspector-pane">
-          <TraceInspector trace={selectedTrace} selection={selection} />
+          <TraceInspector trace={visibleTrace} selection={selection} />
         </Box>
       </Box>
       {exportStatus === "error" ? <Text className="api-trace-export-error">The sanitized trace could not be exported.</Text> : null}

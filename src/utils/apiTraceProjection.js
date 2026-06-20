@@ -112,3 +112,10 @@ export function traceSelectionValue(trace, selection) {
   if (selection.kind === "artifact") return trace.artifacts?.find((item) => item.artifact_id === selection.id) || null;
   return trace;
 }
+
+export function traceSelectionSpanId(trace, selection) {
+  if (selection?.kind === "span") return selection.id;
+  if (selection?.kind === "event") return trace?.events?.find((item) => item.event_id === selection.id)?.span_id || "";
+  if (selection?.kind === "artifact") return trace?.artifacts?.find((item) => item.artifact_id === selection.id)?.span_id || "";
+  return "";
+}

@@ -1,16 +1,21 @@
 import { Box, Text } from "@chakra-ui/react";
 
-import { buildWaterfallRows, formatTraceDuration } from "../../utils/apiTraceProjection";
+import {
+  buildWaterfallRows,
+  formatTraceDuration,
+  traceSelectionSpanId,
+} from "../../utils/apiTraceProjection";
 
 export default function TraceWaterfall({ trace, selection, onSelect }) {
   const rows = buildWaterfallRows(trace);
+  const selectedSpanId = traceSelectionSpanId(trace, selection);
   if (!rows.length) return <Text className="api-trace-empty">No spans have been recorded yet.</Text>;
 
   return (
     <Box className="trace-waterfall" role="listbox" aria-label="Trace span waterfall">
       <Box className="trace-waterfall-axis" aria-hidden="true"><span>Start</span><span>End</span></Box>
       {rows.map((span) => {
-        const selected = selection?.kind === "span" && selection.id === span.span_id;
+        const selected = selectedSpanId === span.span_id;
         return (
           <button
             type="button"

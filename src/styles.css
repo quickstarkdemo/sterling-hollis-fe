@@ -817,6 +817,9 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-state.partial,
 .api-trace-state.reconnecting,
 .api-trace-state.metadata-only,
+.api-trace-state.replay,
+.api-trace-state.replaying,
+.api-trace-state.paused,
 .api-trace-connection.partial,
 .api-trace-connection.reconnecting,
 .api-trace-connection.connecting {
@@ -842,6 +845,11 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-recents,
 .api-trace-workspace {
   border-right: 1px solid var(--line);
+}
+
+.api-trace-workspace {
+  display: flex;
+  flex-direction: column;
 }
 
 .api-trace-section-heading {
@@ -967,7 +975,205 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 }
 
 .api-trace-view {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
   padding: 12px;
+}
+
+.trace-replay-bar {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(238, 232, 220, 0.4);
+}
+
+.trace-replay-copy,
+.trace-replay-time,
+.trace-graph-summary {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.trace-replay-bar.active {
+  border-left: 3px solid var(--saffron);
+  background: #fff7dc;
+}
+
+.trace-replay-scrubber {
+  margin-top: 7px;
+}
+
+.trace-replay-scrubber > input {
+  width: 100%;
+  min-width: 120px;
+  accent-color: var(--saffron);
+}
+
+.trace-speed {
+  min-width: 34px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.trace-speed:hover,
+.trace-speed:focus-visible,
+.trace-speed.active {
+  border-color: var(--line);
+  background: #fffaf0;
+  color: var(--ink);
+}
+
+.trace-graph-shell {
+  display: flex;
+  height: 100%;
+  min-height: 260px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.trace-graph-toolbar {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #fffaf0;
+}
+
+.trace-density {
+  min-height: 28px !important;
+  border-radius: 3px !important;
+  color: var(--muted) !important;
+  font-size: 0.68rem !important;
+}
+
+.trace-density.active {
+  background: var(--paper-deep) !important;
+  color: var(--ink) !important;
+}
+
+.trace-graph-canvas {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.trace-graph-canvas .react-flow {
+  background: var(--paper);
+}
+
+.trace-graph-node {
+  min-height: 74px;
+  padding: 9px 10px;
+  border: 1px solid rgba(23, 19, 15, 0.2);
+  border-left: 4px solid var(--muted);
+  border-radius: 4px;
+  background: #fffaf0;
+  color: var(--ink);
+  box-shadow: 0 7px 18px rgba(23, 19, 15, 0.08);
+}
+
+.compact .trace-graph-node {
+  min-height: 58px;
+  padding: 7px 9px;
+}
+
+.trace-graph-node.browser { border-left-color: var(--ink); }
+.trace-graph-node.http { border-left-color: #60788f; }
+.trace-graph-node.openai { border-left-color: var(--saffron); }
+.trace-graph-node.realtime { border-left-color: #8b6847; }
+.trace-graph-node.worker { border-left-color: #7a6755; border-style: dashed; }
+.trace-graph-node.data { border-left-color: var(--sage); }
+.trace-graph-node.failed { border-color: var(--oxblood); }
+.trace-graph-node.selected { outline: 2px solid var(--saffron); outline-offset: 2px; }
+.trace-graph-node.changed { animation: trace-node-change 620ms ease-out; }
+
+.trace-graph-kind,
+.trace-graph-attempt {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trace-graph-node-title {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-graph-node-meta {
+  margin-top: 3px !important;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-graph-attempt {
+  margin-top: 4px !important;
+  color: #7a520a;
+}
+
+.trace-graph-handle {
+  width: 7px !important;
+  height: 7px !important;
+  border: 1px solid #fffaf0 !important;
+  background: var(--muted) !important;
+}
+
+.trace-graph-link-edge .react-flow__edge-path {
+  stroke: #8b6847;
+  stroke-dasharray: 5 4;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--saffron);
+  stroke-width: 2;
+}
+
+.trace-graph-controls,
+.trace-graph-minimap {
+  overflow: hidden !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 3px !important;
+  background: #fffaf0 !important;
+  box-shadow: none !important;
+}
+
+.trace-graph-minimap {
+  width: 96px !important;
+  height: 64px !important;
+}
+
+.trace-graph-controls button {
+  border-bottom-color: var(--line) !important;
+  background: #fffaf0 !important;
+  color: var(--ink) !important;
+}
+
+.trace-event-row.related {
+  border-color: rgba(192, 139, 18, 0.35);
+  background: rgba(255, 244, 200, 0.45);
+}
+
+@keyframes trace-node-change {
+  from { box-shadow: 0 0 0 7px rgba(192, 139, 18, 0.2); transform: translateY(2px); }
+  to { box-shadow: 0 7px 18px rgba(23, 19, 15, 0.08); transform: translateY(0); }
 }
 
 .trace-waterfall-axis {
@@ -1184,10 +1390,29 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   .trace-waterfall-row {
     grid-template-columns: minmax(120px, 48%) minmax(100px, 1fr);
   }
+
+  .trace-replay-bar {
+    padding-inline: 10px;
+  }
+
+  .trace-replay-copy,
+  .trace-replay-primary .api-trace-state {
+    display: none;
+  }
+
+  .trace-graph-shell {
+    min-height: 300px;
+  }
+
+  .trace-graph-minimap {
+    display: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .trace-waterfall-bar.running { animation: none; }
+  .trace-graph-node.changed { animation: none; }
+  .react-flow__edge.animated path { animation: none !important; }
 }
 
 .chat-launcher {
