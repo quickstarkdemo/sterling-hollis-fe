@@ -11,6 +11,7 @@ import {
   promoteCatalogSourceAsset,
   uploadCatalogSourceBundle,
 } from "../../utils/apiClient";
+import { useApiTrace } from "../ApiTraceContext";
 
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -74,6 +75,7 @@ export default function ProductSourceTray({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [followUps, setFollowUps] = useState([]);
+  const { startAction } = useApiTrace();
   const inputRef = useRef(null);
   const loadRequestId = useRef(0);
   const mutationInFlight = useRef(false);
@@ -126,6 +128,14 @@ export default function ProductSourceTray({
     setSelected((current) => current.map((item) => ({ ...item, serverError: "" })));
     setError("");
     setNotice("");
+    const traceAction = startAction("Upload supplier sources", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "supplier_sources_upload",
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      },
+    });
     try {
       const bundle = await uploadCatalogSourceBundle(valid, {
         title: title.trim() || "Supplier handoff",
@@ -138,10 +148,19 @@ export default function ProductSourceTray({
       setSelected([]);
       if (inputRef.current) inputRef.current.value = "";
       setNotice(`${bundle.assets.length} supplier ${bundle.assets.length === 1 ? "image" : "images"} uploaded privately.`);
+      traceAction.end("completed", {
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      });
     } catch (nextError) {
       const message = sourceError(nextError, "The supplier images could not be uploaded.");
       setSelected((current) => current.map((item) => ({ ...item, serverError: message })));
       setError(message);
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "source_upload_error",
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      });
     } finally {
       mutationInFlight.current = false;
       setUploading(false);
@@ -155,6 +174,14 @@ export default function ProductSourceTray({
     setLoading(false);
     setBusyAssetId(asset.id);
     setError("");
+    const traceAction = startAction("Remove supplier source", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "supplier_source_remove",
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      },
+    });
     try {
       await deleteCatalogSourceAsset(asset.bundle_id, asset.id);
       setBundles((current) => current
@@ -163,8 +190,17 @@ export default function ProductSourceTray({
           : bundle)
         .filter((bundle) => bundle.assets.length));
       setNotice(`${asset.original_filename} removed from private sources.`);
+      traceAction.end("completed", {
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      });
     } catch (nextError) {
       setError(sourceError(nextError, "The supplier image could not be removed."));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "source_remove_error",
+        draft_id: draft?.revision?.id || "",
+        product_id: productId,
+      });
     } finally {
       mutationInFlight.current = false;
       setBusyAssetId("");
@@ -178,6 +214,14 @@ export default function ProductSourceTray({
     setLoading(false);
     setBusyAssetId(asset.id);
     setError("");
+    const traceAction = startAction("Promote supplier source to media", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "supplier_source_promote",
+        draft_id: draft.revision.id,
+        product_id: productId,
+      },
+    });
     try {
       const result = await promoteCatalogSourceAsset(asset.bundle_id, asset.id, {
         draft_id: draft.revision.id,
@@ -188,8 +232,17 @@ export default function ProductSourceTray({
         : bundle));
       setNotice(`${asset.original_filename} promoted to approved product media.`);
       onDraftChanged?.(result);
+      traceAction.end("completed", {
+        draft_id: draft.revision.id,
+        product_id: productId,
+      });
     } catch (nextError) {
       setError(sourceError(nextError, "The supplier image could not be promoted."));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "source_promote_error",
+        draft_id: draft.revision.id,
+        product_id: productId,
+      });
     } finally {
       mutationInFlight.current = false;
       setBusyAssetId("");
@@ -204,6 +257,14 @@ export default function ProductSourceTray({
     setAnalyzing(true);
     setError("");
     setNotice("");
+    const traceAction = startAction("Analyze supplier sources", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "supplier_sources_analyze",
+        draft_id: draft.revision.id,
+        product_id: productId,
+      },
+    });
     try {
       const workflowId = await ensureWorkflow?.();
       if (!workflowId) throw new Error("workflow_unavailable");
@@ -219,8 +280,18 @@ export default function ProductSourceTray({
       setFollowUps(result.follow_up_questions || []);
       setNotice(result.message || "Supplier analysis is ready for review.");
       onSuggestionsChanged?.(result.suggestion_set);
+      traceAction.end("completed", {
+        draft_id: draft.revision.id,
+        product_id: productId,
+        workflow_id: workflowId,
+      });
     } catch (nextError) {
       setError(sourceError(nextError, "Supplier analysis could not be completed. Your draft is unchanged."));
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "source_analyze_error",
+        draft_id: draft.revision.id,
+        product_id: productId,
+      });
     } finally {
       mutationInFlight.current = false;
       setAnalyzing(false);

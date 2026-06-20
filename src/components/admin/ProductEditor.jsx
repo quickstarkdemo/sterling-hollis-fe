@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiPlus, FiRefreshCw, FiSave, FiTrash2 } from "react-icons/fi";
 
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
+import { useApiTrace } from "../ApiTraceContext";
 import {
   createIdempotencyKey,
   approveCatalogImageJob,
@@ -180,6 +181,7 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
   const [notice, setNotice] = useState("");
   const [mediaJob, setMediaJob] = useState(null);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const { startAction } = useApiTrace();
   const saveInFlight = useRef(false);
   const idempotencyKeys = useRef({});
 
@@ -318,6 +320,14 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
 
     saveInFlight.current = true;
     setSaving(true);
+    const traceAction = startAction("Save catalog product draft", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "product_draft_save",
+        draft_id: detail.current_draft?.revision?.id || "",
+        product_id: detail.product_id,
+      },
+    });
     try {
       let currentDraft = detail.current_draft;
       if (!currentDraft) {
@@ -347,6 +357,10 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
       applyDetail(nextDetail);
       setNotice("Draft saved. The published catalog remains unchanged until publication.");
       onCatalogChanged?.(nextDetail);
+      traceAction.end("completed", {
+        draft_id: nextDetail.current_draft?.revision?.id || currentDraft.revision.id,
+        product_id: detail.product_id,
+      });
     } catch (nextError) {
       if (nextError?.response?.status === 409) {
         setConflict(true);
@@ -357,6 +371,11 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
       } else {
         setError(nextError);
       }
+      traceAction.end("failed", {
+        error_code: nextError?.response?.status || nextError?.code || nextError?.name || "draft_save_error",
+        draft_id: detail.current_draft?.revision?.id || "",
+        product_id: detail.product_id,
+      });
     } finally {
       saveInFlight.current = false;
       setSaving(false);
@@ -382,6 +401,15 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
     }
     setMediaBusy(true);
     setNotice("");
+    const traceAction = startAction("Generate catalog media variation", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "media_generate",
+        draft_id: currentDraft.revision.id,
+        product_id: detail.product_id,
+        workflow_id: currentDraft.workflow_id || "",
+      },
+    });
     try {
       let workflowId = currentDraft.workflow_id;
       if (!workflowId) {
@@ -406,8 +434,20 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
       await load();
       if (job.status === "failed") setNotice("The media variation failed. The product draft and inventory are unchanged.");
       if (["queued", "running"].includes(job.status)) setNotice("The media variation is still processing. Refresh the product to check its status.");
-    } catch {
+      traceAction.end(job.status === "failed" ? "failed" : "completed", {
+        draft_id: currentDraft.revision.id,
+        job_id: job.id,
+        product_id: detail.product_id,
+        workflow_id: workflowId,
+      });
+    } catch (error) {
       setNotice("The media variation could not be created. The product draft and inventory are unchanged.");
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "media_generate_error",
+        draft_id: currentDraft.revision.id,
+        product_id: detail.product_id,
+        workflow_id: currentDraft.workflow_id || "",
+      });
     } finally {
       setMediaBusy(false);
     }
@@ -416,6 +456,16 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
   const approveMedia = async (approval = {}) => {
     if (!mediaJob || !detail.current_draft) return;
     setMediaBusy(true);
+    const traceAction = startAction("Approve catalog media variation", {
+      surface: "catalog-studio",
+      attributes: {
+        action: "media_approve",
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      },
+    });
     try {
       await approveCatalogImageJob(
         mediaJob.workflow_id,
@@ -430,8 +480,21 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
       setMediaJob(null);
       await load();
       setNotice("Media variation approved for the next publication.");
-    } catch {
+      traceAction.end("completed", {
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      });
+    } catch (error) {
       setNotice("The media variation could not be approved. Try again with the current draft.");
+      traceAction.end("failed", {
+        error_code: error?.response?.status || error?.code || error?.name || "media_approve_error",
+        draft_id: detail.current_draft.revision.id,
+        job_id: mediaJob.id,
+        product_id: detail.product_id,
+        workflow_id: mediaJob.workflow_id || "",
+      });
     } finally {
       setMediaBusy(false);
     }
