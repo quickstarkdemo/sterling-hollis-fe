@@ -8,6 +8,13 @@ import ApiTraceDock from "./ApiTraceDock";
 
 vi.mock("../ApiTraceContext", () => ({ useApiTrace: vi.fn() }));
 vi.mock("../../utils/apiClient", () => ({ downloadAdminApiTrace: vi.fn() }));
+vi.mock("./TraceGraph", () => ({
+  default: ({ trace, onSelect }) => (
+    <button type="button" onClick={() => onSelect({ kind: "span", id: trace.spans[0].span_id })}>
+      Graph spans {trace.spans.length}
+    </button>
+  ),
+}));
 
 const projection = {
   trace_id: "trace-1",
@@ -81,6 +88,23 @@ describe("ApiTraceDock", () => {
 
     fireEvent.keyDown(screen.getByRole("button", { name: "Resize API trace dock" }), { key: "ArrowUp" });
     expect(screen.getByLabelText("API trace visualizer")).toHaveStyle({ height: "454px" });
+  });
+
+  it("synchronizes graph selection and replays the immutable projection without a request", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    renderWithProviders(<ApiTraceDock />);
+
+    const graph = await screen.findByRole("button", { name: "Graph spans 1" });
+    await userEvent.click(graph);
+    expect(screen.getByText("Span inspector")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Replay trace" }));
+    expect(screen.getByLabelText("Trace replay controls")).toBeInTheDocument();
+    expect(screen.getByText("replaying")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "Replay position" }), { target: { value: "240" } });
+    expect(screen.getByText("complete")).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   it("copies a defense-in-depth sanitized projection", async () => {
