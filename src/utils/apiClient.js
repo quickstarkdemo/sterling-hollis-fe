@@ -81,6 +81,94 @@ export async function postApiTraceEvent(traceId, event) {
   return response.data;
 }
 
+export async function getAdminApiTraces(params = {}) {
+  const response = await apiClient.get("/api/admin/traces", {
+    params: cleanParams(params),
+    apiTrace: false,
+  });
+  return response.data;
+}
+
+export async function getAdminApiTrace(traceId) {
+  const response = await apiClient.get(
+    `/api/admin/traces/${encodeURIComponent(traceId)}`,
+    { apiTrace: false },
+  );
+  return response.data;
+}
+
+export async function getAdminApiTraceEvents(traceId, afterSequence = -1) {
+  const response = await apiClient.get(
+    `/api/admin/traces/${encodeURIComponent(traceId)}/events`,
+    { params: { after_sequence: afterSequence }, apiTrace: false },
+  );
+  return response.data;
+}
+
+export async function downloadAdminApiTrace(traceId) {
+  const response = await apiClient.get(
+    `/api/admin/traces/${encodeURIComponent(traceId)}/export`,
+    { apiTrace: false, responseType: "blob" },
+  );
+  return response;
+}
+
+export async function subscribeAdminApiTraceEvents(
+  traceId,
+  { afterSequence = -1, signal, onEvent = () => {}, onStatus = () => {} } = {},
+) {
+  const token = authTokenGetter ? await authTokenGetter() : "";
+  const query = new URLSearchParams({ after_sequence: String(afterSequence) });
+  const response = await fetch(
+    `${API_BASE_URL}/api/admin/traces/${encodeURIComponent(traceId)}/stream?${query}`,
+    {
+      cache: "no-store",
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal,
+    },
+  );
+  if (!response.ok) {
+    const error = new Error(`Trace stream failed with status ${response.status}.`);
+    error.status = response.status;
+    throw error;
+  }
+  if (!response.body?.getReader) throw new Error("Trace streaming is unavailable in this browser.");
+
+  onStatus("live");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const processBlock = (block) => {
+    const lines = block.split(/\r?\n/);
+    let eventType = "message";
+    const dataLines = [];
+    lines.forEach((line) => {
+      if (line.startsWith("event:")) eventType = line.slice(6).trim();
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+    });
+    if (!dataLines.length) return;
+    const data = JSON.parse(dataLines.join("\n"));
+    onEvent({ type: eventType, data });
+  };
+
+  try {
+    while (!signal?.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() || "";
+      blocks.forEach(processBlock);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 setApiTraceEventTransport(postApiTraceEvent);
 
 export function getCatalog(params) {
