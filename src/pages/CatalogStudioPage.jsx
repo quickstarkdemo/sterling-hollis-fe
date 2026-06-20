@@ -1,5 +1,5 @@
 import { Box, Button, Container, Flex, Text } from "@chakra-ui/react";
-import { FiCode, FiEye, FiPlus } from "react-icons/fi";
+import { FiCode, FiPlus } from "react-icons/fi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDeveloperLens } from "../components/DeveloperLensContext";
@@ -9,7 +9,7 @@ import ProductWorkbench from "../components/admin/ProductWorkbench";
 import { getAdminCatalogReferences } from "../utils/apiClient";
 
 export default function CatalogStudioPage() {
-  const { enabled: developerLensEnabled, toggle } = useDeveloperLens();
+  const { enabled: developerToolsEnabled, toggle } = useDeveloperLens();
   const { session } = useCatalogStudioAccess();
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
@@ -80,25 +80,16 @@ export default function CatalogStudioPage() {
     <Box className="catalog-studio-page">
       <Box className="catalog-studio-hero">
         <Container maxW="1180px">
-          <Flex align={{ base: "stretch", md: "end" }} justify="space-between" gap={6} direction={{ base: "column", md: "row" }}>
+          <Flex align={{ base: "stretch", md: "center" }} justify="space-between" gap={6} direction={{ base: "column", md: "row" }}>
             <Box maxW="760px">
-              <Text className="section-kicker">Catalog Studio</Text>
-              <Text as="h1" className="page-title">
-                Build and manage the product catalog
+              <Text className="section-kicker">Catalog management</Text>
+              <Text as="h1" className="page-title catalog-page-title">
+                Product Catalog
               </Text>
-              <Text className="hero-copy" mt={4}>
-                Find a product, review its current state, and publish deliberate catalog changes.
+              <Text className="hero-copy" mt={3}>
+                Find products, edit shopper-facing details, manage media and inventory, then publish deliberate catalog changes.
               </Text>
             </Box>
-            <Button
-              type="button"
-              className={developerLensEnabled ? "developer-lens-toggle enabled" : "developer-lens-toggle"}
-              aria-pressed={developerLensEnabled}
-              onClick={toggle}
-            >
-              {developerLensEnabled ? <FiCode /> : <FiEye />}
-              Developer lens {developerLensEnabled ? "on" : "off"}
-            </Button>
           </Flex>
         </Container>
       </Box>
@@ -130,6 +121,18 @@ export default function CatalogStudioPage() {
           />
         </Box>
       </Container>
+
+      <Box className="developer-tools-launcher">
+        <Button
+          type="button"
+          className={developerToolsEnabled ? "developer-tools-button enabled" : "developer-tools-button"}
+          aria-pressed={developerToolsEnabled}
+          onClick={toggle}
+        >
+          <FiCode />
+          {developerToolsEnabled ? "Hide Developer tools" : "Developer tools"}
+        </Button>
+      </Box>
     </Box>
   );
 }

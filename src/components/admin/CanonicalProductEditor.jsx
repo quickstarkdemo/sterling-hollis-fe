@@ -20,7 +20,6 @@ import {
   submitCatalogMediaCommand,
 } from "../../utils/apiClient";
 import BrandSelect from "./BrandSelect";
-import DeveloperLens from "./DeveloperLens";
 import ProductInventoryEditor from "./ProductInventoryEditor";
 import ProductContentEditor from "./ProductContentEditor";
 import ProductDraftPreview from "./ProductDraftPreview";
@@ -441,15 +440,6 @@ export default function CanonicalProductEditor({
 
   const referencesReady = referencesStatus === "ready";
   const categoryExists = references.categories.some((item) => item.id === product.category);
-  const technicalContext = {
-    schema_version: product.schema_version,
-    product_id: detail.product_id,
-    draft_id: detail.current_draft?.revision?.id || null,
-    seed_run_id: product.seed_run_id,
-    metadata: product.metadata,
-    media_lineage: product.media.map(({ media_id, source_media_id, predecessor_media_id, provenance }) => ({ media_id, source_media_id, predecessor_media_id, provenance })),
-  };
-
   return (
     <VStack align="stretch" gap={6} className="product-editor merchandiser-product-editor">
       <HStack justify="space-between" gap={4} align="start" flexWrap="wrap">
@@ -536,7 +526,6 @@ export default function CanonicalProductEditor({
           <ProductReadinessPanel readiness={readiness} loading={projectionLoading} error={projectionError} dirty={dirty} onRetry={loadProjection} />
         </>
       ) : null}
-      <DeveloperLens catalogContext={technicalContext} />
       <ProductLifecycleActions product={detail} dirty={dirty} authoringSchemaVersion={schemaVersion} readiness={readiness} onChanged={lifecycleChanged} />
     </VStack>
   );
