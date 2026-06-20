@@ -11,6 +11,7 @@ import ChatContextProvider from "./components/ChatContextProvider";
 import AdminRoute, { CatalogStudioAccessProvider } from "./components/AdminRoute";
 import DeveloperLensProvider from "./components/DeveloperLensProvider";
 import { ApiTraceCapabilityBridge } from "./components/ApiTraceProvider";
+import ApiTraceDock from "./components/api-trace/ApiTraceDock";
 import Shell from "./components/Shell";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
               />
             </Routes>
           </Shell>
+          <ApiTraceDock />
         </ChatContextProvider>
       </DeveloperLensProvider>
     </CatalogStudioAccessProvider>

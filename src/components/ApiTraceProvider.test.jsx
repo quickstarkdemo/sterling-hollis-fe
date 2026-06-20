@@ -1,7 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../test/render";
 import { CatalogStudioAccessContext } from "./CatalogStudioAccessContext";
@@ -14,6 +14,13 @@ import {
   resetApiTraceRuntimeForTests,
   startApiTraceAction,
 } from "../utils/apiTraceClient";
+import { getAdminApiTraces, subscribeAdminApiTraceEvents } from "../utils/apiClient";
+
+vi.mock("../utils/apiClient", () => ({
+  getAdminApiTraces: vi.fn().mockResolvedValue({ items: [] }),
+  getAdminApiTrace: vi.fn().mockResolvedValue(null),
+  subscribeAdminApiTraceEvents: vi.fn(() => new Promise(() => {})),
+}));
 
 function TraceConsumer() {
   const trace = useApiTrace();
@@ -65,6 +72,7 @@ function renderProvider({ status = "authorized", capability = true, lens = true 
 
 describe("ApiTraceProvider", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     resetApiTraceRuntimeForTests();
   });
 
@@ -88,6 +96,8 @@ describe("ApiTraceProvider", () => {
     expect(await screen.findByText("enabled:false")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Trace action" }));
     expect(screen.getByText("events:0")).toBeInTheDocument();
+    expect(getAdminApiTraces).not.toHaveBeenCalled();
+    expect(subscribeAdminApiTraceEvents).not.toHaveBeenCalled();
   });
 
   it("resets the session-scoped runtime when the provider unmounts", async () => {

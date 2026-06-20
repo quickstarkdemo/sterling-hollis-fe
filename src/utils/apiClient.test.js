@@ -26,6 +26,9 @@ import {
   decideCatalogProductReview,
   deleteCatalogSourceAsset,
   generateCatalogSuggestionSet,
+  getAdminApiTrace,
+  getAdminApiTraceEvents,
+  getAdminApiTraces,
   getAdminCatalogProduct,
   getAdminCatalogProductReviews,
   getAdminCatalogProductV2,
@@ -62,6 +65,7 @@ import {
   submitCatalogMediaCommand,
   submitCatalogRealtimeToolCall,
   submitCatalogRealtimeV3ToolCall,
+  subscribeAdminApiTraceEvents,
   updateDemoObservabilityState,
   uploadCatalogSourceBundle,
 } from "./apiClient";
@@ -404,4 +408,60 @@ it("uses workflow-bound Realtime routes without exposing provider credentials", 
   );
   expect(JSON.stringify(client.post.mock.calls)).not.toContain("client_secret");
   expect(JSON.stringify(client.post.mock.calls)).not.toContain("api.openai.com");
+});
+
+it("uses non-tracing admin routes for trace projections", async () => {
+  client.get
+    .mockResolvedValueOnce({ data: { items: [] } })
+    .mockResolvedValueOnce({ data: { trace_id: "trace/one" } })
+    .mockResolvedValueOnce({ data: { items: [], next_cursor: 3 } });
+
+  await getAdminApiTraces({ limit: 12 });
+  await getAdminApiTrace("trace/one");
+  await getAdminApiTraceEvents("trace/one", 3);
+
+  expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/traces", {
+    params: { limit: 12 },
+    apiTrace: false,
+  });
+  expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/traces/trace%2Fone", { apiTrace: false });
+  expect(client.get).toHaveBeenNthCalledWith(3, "/api/admin/traces/trace%2Fone/events", {
+    params: { after_sequence: 3 },
+    apiTrace: false,
+  });
+});
+
+it("streams authenticated trace events without putting credentials in the URL", async () => {
+  const event = { event_id: "evt-1", sequence: 4, name: "Completed" };
+  const read = vi.fn()
+    .mockResolvedValueOnce({
+      done: false,
+      value: new TextEncoder().encode(`id: 4\nevent: trace_event\ndata: ${JSON.stringify(event)}\n\n`),
+    })
+    .mockResolvedValueOnce({ done: true });
+  const releaseLock = vi.fn();
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+    ok: true,
+    body: { getReader: () => ({ read, releaseLock }) },
+  });
+  const onEvent = vi.fn();
+  const onStatus = vi.fn();
+  setAuthTokenGetter(() => Promise.resolve("clerk-token"));
+
+  try {
+    await subscribeAdminApiTraceEvents("trace/one", { afterSequence: 3, onEvent, onStatus });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/traces/trace%2Fone/stream?after_sequence=3",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer clerk-token" }),
+      }),
+    );
+    expect(fetchMock.mock.calls[0][0]).not.toContain("clerk-token");
+    expect(onStatus).toHaveBeenCalledWith("live");
+    expect(onEvent).toHaveBeenCalledWith({ type: "trace_event", data: event });
+    expect(releaseLock).toHaveBeenCalled();
+  } finally {
+    setAuthTokenGetter(null);
+    fetchMock.mockRestore();
+  }
 });

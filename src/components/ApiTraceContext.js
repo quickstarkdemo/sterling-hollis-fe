@@ -23,6 +23,15 @@ export const ApiTraceContext = createContext({
   recordEvent: recordApiTraceEvent,
   traceFetch: traceApiFetch,
   subscribe: subscribeApiTraceEvents,
+  recentTraces: [],
+  recentStatus: "idle",
+  selectedTraceId: "",
+  selectedTrace: null,
+  traceStatus: "idle",
+  connectionStatus: "offline",
+  traceError: "",
+  selectTrace: () => {},
+  refreshTraces: async () => {},
 });
 
 export function useApiTrace() {

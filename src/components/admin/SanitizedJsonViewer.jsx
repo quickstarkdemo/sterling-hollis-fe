@@ -1,35 +1,13 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCheck, FiCopy } from "react-icons/fi";
-
-const SENSITIVE_KEY = /(authorization|api[_-]?key|token|secret|password|credential|reasoning|chain[_-]?of[_-]?thought|raw[_-]?prompt)/i;
-
-function sanitize(value, seen = new WeakSet(), depth = 0) {
-  if (depth > 8) return "[TRUNCATED_DEPTH]";
-  if (value === null || typeof value !== "object") return value;
-  if (seen.has(value)) return "[CIRCULAR]";
-  seen.add(value);
-  if (Array.isArray(value)) return value.slice(0, 100).map((item) => sanitize(item, seen, depth + 1));
-
-  return Object.fromEntries(
-    Object.entries(value).slice(0, 100).map(([key, item]) => [
-      key,
-      SENSITIVE_KEY.test(key) ? "[REDACTED]" : sanitize(item, seen, depth + 1),
-    ]),
-  );
-}
-
-function sanitizedJson(value, maxChars = 6000) {
-  const serialized = JSON.stringify(sanitize(value ?? {}), null, 2);
-  if (serialized.length <= maxChars) return { text: serialized, truncated: false };
-  return { text: `${serialized.slice(0, maxChars)}\n… [TRUNCATED]`, truncated: true };
-}
+import { sanitizedTraceJson } from "../../utils/apiTraceProjection";
 
 export default function SanitizedJsonViewer({ label, value, maxChars = 6000 }) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimer = useRef(null);
-  const projection = useMemo(() => sanitizedJson(value, maxChars), [maxChars, value]);
+  const projection = useMemo(() => sanitizedTraceJson(value, maxChars), [maxChars, value]);
 
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
