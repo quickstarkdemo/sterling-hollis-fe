@@ -177,20 +177,21 @@ describe("Catalog Studio contract journey", () => {
     telemetry.trackCatalogStudioMilestone.mockReset();
   });
 
-  it("covers authorization, draft creation, developer inspection, and publication handoff", async () => {
+  it("covers authorization, draft creation, hidden developer metadata, and publication handoff", async () => {
     sessionStorage.setItem("sterling-hollis:catalog-studio:developer-lens", "enabled");
     const user = userEvent.setup();
     renderStudio();
 
-    await screen.findByRole("heading", { name: "Build and manage the product catalog" });
+    await screen.findByRole("heading", { name: "Product Catalog" });
     expect(screen.getByText("Realtime capability: ready")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a contract coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
 
     expect(await screen.findByText("Draft created.")).toBeInTheDocument();
     expect(screen.getByTestId("contract-product-editor")).toHaveTextContent("cat_contract_coat");
-    expect(screen.getByText("Sanitized API metadata")).toBeInTheDocument();
-    expect(screen.getByText("gpt-5")).toBeInTheDocument();
+    expect(screen.queryByText("Sanitized API metadata")).not.toBeInTheDocument();
+    expect(screen.queryByText("gpt-5")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
     expect(document.body).not.toHaveTextContent("never-render");
 
     api.getCatalogWorkflow.mockResolvedValue({
@@ -299,6 +300,7 @@ describe("Catalog Studio contract journey", () => {
     expect(screen.getByTestId("contract-product-editor")).toBeInTheDocument();
 
     api.submitCatalogImageCommand.mockRejectedValueOnce({ response: { status: 503 } });
+    await user.click(screen.getByText("Legacy image generation"));
     await user.click(screen.getByRole("button", { name: /Generate primary image/i }));
     expect(await screen.findByRole("button", { name: /Retry image action/i })).toBeInTheDocument();
     expect(screen.getByTestId("contract-product-editor")).toBeInTheDocument();

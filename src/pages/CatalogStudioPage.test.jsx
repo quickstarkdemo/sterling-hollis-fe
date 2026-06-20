@@ -95,14 +95,14 @@ describe("CatalogStudioPage", () => {
   it("shows authorized navigation and focuses the page on catalog work", async () => {
     renderStudio();
 
-    expect(await screen.findByRole("heading", { name: "Build and manage the product catalog" })).toBeInTheDocument();
-    expect(screen.getAllByText("Catalog Studio").length).toBeGreaterThan(1);
+    expect(await screen.findByRole("heading", { name: "Product Catalog" })).toBeInTheDocument();
+    expect(screen.getByText("Catalog management")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Create product" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New product" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("button", { name: "Create with OpenAI" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Manage catalog" })).not.toBeInTheDocument();
     expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Developer lens off" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Developer tools" })).toHaveAttribute("aria-pressed", "false");
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
@@ -120,20 +120,20 @@ describe("CatalogStudioPage", () => {
     expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
   });
 
-  it("persists the developer lens for the browser session", async () => {
+  it("persists the developer tools launcher for the browser session", async () => {
     const user = userEvent.setup();
     const firstRender = renderStudio();
-    await screen.findByRole("heading", { name: "Build and manage the product catalog" });
+    await screen.findByRole("heading", { name: "Product Catalog" });
 
-    await user.click(screen.getByRole("button", { name: "Developer lens off" }));
+    await user.click(screen.getByRole("button", { name: "Developer tools" }));
 
-    expect(screen.getByLabelText("Workflow developer lens")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
     expect(sessionStorage.getItem("sterling-hollis:catalog-studio:developer-lens")).toBe("enabled");
 
     firstRender.unmount();
     renderStudio();
 
-    expect(await screen.findByRole("button", { name: "Developer lens on" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("warns before switching away from a dirty product", async () => {

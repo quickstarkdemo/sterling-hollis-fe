@@ -1,4 +1,4 @@
-import { Badge, Box, Button, HStack, Input, Link, SimpleGrid, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Link, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiImage, FiRefreshCw, FiSend, FiThumbsUp } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
@@ -17,8 +17,6 @@ import {
   submitCatalogImageCommand,
 } from "../../utils/apiClient";
 import { trackCatalogStudioMilestone } from "../../utils/datadog";
-import ApiStageTimeline from "./ApiStageTimeline";
-import DeveloperLens from "./DeveloperLens";
 import ProductEditor from "./ProductEditor";
 import ProductReviewPanel from "./ProductReviewPanel";
 import ProductSourceTray from "./ProductSourceTray";
@@ -46,6 +44,20 @@ function safeErrorMessage(error, fallback) {
   if (status === 422) return "The request needs different product or image details before it can continue.";
   if ([502, 503, 504].includes(status)) return "The OpenAI capability is temporarily unavailable. Your current draft is preserved.";
   return fallback;
+}
+
+function DisclosureSection({ id, kicker, title, children, defaultOpen = false }) {
+  return (
+    <Box as="details" id={id} className="catalog-disclosure" open={defaultOpen}>
+      <Box as="summary" className="catalog-disclosure-summary">
+        <Box>
+          <Text className="section-kicker">{kicker}</Text>
+          <Text className="panel-title">{title}</Text>
+        </Box>
+      </Box>
+      <Box className="catalog-disclosure-body">{children}</Box>
+    </Box>
+  );
 }
 
 export default function ProductWorkbench({
@@ -600,25 +612,62 @@ export default function ProductWorkbench({
 
   return (
     <VStack align="stretch" gap={7} className="product-workbench">
-      <HStack justify="space-between" gap={4} align="start" flexWrap="wrap">
+      <HStack justify="space-between" gap={4} align="start" flexWrap="wrap" className="product-workbench-header">
         <Box>
           <Text className="section-kicker">Product workbench</Text>
           <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
-          <Text className="muted-text" mt={2}>Product details, media, inventory, readiness, and AI assistance stay in one workspace.</Text>
+          <Text className="muted-text" mt={2}>Product details, media, price, and store inventory come first. Optional AI controls stay available below the form.</Text>
         </Box>
         {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
       </HStack>
 
       <HStack as="nav" aria-label="Product sections" className="product-workbench-sections" gap={2} flexWrap="wrap">
         <Button as="a" href="#workbench-product" size="sm" className="secondary-button">Product details</Button>
-        {usesStructuredSuggestions ? <Button as="a" href="#workbench-sources" size="sm" className="secondary-button">Supplier sources</Button> : null}
-        {usesStructuredSuggestions ? <Button as="a" href="#workbench-suggestions" size="sm" className="secondary-button">AI suggestions</Button> : null}
-        <Button as="a" href="#workbench-media" size="sm" className="secondary-button">Media</Button>
-        <Button as="a" href="#workbench-inventory" size="sm" className="secondary-button">Inventory</Button>
-        <Button as="a" href="#workbench-readiness" size="sm" className="secondary-button">Preview & readiness</Button>
         {editorProductId ? <Button as="a" href="#workbench-reviews" size="sm" className="secondary-button">Reviews</Button> : null}
+        {usesStructuredSuggestions ? <Button as="a" href="#workbench-sources" size="sm" className="secondary-button">Supplier import</Button> : null}
+        {usesStructuredSuggestions ? <Button as="a" href="#workbench-suggestions" size="sm" className="secondary-button">Suggestions</Button> : null}
+        <Button as="a" href="#workbench-ai" size="sm" className="secondary-button">AI controls</Button>
       </HStack>
 
+      {editorProductId && !publishedProductId ? (
+        <Box id="workbench-product">
+          <HStack justify="space-between" gap={3} mb={4} flexWrap="wrap">
+            <Box><Text className="section-kicker">Product details</Text><Text className="panel-title">Edit and publish the product draft</Text></Box>
+          </HStack>
+          <ProductEditor
+            productId={editorProductId}
+            refreshKey={editorRefreshKey}
+            onDirtyChange={setEditorDirty}
+            onCatalogChanged={editorChanged}
+            onLifecycleChanged={lifecycleChanged}
+            authoringSchemaVersion={authoringSchemaVersion}
+            references={references}
+            referencesStatus={referencesStatus}
+            onRetryReferences={onRetryReferences}
+            onBrandAdded={onBrandAdded}
+            onDetailChange={setActiveDetail}
+            activeVoiceTarget={fieldVoiceTarget?.targetPath || ""}
+            aiBusyTarget={fieldAiBusyTarget}
+            onFieldVoiceRequest={requestFieldVoice}
+            onFieldAiRequest={requestFieldAi}
+            fieldActionsDisabled={editorDirty}
+          />
+        </Box>
+      ) : null}
+
+      {editorProductId ? (
+        <ProductReviewPanel
+          productId={editorProductId}
+          manualEditsPending={editorDirty}
+        />
+      ) : null}
+
+      <DisclosureSection
+        id="workbench-ai"
+        kicker="Optional AI controls"
+        title={activeProductId ? "Product questions and voice" : "AI product drafting"}
+        defaultOpen={!editorProductId || Boolean(fieldVoiceTarget)}
+      >
       <Box className="workflow-prompt-panel">
         <Text className="section-kicker">AI assistant</Text>
         <Text className="panel-title">{activeProductId ? "Ask about this product" : "Describe the product outcome"}</Text>
@@ -658,16 +707,17 @@ export default function ProductWorkbench({
           </HStack>
         ) : null}
       </Box>
+      </DisclosureSection>
 
-      {message ? <Box className="workflow-message"><Text>{message}</Text></Box> : null}
+      {message ? <Box className="workflow-message product-workbench-status"><Text>{message}</Text></Box> : null}
       {publishedProductId ? (
-        <Box className="workflow-message">
+        <Box className="workflow-message product-workbench-status">
           <Text>This workflow is complete and read-only.</Text>
           <Link as={RouterLink} to={`/product/${publishedProductId}`} target="_blank" rel="noreferrer">View published product</Link>
         </Box>
       ) : null}
       {actionError ? (
-        <Box className="catalog-conflict-alert" role="alert">
+        <Box className="catalog-conflict-alert product-workbench-status" role="alert">
           <Text>{actionError.message}</Text>
           {actionError.kind === "draft" && actionError.retryable ? (
             <Button type="button" className="secondary-button" mt={3} onClick={() => submitInstruction(actionError.instruction)}><FiRefreshCw /> Retry instruction</Button>
@@ -681,14 +731,9 @@ export default function ProductWorkbench({
         </Box>
       ) : null}
 
-      <SimpleGrid columns={{ base: 1, xl: usesCanonicalEditor ? 1 : 2 }} gap={6} alignItems="start">
-        <Box id="workbench-api-stages" className="workflow-stage-panel">
-          <Text className="section-kicker">API stages</Text>
-          <Text className="panel-title" mb={4}>Business timeline</Text>
-          <ApiStageTimeline events={workflow?.events || []} />
-        </Box>
-
-        {!usesCanonicalEditor ? <Box className="workflow-image-panel">
+      {!usesCanonicalEditor ? (
+        <DisclosureSection id="workbench-legacy-images" kicker="Optional AI controls" title="Legacy image generation">
+        <Box className="workflow-image-panel">
           <HStack justify="space-between" gap={3} mb={4}>
             <Box><Text className="section-kicker">Image review</Text><Text className="panel-title">Version-bound imagery</Text></Box>
             {imageJob ? <Badge className={`workflow-status ${imageJob.status}`}>{imageJob.status}</Badge> : null}
@@ -710,13 +755,13 @@ export default function ProductWorkbench({
               {pollExpired ? <Button type="button" className="secondary-button" onClick={resumeImagePolling}><FiRefreshCw /> Refresh image status</Button> : null}
             </VStack>
           ) : null}
-        </Box> : null}
-      </SimpleGrid>
-
-      <DeveloperLens events={workflow?.events || []} />
+        </Box>
+        </DisclosureSection>
+      ) : null}
 
       {usesStructuredSuggestions && editorProductId && contextualDraft ? (
-        <>
+        <DisclosureSection id="workbench-ai-suggestions" kicker="Optional AI controls" title="Supplier import and field proposals">
+        <VStack align="stretch" gap={5}>
           <ProductSourceTray
             productId={editorProductId}
             draft={contextualDraft}
@@ -731,41 +776,10 @@ export default function ProductWorkbench({
             onDraftChanged={authoringDraftChanged}
             manualEditsPending={editorDirty}
           />
-        </>
+        </VStack>
+        </DisclosureSection>
       ) : null}
 
-      {editorProductId && !publishedProductId ? (
-        <Box id="workbench-product">
-          <HStack justify="space-between" gap={3} mb={4} flexWrap="wrap">
-            <Box><Text className="section-kicker">Product details</Text><Text className="panel-title">Edit and publish the product draft</Text></Box>
-          </HStack>
-          <ProductEditor
-            productId={editorProductId}
-            refreshKey={editorRefreshKey}
-            onDirtyChange={setEditorDirty}
-            onCatalogChanged={editorChanged}
-            onLifecycleChanged={lifecycleChanged}
-            authoringSchemaVersion={authoringSchemaVersion}
-            references={references}
-            referencesStatus={referencesStatus}
-            onRetryReferences={onRetryReferences}
-            onBrandAdded={onBrandAdded}
-            onDetailChange={setActiveDetail}
-            activeVoiceTarget={fieldVoiceTarget?.targetPath || ""}
-            aiBusyTarget={fieldAiBusyTarget}
-            onFieldVoiceRequest={requestFieldVoice}
-            onFieldAiRequest={requestFieldAi}
-            fieldActionsDisabled={editorDirty}
-          />
-        </Box>
-      ) : null}
-
-      {editorProductId ? (
-        <ProductReviewPanel
-          productId={editorProductId}
-          manualEditsPending={editorDirty}
-        />
-      ) : null}
     </VStack>
   );
 }

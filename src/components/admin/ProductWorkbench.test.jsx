@@ -90,6 +90,10 @@ function renderWorkspace(props = {}) {
   return renderWithProviders(<DeveloperLensProvider><ProductWorkbench {...props} /></DeveloperLensProvider>, { route: "/catalog-studio" });
 }
 
+async function openLegacyImageGeneration(user = userEvent) {
+  await user.click(screen.getByText("Legacy image generation"));
+}
+
 describe("ProductWorkbench", () => {
   beforeEach(() => {
     api.startCatalogWorkflow.mockReset().mockResolvedValue({ ...baseWorkflow, events: [] });
@@ -110,8 +114,8 @@ describe("ProductWorkbench", () => {
 
     expect(await screen.findByText("Draft created.")).toBeInTheDocument();
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
-    expect(screen.getByText("Responses structured the product.")).toBeInTheDocument();
-    expect(screen.getByText("Moderation approved the product.")).toBeInTheDocument();
+    expect(screen.queryByText("Responses structured the product.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Moderation approved the product.")).not.toBeInTheDocument();
     expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
       title: "Catalog Studio product creation",
       business_summary: "Text-guided catalog product creation workflow.",
@@ -209,7 +213,7 @@ describe("ProductWorkbench", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
 
     expect(await screen.findByText("The request was blocked by policy.")).toBeInTheDocument();
-    expect(screen.getByText("Request stopped by policy.")).toBeInTheDocument();
+    expect(screen.queryByText("Request stopped by policy.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Generate primary image/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("product-editor")).not.toBeInTheDocument();
   });
@@ -224,6 +228,7 @@ describe("ProductWorkbench", () => {
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
     await screen.findByTestId("product-editor");
+    await openLegacyImageGeneration(user);
     await user.click(screen.getByRole("button", { name: /Generate primary image/i }));
     expect(await screen.findByText("queued")).toBeInTheDocument();
 
@@ -256,6 +261,7 @@ describe("ProductWorkbench", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Simulate editor save" }));
     expect(screen.getByText("Draft version 2")).toBeInTheDocument();
+    await openLegacyImageGeneration();
     await userEvent.click(screen.getByRole("button", { name: /Generate primary image/i }));
 
     expect(api.submitCatalogImageCommand).toHaveBeenCalledWith("workflow_1", expect.objectContaining({
@@ -273,6 +279,7 @@ describe("ProductWorkbench", () => {
     await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await screen.findByTestId("product-editor");
+    await openLegacyImageGeneration();
     await userEvent.click(screen.getByRole("button", { name: /Generate primary image/i }));
     await userEvent.click(await screen.findByRole("button", { name: /Approve image/i }));
 
@@ -300,7 +307,7 @@ describe("ProductWorkbench", () => {
 
     expect(await screen.findByText("This workflow is complete and read-only.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View published product" })).toHaveAttribute("href", "/product/cat_coat");
-    expect(screen.getByText("Published the product.")).toBeInTheDocument();
+    expect(screen.queryByText("Published the product.")).not.toBeInTheDocument();
     expect(screen.queryByTestId("product-editor")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Catalog product instruction")).toBeDisabled();
   });
