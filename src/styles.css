@@ -1763,6 +1763,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   position: sticky;
   top: 88px;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   max-height: calc(100dvh - 104px);
   min-height: 0;
@@ -2039,7 +2040,6 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
 }
 
 .workflow-prompt-panel,
-.workflow-stage-panel,
 .workflow-image-panel,
 .workflow-developer-lens {
   padding: clamp(18px, 3vw, 24px);
@@ -2091,48 +2091,6 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   background: rgba(96, 114, 77, 0.08);
   color: #405033;
   font-weight: 700;
-}
-
-.api-stage-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
-  min-height: 88px;
-  padding: 12px 0;
-}
-
-.api-stage-row:not(:last-child)::after {
-  position: absolute;
-  top: 50px;
-  bottom: -10px;
-  left: 16px;
-  width: 1px;
-  background: rgba(23, 19, 15, 0.16);
-  content: "";
-}
-
-.api-stage-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(23, 19, 15, 0.14);
-  border-radius: 50%;
-  background: #fffaf0;
-  color: var(--muted);
-}
-
-.api-stage-row.succeeded .api-stage-icon,
-.api-stage-row.completed .api-stage-icon {
-  border-color: rgba(96, 114, 77, 0.4);
-  color: var(--sage);
-}
-
-.api-stage-row.failed .api-stage-icon,
-.api-stage-row.blocked .api-stage-icon {
-  border-color: rgba(119, 39, 37, 0.35);
-  color: var(--oxblood);
 }
 
 .workflow-status {
@@ -2215,7 +2173,9 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   position: static;
   display: flex;
   min-height: 0;
+  max-height: 100%;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .studio-column-title {

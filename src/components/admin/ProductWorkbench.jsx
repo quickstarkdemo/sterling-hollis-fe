@@ -179,12 +179,12 @@ export default function ProductWorkbench({
     if (workflowStartPromise.current) return workflowStartPromise.current;
     const activeDraft = activeDetail?.current_draft;
     const workflowPayload = activeProductId && activeDraft ? {
-      title: `Catalog Studio workbench for ${activeDetail.title || activeProductId}`,
+      title: `Product Catalog workbench for ${activeDetail.title || activeProductId}`,
       business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
       draft_id: activeDraft.revision.id,
     } : {
-      title: "Catalog Studio product creation",
-      business_summary: "Text-guided catalog product creation workflow.",
+      title: "Product Catalog product creation",
+      business_summary: "Text-guided product creation workflow.",
     };
     const startPromise = startCatalogWorkflow(
       workflowPayload,
@@ -616,7 +616,7 @@ export default function ProductWorkbench({
       { id: "sources", label: "Supplier import" },
       { id: "suggestions", label: "Suggestions" },
     ] : []),
-    { id: "chat", label: editorProductId ? "Product chat" : "Create with AI" },
+    { id: "chat", label: editorProductId ? "Product chat" : "Draft assistant" },
     ...(!usesCanonicalEditor && draft ? [{ id: "legacyImages", label: "Legacy images" }] : []),
   ], [contextualDraft, draft, editorProductId, publishedProductId, usesCanonicalEditor, usesStructuredSuggestions]);
   const activeTabIsAvailable = availableTabs.some((tab) => tab.id === activeWorkbenchTab);
@@ -630,9 +630,9 @@ export default function ProductWorkbench({
     <VStack align="stretch" gap={7} className="product-workbench">
       <HStack justify="space-between" gap={4} align="start" flexWrap="wrap" className="product-workbench-header">
         <Box>
-          <Text className="section-kicker">Product workbench</Text>
+          <Text className="section-kicker">Product workspace</Text>
           <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
-          <Text className="muted-text" mt={2}>Edit the product directly, review related work, or use one product-wide chat for voice-assisted changes.</Text>
+          <Text className="muted-text" mt={2}>Edit product facts, images, pricing, and store inventory first. Assistant tools stay available when you need proposals.</Text>
         </Box>
         {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
       </HStack>
@@ -689,7 +689,7 @@ export default function ProductWorkbench({
 
       <WorkbenchTabPanel id="workbench-chat" tabId="chat" activeTab={activeWorkbenchTab}>
       <Box className="workflow-prompt-panel">
-        <Text className="section-kicker">{editorProductId ? "Product chat" : "AI product drafting"}</Text>
+        <Text className="section-kicker">{editorProductId ? "Product chat" : "Draft assistant"}</Text>
         <Text className="panel-title">{editorProductId ? "Ask for product-wide changes" : "Describe the product outcome"}</Text>
         {!activeProductId ? <>
         <Textarea
@@ -707,7 +707,7 @@ export default function ProductWorkbench({
             <FiSend /> {submitting ? "Working…" : draft ? "Refine draft" : "Create draft"}
           </Button>
         </HStack>
-        </> : <Text className="muted-text" mt={2}>Use voice to request changes across copy, SEO, imagery context, inventory, and publish readiness. Review generated suggestions before they affect the draft.</Text>}
+        </> : <Text className="muted-text" mt={2}>Use voice for reviewable changes across copy, SEO, image context, inventory, and publish readiness. Nothing changes the draft until accepted.</Text>}
         <VoiceControls
           workflowId={workflowId}
           ensureWorkflow={ensureWorkflow}

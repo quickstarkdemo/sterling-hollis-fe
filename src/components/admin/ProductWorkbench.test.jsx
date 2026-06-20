@@ -114,8 +114,8 @@ describe("ProductWorkbench", () => {
     expect(screen.queryByText("Responses structured the product.")).not.toBeInTheDocument();
     expect(screen.queryByText("Moderation approved the product.")).not.toBeInTheDocument();
     expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
-      title: "Catalog Studio product creation",
-      business_summary: "Text-guided catalog product creation workflow.",
+      title: "Product Catalog product creation",
+      business_summary: "Text-guided product creation workflow.",
     }, "start-workflow-key");
     expect(JSON.stringify(api.startCatalogWorkflow.mock.calls[0])).not.toContain("tailored wool coat");
     expect(api.submitCatalogDraftCommand).toHaveBeenCalledWith("workflow_1", {
@@ -178,7 +178,7 @@ describe("ProductWorkbench", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start voice workflow" }));
 
     await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
-      title: "Catalog Studio workbench for Studio Coat",
+      title: "Product Catalog workbench for Studio Coat",
       business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
       draft_id: "draft_1",
     }, "start-workflow-key"));
