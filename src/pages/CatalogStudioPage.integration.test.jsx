@@ -182,6 +182,7 @@ describe("Catalog Studio contract journey", () => {
     renderStudio();
 
     await screen.findByRole("heading", { name: "Catalog Studio" });
+    await user.click(screen.getByRole("button", { name: "New product" }));
     expect(screen.getByText("Realtime capability: ready")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a contract coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
@@ -226,6 +227,7 @@ describe("Catalog Studio contract journey", () => {
     api.getCatalogWorkflow.mockResolvedValue(blockedWorkflow);
     renderStudio();
 
+    await userEvent.click(await screen.findByRole("button", { name: "New product" }));
     await userEvent.type(await screen.findByLabelText("Catalog product instruction"), "Create prohibited merchandise");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
 
@@ -239,6 +241,7 @@ describe("Catalog Studio contract journey", () => {
     session.capabilities.catalog.authoring_schema_version = 2;
     renderStudio();
 
+    await userEvent.click(await screen.findByRole("button", { name: "New product" }));
     await userEvent.type(await screen.findByLabelText("Catalog product instruction"), "Create a canonical coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
 
@@ -251,6 +254,7 @@ describe("Catalog Studio contract journey", () => {
     session.capabilities.catalog.authoring_schema_version = 3;
     renderStudio();
 
+    await userEvent.click(await screen.findByRole("button", { name: "New product" }));
     await userEvent.type(await screen.findByLabelText("Catalog product instruction"), "Create a supplier-backed coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await userEvent.click(await screen.findByRole("button", { name: "Load supplier authoring" }));
@@ -293,6 +297,7 @@ describe("Catalog Studio contract journey", () => {
   it("preserves the draft when text, image, or voice capabilities fail", async () => {
     const user = userEvent.setup();
     renderStudio();
+    await user.click(await screen.findByRole("button", { name: "New product" }));
     const instruction = await screen.findByLabelText("Catalog product instruction");
     await user.type(instruction, "Create a resilient coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));

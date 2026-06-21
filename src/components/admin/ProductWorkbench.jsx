@@ -1,6 +1,6 @@
-import { Badge, Box, Button, HStack, Input, Link, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, Drawer, HStack, IconButton, Input, Link, Portal, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FiImage, FiRefreshCw, FiSend, FiThumbsUp } from "react-icons/fi";
+import { FiImage, FiRefreshCw, FiSend, FiThumbsUp, FiX } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 
 import { useDeveloperLens } from "../DeveloperLensContext";
@@ -73,6 +73,8 @@ export default function ProductWorkbench({
   onBrandAdded,
   assistantOpen = false,
   onAssistantOpenChange,
+  inspectorOpen = true,
+  onInspectorOpenChange,
 }) {
   const initial = useMemo(() => activeProductId ? {} : restoredState(), [activeProductId]);
   const { enabled: developerLensEnabled } = useDeveloperLens();
@@ -632,29 +634,56 @@ export default function ProductWorkbench({
     if (activeTabIsAvailable) return;
     setActiveWorkbenchTab(availableTabs[0]?.id || "chat");
   }, [activeTabIsAvailable, availableTabs]);
+  const inspectorTitle = activeProductId ? "Edit product" : "Create product";
 
   return (
-    <VStack align="stretch" gap={7} className="product-workbench">
-      <HStack justify="space-between" gap={4} align="start" flexWrap="wrap" className="product-workbench-header">
-        <Box>
-          <Text className="section-kicker">Product workspace</Text>
-          <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
-          <Text className="muted-text" mt={2}>Edit product facts, images, pricing, and store inventory first. Assistant tools stay available when you need proposals.</Text>
-        </Box>
-        {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
-      </HStack>
+    <>
+    <CatalogGlobalAssistant
+      activeDetail={activeDetail}
+      workflowId={workflowId}
+      ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
+      open={assistantOpen}
+      onOpenChange={onAssistantOpenChange}
+      realtimeCapability={catalogStudioSession?.capabilities?.realtime}
+      resetSignal={voiceResetKey}
+      productVoiceContext={voiceContext}
+      onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
+    />
 
-      <CatalogGlobalAssistant
-        activeDetail={activeDetail}
-        workflowId={workflowId}
-        ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
-        open={assistantOpen}
-        onOpenChange={onAssistantOpenChange}
-        realtimeCapability={catalogStudioSession?.capabilities?.realtime}
-        resetSignal={voiceResetKey}
-        productVoiceContext={voiceContext}
-        onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
-      />
+    <Drawer.Root
+      open={inspectorOpen}
+      onOpenChange={(details) => onInspectorOpenChange?.(details.open)}
+      placement="end"
+      size="full"
+      modal={false}
+      trapFocus={false}
+      preventScroll={false}
+      restoreFocus={false}
+    >
+      <Portal>
+        <Drawer.Positioner pointerEvents="none">
+          <Drawer.Content className="product-inspector-drawer-content" pointerEvents="auto">
+            <Drawer.Header className="product-inspector-drawer-header">
+              <Box minW={0}>
+                <Drawer.Title asChild>
+                  <Text className="assistant-title">Product inspector</Text>
+                </Drawer.Title>
+                <Drawer.Description className="muted-mini">{inspectorTitle}</Drawer.Description>
+              </Box>
+              <IconButton type="button" size="sm" variant="ghost" className="icon-button" aria-label="Close product inspector" onClick={() => onInspectorOpenChange?.(false)}>
+                <FiX />
+              </IconButton>
+            </Drawer.Header>
+            <Drawer.Body className="product-inspector-drawer-body">
+              <VStack align="stretch" gap={7} className="product-workbench">
+                <HStack justify="space-between" gap={4} align="start" flexWrap="wrap" className="product-workbench-header">
+                  <Box>
+                    <Text className="section-kicker">Product workspace</Text>
+                    <Text as="h2" className="studio-column-title">{activeProductId ? "Edit product" : "Create product"}</Text>
+                    <Text className="muted-text" mt={2}>Edit product facts, images, pricing, and store inventory first. Assistant tools stay available when you need proposals.</Text>
+                  </Box>
+                  {!activeProductId && workflowId ? <Button type="button" className="secondary-button" disabled={submitting || imageBusy} onClick={resetWorkflow}>Start new product</Button> : null}
+                </HStack>
 
       <HStack role="tablist" aria-label="Product workbench" className="product-workbench-tabs" gap={1} flexWrap="wrap">
         {availableTabs.map((tab) => (
@@ -815,6 +844,12 @@ export default function ProductWorkbench({
       ) : null}
       </WorkbenchTabPanel>
 
-    </VStack>
+              </VStack>
+            </Drawer.Body>
+          </Drawer.Content>
+        </Drawer.Positioner>
+      </Portal>
+    </Drawer.Root>
+    </>
   );
 }
