@@ -59,7 +59,7 @@ describe("SuggestionReviewPanel", () => {
     expect(await screen.findByText("description")).toBeInTheDocument();
     expect(screen.getByText("observed")).toBeInTheDocument();
     expect(screen.getByText("supplier analysis")).toBeInTheDocument();
-    expect(screen.getByText("1 source image")).toBeInTheDocument();
+    expect(screen.getByText("1 source")).toBeInTheDocument();
     expect(screen.getByText("Original description.")).toBeInTheDocument();
     expect(screen.getByText("A warm, supplier-grounded description.")).toBeInTheDocument();
   });

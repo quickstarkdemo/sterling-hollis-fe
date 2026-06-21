@@ -1935,6 +1935,18 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   color: var(--sage);
 }
 
+.catalog-source-preview.document {
+  gap: 4px;
+  font-size: 1.35rem;
+}
+
+.catalog-source-preview.document span {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .catalog-follow-up {
   padding: 14px;
   border-left: 3px solid var(--saffron);

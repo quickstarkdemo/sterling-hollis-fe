@@ -124,7 +124,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
       </HStack>
 
       {loading ? <Text className="muted-text" mt={4}>Loading reviewable suggestions…</Text> : null}
-      {!loading && !sets.length ? <Text className="muted-text" mt={4}>No suggestions yet. Analyze supplier images or use an inline AI action to create a reviewable proposal.</Text> : null}
+      {!loading && !sets.length ? <Text className="muted-text" mt={4}>No suggestions yet. Analyze supplier sources or use an inline AI action to create a reviewable proposal.</Text> : null}
       {manualEditsPending ? <Text className="catalog-action-hint" mt={4}>Save or discard manual edits before accepting a proposal. Rejecting a proposal remains available.</Text> : null}
 
       <VStack align="stretch" gap={5} mt={5}>
@@ -145,7 +145,7 @@ export default function SuggestionReviewPanel({ productId, draft, refreshSignal 
                   return (
                     <Box key={suggestion.id} className={`suggestion-card ${suggestion.status}`}>
                       <HStack justify="space-between" gap={3} align="start" flexWrap="wrap">
-                        <Box><Text className="panel-title">{fieldLabel(suggestion.target_path)}</Text><HStack gap={2} mt={1} flexWrap="wrap"><Badge className="soft-badge">{suggestion.certainty_class}</Badge><Badge className="soft-badge">{suggestion.input_origin.replaceAll("_", " ")}</Badge><Badge className={`workflow-status ${suggestion.status}`}>{suggestion.status}</Badge>{suggestion.evidence_asset_ids.length ? <Text className="muted-text">{suggestion.evidence_asset_ids.length} source {suggestion.evidence_asset_ids.length === 1 ? "image" : "images"}</Text> : null}</HStack></Box>
+                        <Box><Text className="panel-title">{fieldLabel(suggestion.target_path)}</Text><HStack gap={2} mt={1} flexWrap="wrap"><Badge className="soft-badge">{suggestion.certainty_class}</Badge><Badge className="soft-badge">{suggestion.input_origin.replaceAll("_", " ")}</Badge><Badge className={`workflow-status ${suggestion.status}`}>{suggestion.status}</Badge>{suggestion.evidence_asset_ids.length ? <Text className="muted-text">{suggestion.evidence_asset_ids.length} {suggestion.evidence_asset_ids.length === 1 ? "source" : "sources"}</Text> : null}</HStack></Box>
                       </HStack>
                       <Box className="suggestion-diff" mt={3}>
                         <Box><Text className="filter-label">Current</Text><Text whiteSpace="pre-wrap">{displayValue(suggestion.baseline_value)}</Text></Box>
