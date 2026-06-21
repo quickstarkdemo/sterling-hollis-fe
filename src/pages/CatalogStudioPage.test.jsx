@@ -96,8 +96,10 @@ describe("CatalogStudioPage", () => {
   it("shows authorized navigation and focuses the page on catalog work", async () => {
     renderStudio();
 
-    expect(await screen.findByRole("heading", { name: "Product Catalog" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Catalog Studio" })).toBeInTheDocument();
     expect(screen.getByText("Catalog management")).toBeInTheDocument();
+    expect(screen.getByText("Search, edit, ask, review, and publish product data from one protected command center.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask AI" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Create product" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New product" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("button", { name: "Create with OpenAI" })).not.toBeInTheDocument();
@@ -124,7 +126,7 @@ describe("CatalogStudioPage", () => {
   it("persists the developer tools launcher for the browser session", async () => {
     const user = userEvent.setup();
     const firstRender = renderStudio();
-    await screen.findByRole("heading", { name: "Product Catalog" });
+    await screen.findByRole("heading", { name: "Catalog Studio" });
 
     await user.click(screen.getByRole("button", { name: "Developer tools" }));
 
