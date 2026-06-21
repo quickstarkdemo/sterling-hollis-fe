@@ -15,17 +15,20 @@ the durable image worker, object storage, or ChatGPT discovery.
 
 1. Start on the public storefront and point out that shopping remains anonymous.
 2. Sign in and open **Catalog Studio** from the header or Clerk user menu.
-3. Open one product and upload its known-good supplier image bundle.
-4. Accept one evidence-backed suggestion and reject another, explaining that AI
+3. Use the command center search, filters, and view toggle to find an existing
+   product, or click **New product** to open the **Product inspector**.
+4. In the inspector, upload the known-good supplier image bundle.
+5. Accept one evidence-backed suggestion and reject another, explaining that AI
    proposals do not become product data until a merchant accepts them.
-5. Ask the workbench voice assistant which store is low on stock. Then use the
-   description microphone to stage a warmer rewrite and accept the proposal.
-6. Review readiness, moderate one synthetic customer review, and publish a
+6. Open **Ask AI** for a read-only catalog question such as which store is low
+   on stock. Then use the inspector's product chat or voice controls to stage a
+   warmer description rewrite and accept the proposal.
+7. Review readiness, moderate one synthetic customer review, and publish a
    merchant response only after approving the review.
-7. Publish the product explicitly, open it on the storefront, and confirm the
+8. Publish the product explicitly, open it on the storefront, and confirm the
    approved customer review and published response appear there.
 
-Keep the developer lens off. Emphasize human approval, one catalog record, and
+Keep **Developer tools** off. Emphasize human approval, one catalog record, and
 safe recovery rather than implementation details.
 
 ### Codex build path (10 minutes)
@@ -36,33 +39,26 @@ contracts before consumers, and tests for authorization, moderation, recovery,
 redaction, and publication. Do not imply that Codex bypassed code review or that
 mocked tests validated live provider credentials.
 
-### Developer-lens path (15 minutes)
-
-Turn on **Developer lens** after the first successful draft. Walk through the
-bounded event projection: capability, status, model, request ID, duration,
-usage, and safe request/response summaries. State explicitly that credentials,
-system instructions, private reasoning, raw audio, and unbounded provider
-payloads are not sent to the browser and cannot be copied from this view.
-
 ### Trace path (15 minutes)
 
 Use this path when the shared API trace capability is configured. Turn on
-**Developer tools** from the persistent bottom launcher, then perform these
-actions in order:
+**Developer tools** from the persistent bottom launcher, then open the compact
+bottom **Dev Tools** tray. Perform these actions in order:
 
-1. Create or refine a product draft from the Product Catalog workbench.
-2. Upload supplier sources, generate suggestions, and accept or reject one
+1. Create or refine a product draft from the **Product inspector**.
+2. Open **Ask AI** and ask one read-only inventory or assortment question.
+3. Upload supplier sources, generate suggestions, and accept or reject one
    proposal.
-3. Generate and approve one reviewed image variant.
-4. Publish the draft.
-5. Open the public product page and send one storefront chat turn about the same
+4. Generate and approve one reviewed image variant.
+5. Publish the draft.
+6. Open the public product page and send one storefront chat turn about the same
    product.
 
-For each action, select the most recent trace in the dock and confirm the root
-span name matches the user action, with child HTTP spans for the backend calls.
-The selected trace should show only bounded IDs, endpoints, statuses, and
-operational metadata. It must not show prompts, credentials, raw review text,
-supplier file contents, audio, or private provider payloads.
+For each action, expand **Dev Tools**, select the most recent trace, and confirm
+the root span name matches the user action, with child HTTP spans for the
+backend calls. The selected trace should show only bounded IDs, endpoints,
+statuses, and operational metadata. It must not show prompts, credentials, raw
+review text, supplier file contents, audio, or private provider payloads.
 
 For an offline walkthrough, load the sanitized scripted projection in
 `docs/fixtures/catalog-chat-trace-replay.json` into the trace replay tooling or
@@ -90,15 +86,20 @@ credentials or Clerk tokens.
 
 - Sign in with the designated presenter account.
 - Confirm Catalog Studio appears in both the header and Clerk user menu.
-- Open the Studio and confirm **Authorized**.
-- Confirm Responses, Moderation, Image generation, Realtime voice, Worker
-  storage, and Catalog all show **Ready**. Treat any unavailable capability as a
+- Open the Studio and confirm the command center renders with **Ask AI**, **New
+  product**, search, filters, product count, and view toggle controls.
+- Confirm capability-dependent controls are available in the expected surfaces:
+  **Ask AI** opens the assistant drawer, **New product** opens the Product
+  inspector, voice controls appear when Realtime is configured, and **Dev
+  Tools** appears only after **Developer tools** is enabled and the session
+  advertises `api_traces.configured`. Treat unavailable capabilities as a
   live-system failure even if CI is green.
 
 ### 3. Text, moderation, and recovery
 
-- Create a disposable test product with text and verify separate Responses,
-  Moderation, and Catalog events.
+- Click **New product**, create a disposable test product with text in the
+  **Product inspector**, and verify separate Responses, Moderation, and Catalog
+  events through the trace tray when enabled.
 - Submit a known policy-test instruction only if the meeting environment permits
   it; confirm no product draft or image controls appear for a blocked result.
 - Use the operator latency/error controls only in an approved demo environment.
@@ -196,8 +197,9 @@ start, text/voice completion, image lifecycle, publication, and recoverable
 errors. Context is allowlisted to operational status and stable IDs; prompts,
 draft payloads, credentials, and provider responses are excluded.
 
-The in-app API trace dock captures selected user actions while Developer tools
-are enabled and the authorized session advertises `api_traces.configured`.
+The in-app **Dev Tools** trace tray captures selected user actions while
+Developer tools are enabled and the authorized session advertises
+`api_traces.configured`.
 Catalog draft, supplier source, suggestion, media, lifecycle, Realtime voice, and
 storefront chat turns register explicit UI root spans so live and replay demos
 can correlate the action, HTTP calls, events, and sanitized artifacts without
