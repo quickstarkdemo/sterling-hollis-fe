@@ -17,6 +17,7 @@ export default function CatalogStudioPage() {
   const [references, setReferences] = useState(null);
   const [referencesStatus, setReferencesStatus] = useState("idle");
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const loadedReferenceVersion = useRef(0);
   const authoringSchemaVersion = Number(session?.capabilities?.catalog?.authoring_schema_version || 1);
 
@@ -51,6 +52,7 @@ export default function CatalogStudioPage() {
     if (editorDirty && !window.confirm("Discard unsaved changes and open another product?")) return;
     setSelectedProductId(productId);
     setEditorDirty(false);
+    setInspectorOpen(true);
   }, [editorDirty, selectedProductId]);
 
   const catalogChanged = useCallback(() => {
@@ -58,11 +60,11 @@ export default function CatalogStudioPage() {
   }, []);
 
   const createProduct = useCallback(() => {
-    if (!selectedProductId) return;
     if (editorDirty && !window.confirm("Discard unsaved changes and start a new product?")) return;
     setSelectedProductId("");
     setEditorDirty(false);
-  }, [editorDirty, selectedProductId]);
+    setInspectorOpen(true);
+  }, [editorDirty]);
 
   const openAssistant = useCallback(() => setAssistantOpen(true), []);
 
@@ -123,6 +125,8 @@ export default function CatalogStudioPage() {
             onBrandAdded={brandAdded}
             assistantOpen={assistantOpen}
             onAssistantOpenChange={setAssistantOpen}
+            inspectorOpen={inspectorOpen}
+            onInspectorOpenChange={setInspectorOpen}
           />
         </Box>
       </Container>

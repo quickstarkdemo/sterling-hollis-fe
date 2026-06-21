@@ -101,8 +101,13 @@ describe("CatalogStudioPage", () => {
     expect(screen.getByText("Catalog management")).toBeInTheDocument();
     expect(screen.getByText("Search, edit, ask, review, and publish product data from one protected command center.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask AI" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Create product" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Product inspector" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New product" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "New product" }));
+    expect(await screen.findByRole("dialog", { name: "Product inspector" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create product" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close product inspector" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Product inspector" })).not.toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Create with OpenAI" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Manage catalog" })).not.toBeInTheDocument();
     expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
