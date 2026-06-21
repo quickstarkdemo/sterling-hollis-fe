@@ -1,5 +1,5 @@
 import { Box, Button, Container, Flex, Text } from "@chakra-ui/react";
-import { FiCode, FiPlus } from "react-icons/fi";
+import { FiCode, FiMessageSquare, FiPlus } from "react-icons/fi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDeveloperLens } from "../components/DeveloperLensContext";
@@ -63,6 +63,12 @@ export default function CatalogStudioPage() {
     setEditorDirty(false);
   }, [editorDirty, selectedProductId]);
 
+  const focusAssistant = useCallback(() => {
+    const assistant = document.querySelector(".catalog-global-assistant");
+    assistant?.scrollIntoView({ behavior: "smooth", block: "start" });
+    assistant?.querySelector("textarea, button")?.focus?.();
+  }, []);
+
   useEffect(() => {
     if (!editorDirty) return undefined;
     const confirmInternalNavigation = (event) => {
@@ -78,28 +84,28 @@ export default function CatalogStudioPage() {
 
   return (
     <Box className="catalog-studio-page">
-      <Box className="catalog-studio-hero">
-        <Container maxW="1180px">
-          <Flex align={{ base: "stretch", md: "center" }} justify="space-between" gap={6} direction={{ base: "column", md: "row" }}>
-            <Box maxW="760px">
-              <Text className="section-kicker">Catalog management</Text>
-              <Text as="h1" className="page-title catalog-page-title">
-                Product Catalog
-              </Text>
-              <Text className="hero-copy" mt={3}>
-                Find products, edit shopper-facing details, manage media and inventory, then publish deliberate catalog changes.
-              </Text>
-            </Box>
-          </Flex>
-        </Container>
-      </Box>
-
-      <Container maxW="1440px" py={{ base: 6, md: 8 }}>
-        <Box className="catalog-workbench-layout">
-          <Box className="catalog-workbench-navigation">
-            <Button type="button" className="primary-button catalog-new-product" onClick={createProduct} aria-pressed={!selectedProductId}>
+      <Container maxW="1440px" py={{ base: 4, md: 5 }} className="catalog-command-container">
+        <Box className="catalog-command-header">
+          <Box minW={0}>
+            <Text className="section-kicker">Catalog management</Text>
+            <Text as="h1" className="page-title catalog-page-title">
+              Catalog Studio
+            </Text>
+            <Text className="muted-text catalog-command-copy">
+              Search, edit, ask, review, and publish product data from one protected command center.
+            </Text>
+          </Box>
+          <Flex gap={2} align="center" justify={{ base: "stretch", md: "end" }} wrap="wrap" className="catalog-command-actions">
+            <Button type="button" className="secondary-button" onClick={focusAssistant}>
+              <FiMessageSquare /> Ask AI
+            </Button>
+            <Button type="button" className="primary-button" onClick={createProduct} aria-pressed={!selectedProductId}>
               <FiPlus /> New product
             </Button>
+          </Flex>
+        </Box>
+        <Box className="catalog-workbench-layout">
+          <Box className="catalog-workbench-navigation">
             <CatalogProductList
               selectedProductId={selectedProductId}
               onSelect={selectProduct}

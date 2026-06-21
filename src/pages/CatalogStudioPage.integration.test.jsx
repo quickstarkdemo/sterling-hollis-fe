@@ -181,7 +181,7 @@ describe("Catalog Studio contract journey", () => {
     const user = userEvent.setup();
     renderStudio();
 
-    await screen.findByRole("heading", { name: "Product Catalog" });
+    await screen.findByRole("heading", { name: "Catalog Studio" });
     expect(screen.getByText("Realtime capability: ready")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a contract coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
