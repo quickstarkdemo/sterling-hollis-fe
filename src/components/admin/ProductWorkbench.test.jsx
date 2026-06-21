@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -196,10 +196,12 @@ describe("ProductWorkbench", () => {
   });
 
   it("answers store-wide assistant text questions with bounded citations", async () => {
-    renderWorkspace();
+    renderWorkspace({ assistantOpen: true });
 
-    await userEvent.type(screen.getByLabelText("Catalog assistant question"), "Which stores have low stock?");
-    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+    const assistantQuestion = screen.getByLabelText("Catalog assistant question");
+    fireEvent.change(assistantQuestion, { target: { value: "Which stores have low stock?" } });
+    expect(assistantQuestion).toHaveValue("Which stores have low stock?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
 
     await waitFor(() => expect(api.queryCatalogAssistant).toHaveBeenCalledWith({
       question: "Which stores have low stock?",
@@ -211,7 +213,7 @@ describe("ProductWorkbench", () => {
   });
 
   it("starts a read-only store-wide voice workflow without product context", async () => {
-    renderWorkspace();
+    renderWorkspace({ assistantOpen: true });
 
     expect(screen.getByTestId("catalog-assistant-voice-controls")).toHaveTextContent("Voice mode workbench; target none; label entire catalog and inventory");
     await userEvent.click(screen.getByRole("button", { name: "Start assistant voice" }));
@@ -223,16 +225,20 @@ describe("ProductWorkbench", () => {
   });
 
   it("enables current-product assistant drill-down only after product detail loads", async () => {
-    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat", assistantOpen: true });
     expect(screen.getByRole("button", { name: "Current product" })).toBeDisabled();
 
     await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
     await userEvent.click(screen.getByRole("button", { name: "Current product" }));
-    await userEvent.type(screen.getByLabelText("Catalog assistant question"), "What is low stock for this product?");
-    await userEvent.click(screen.getByRole("button", { name: "Ask" }));
+    const assistantQuestion = screen.getByLabelText("Catalog assistant question");
+    fireEvent.change(assistantQuestion, { target: { value: "What is low stock for this product?" } });
+    expect(assistantQuestion).toHaveValue("What is low stock for this product?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
 
     expect(await screen.findByText(/Studio Coat inventory: 1001 has 3 unit/i)).toBeInTheDocument();
     expect(api.queryCatalogAssistant).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Close catalog assistant" }));
+    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
   });
 
   it("uses one product chat for product-wide voice context", async () => {

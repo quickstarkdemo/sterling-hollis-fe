@@ -71,6 +71,8 @@ export default function ProductWorkbench({
   referencesStatus,
   onRetryReferences,
   onBrandAdded,
+  assistantOpen = false,
+  onAssistantOpenChange,
 }) {
   const initial = useMemo(() => activeProductId ? {} : restoredState(), [activeProductId]);
   const { enabled: developerLensEnabled } = useDeveloperLens();
@@ -646,6 +648,8 @@ export default function ProductWorkbench({
         activeDetail={activeDetail}
         workflowId={workflowId}
         ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
+        open={assistantOpen}
+        onOpenChange={onAssistantOpenChange}
         realtimeCapability={catalogStudioSession?.capabilities?.realtime}
         resetSignal={voiceResetKey}
         productVoiceContext={voiceContext}

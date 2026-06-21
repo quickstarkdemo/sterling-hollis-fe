@@ -94,6 +94,7 @@ describe("CatalogStudioPage", () => {
   });
 
   it("shows authorized navigation and focuses the page on catalog work", async () => {
+    const user = userEvent.setup();
     renderStudio();
 
     expect(await screen.findByRole("heading", { name: "Catalog Studio" })).toBeInTheDocument();
@@ -109,6 +110,13 @@ describe("CatalogStudioPage", () => {
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
+
+    expect(screen.queryByRole("dialog", { name: "Catalog assistant" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ask AI" }));
+    expect(await screen.findByRole("dialog", { name: "Catalog assistant" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Catalog assistant question")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close catalog assistant" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Catalog assistant" })).not.toBeInTheDocument());
   });
 
   it("loads v2 reference data once and uses the canonical product list when capability is advertised", async () => {

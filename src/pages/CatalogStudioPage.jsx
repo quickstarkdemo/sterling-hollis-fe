@@ -16,6 +16,7 @@ export default function CatalogStudioPage() {
   const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
   const [references, setReferences] = useState(null);
   const [referencesStatus, setReferencesStatus] = useState("idle");
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const loadedReferenceVersion = useRef(0);
   const authoringSchemaVersion = Number(session?.capabilities?.catalog?.authoring_schema_version || 1);
 
@@ -63,11 +64,7 @@ export default function CatalogStudioPage() {
     setEditorDirty(false);
   }, [editorDirty, selectedProductId]);
 
-  const focusAssistant = useCallback(() => {
-    const assistant = document.querySelector(".catalog-global-assistant");
-    assistant?.scrollIntoView({ behavior: "smooth", block: "start" });
-    assistant?.querySelector("textarea, button")?.focus?.();
-  }, []);
+  const openAssistant = useCallback(() => setAssistantOpen(true), []);
 
   useEffect(() => {
     if (!editorDirty) return undefined;
@@ -96,7 +93,7 @@ export default function CatalogStudioPage() {
             </Text>
           </Box>
           <Flex gap={2} align="center" justify={{ base: "stretch", md: "end" }} wrap="wrap" className="catalog-command-actions">
-            <Button type="button" className="secondary-button" onClick={focusAssistant}>
+            <Button type="button" className="secondary-button" onClick={openAssistant}>
               <FiMessageSquare /> Ask AI
             </Button>
             <Button type="button" className="primary-button" onClick={createProduct} aria-pressed={!selectedProductId}>
@@ -124,6 +121,8 @@ export default function CatalogStudioPage() {
             referencesStatus={referencesStatus}
             onRetryReferences={loadReferences}
             onBrandAdded={brandAdded}
+            assistantOpen={assistantOpen}
+            onAssistantOpenChange={setAssistantOpen}
           />
         </Box>
       </Container>
