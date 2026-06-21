@@ -39,12 +39,12 @@ function initialPreference() {
   try {
     const stored = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
     return {
-      expanded: stored.expanded !== false,
+      expanded: stored.expanded === true,
       height: Math.max(300, Math.min(720, Number(stored.height) || 430)),
       view: VIEWS.some((view) => view.id === stored.view) ? stored.view : "graph",
     };
   } catch {
-    return { expanded: true, height: 430, view: "graph" };
+    return { expanded: false, height: 430, view: "graph" };
   }
 }
 
@@ -207,11 +207,10 @@ export default function ApiTraceDock() {
     return (
       <Box className="api-trace-dock collapsed" aria-label="API trace visualizer">
         <Button ref={collapsedButtonRef} type="button" className="api-trace-strip" onClick={() => updatePreference({ expanded: true })} aria-expanded="false">
-          <FiActivity />
-          <span>API traces</span>
-          <Badge className={`api-trace-state ${lifecycle}`}>{lifecycle}</Badge>
-          <span className="api-trace-strip-name">{selectedSummary?.name || "Waiting for an instrumented action"}</span>
           <FiChevronUp />
+          <span>Dev Tools</span>
+          <Badge className="api-trace-count">{recentTraces.length}</Badge>
+          <span className="api-trace-strip-name">{selectedSummary?.name || "Waiting for an instrumented action"}</span>
         </Button>
       </Box>
     );
@@ -243,8 +242,8 @@ export default function ApiTraceDock() {
         <HStack gap={3} minW={0}>
           <Box className="api-trace-mark"><FiActivity /></Box>
           <Box minW={0}>
-            <Text className="section-kicker">Developer instrument</Text>
-            <Text className="api-trace-title">API trace visualizer</Text>
+            <Text className="section-kicker">Developer tools</Text>
+            <Text className="api-trace-title">Trace tray</Text>
           </Box>
           <Badge className={`api-trace-state ${lifecycle}`}>{lifecycle}</Badge>
           <Badge className={`api-trace-connection ${connectionStatus}`}>{connectionStatus}</Badge>
