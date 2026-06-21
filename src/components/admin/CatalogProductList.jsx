@@ -1,12 +1,93 @@
 import { Badge, Box, Button, HStack, Input, NativeSelect, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FiChevronLeft, FiChevronRight, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiGrid, FiList, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
 
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
 import { getAdminCatalogProducts, getAdminCatalogProductsV2, getCategories } from "../../utils/apiClient";
 import { titleize } from "../../utils/format";
 
 const PAGE_SIZE = 12;
+const VIEW_MODE_KEY = "sterling-hollis:catalog-studio:product-view-mode";
+
+function preferredViewMode() {
+  try {
+    return localStorage.getItem(VIEW_MODE_KEY) === "table" ? "table" : "grid";
+  } catch {
+    return "grid";
+  }
+}
+
+function ProductStatusBadges({ item, align = "end" }) {
+  return (
+    <VStack gap={1} align={align}>
+      <Badge className={`lifecycle-badge ${item.lifecycle_status}`}>{item.lifecycle_status}</Badge>
+      {item.has_draft ? <Badge className="draft-badge">Draft v{item.current_draft_version}</Badge> : null}
+    </VStack>
+  );
+}
+
+function ProductGridResults({ items, selectedProductId, onSelect }) {
+  return (
+    <Box className="catalog-product-grid">
+      {items.map((item) => (
+        <Button
+          key={item.product_id}
+          type="button"
+          variant="ghost"
+          className={`catalog-product-card ${selectedProductId === item.product_id ? "selected" : ""}`}
+          aria-pressed={selectedProductId === item.product_id}
+          onClick={() => onSelect(item.product_id)}
+        >
+          <Box minW={0} textAlign="left">
+            <Text className="catalog-product-row-title">{item.title}</Text>
+            <Text className="catalog-product-row-meta">{item.brand}</Text>
+            <Text className="catalog-product-card-category">{titleize(item.category)}</Text>
+          </Box>
+          <ProductStatusBadges item={item} />
+        </Button>
+      ))}
+    </Box>
+  );
+}
+
+function ProductTableResults({ items, selectedProductId, onSelect }) {
+  return (
+    <Box className="catalog-product-table-wrap">
+      <Box as="table" className="catalog-product-table" aria-label="Catalog results table">
+        <Box as="thead">
+          <Box as="tr">
+            <Box as="th" scope="col">Product</Box>
+            <Box as="th" scope="col">Brand</Box>
+            <Box as="th" scope="col">Category</Box>
+            <Box as="th" scope="col">Status</Box>
+          </Box>
+        </Box>
+        <Box as="tbody">
+          {items.map((item) => (
+            <Box as="tr" key={item.product_id} className={selectedProductId === item.product_id ? "selected" : ""}>
+              <Box as="td">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="catalog-product-table-action"
+                  aria-pressed={selectedProductId === item.product_id}
+                  onClick={() => onSelect(item.product_id)}
+                >
+                  Open {item.title}
+                </Button>
+              </Box>
+              <Box as="td">{item.brand}</Box>
+              <Box as="td">{titleize(item.category)}</Box>
+              <Box as="td">
+                <ProductStatusBadges item={item} align="start" />
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
 
 export default function CatalogProductList({
   selectedProductId,
@@ -24,6 +105,7 @@ export default function CatalogProductList({
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState(preferredViewMode);
   const requestId = useRef(0);
 
   const load = useCallback(async () => {
@@ -95,20 +177,39 @@ export default function CatalogProductList({
     setPage(1);
   };
 
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      // The selected mode is a preference, not a requirement for the catalog.
+    }
+  };
+
   return (
     <Box className="catalog-product-list" aria-label="Catalog products">
-      <HStack justify="space-between" gap={3} mb={4} align="start">
+      <HStack justify="space-between" gap={3} mb={4} align="start" className="catalog-product-header">
         <Box>
           <Text className="section-kicker">Products</Text>
           <Text as="h2" className="studio-column-title">Product catalog</Text>
           <Text className="catalog-results-count">
-            {loading && !payload ? "Loading products…" : `${total.toLocaleString()} ${total === 1 ? "product" : "products"}`}
+            {loading && !payload ? "Loading products..." : `${total.toLocaleString()} ${total === 1 ? "product" : "products"}`}
           </Text>
         </Box>
-        <Button type="button" size="sm" className="secondary-button" onClick={refresh} aria-label="Refresh catalog products">
-          <FiRefreshCw />
-          Refresh
-        </Button>
+        <HStack gap={2} className="catalog-product-toolbar">
+          <Box className="catalog-view-switch" role="group" aria-label="Catalog view mode">
+            <Button type="button" size="sm" aria-pressed={viewMode === "grid"} onClick={() => changeViewMode("grid")}>
+              <FiGrid /> Grid view
+            </Button>
+            <Button type="button" size="sm" aria-pressed={viewMode === "table"} onClick={() => changeViewMode("table")}>
+              <FiList /> Table view
+            </Button>
+          </Box>
+          <Button type="button" size="sm" className="secondary-button" onClick={refresh} aria-label="Refresh catalog products">
+            <FiRefreshCw />
+            Refresh
+          </Button>
+        </HStack>
       </HStack>
 
       <VStack align="stretch" gap={3} mb={4}>
@@ -176,32 +277,18 @@ export default function CatalogProductList({
         <EmptyState title="No managed products" message="Adjust the search or lifecycle filters." />
       ) : null}
       {!loading && !error && items.length ? (
-        <VStack align="stretch" gap={2} className="catalog-product-results">
-          {items.map((item) => (
-            <Button
-              key={item.product_id}
-              type="button"
-              variant="ghost"
-              className={`catalog-product-row ${selectedProductId === item.product_id ? "selected" : ""}`}
-              aria-pressed={selectedProductId === item.product_id}
-              onClick={() => onSelect(item.product_id)}
-            >
-              <Box minW={0} textAlign="left">
-                <Text className="catalog-product-row-title">{item.title}</Text>
-                <Text className="catalog-product-row-meta">{item.brand} · {titleize(item.category)}</Text>
-              </Box>
-              <VStack gap={1} align="end">
-                <Badge className={`lifecycle-badge ${item.lifecycle_status}`}>{item.lifecycle_status}</Badge>
-                {item.has_draft ? <Badge className="draft-badge">Draft v{item.current_draft_version}</Badge> : null}
-              </VStack>
-            </Button>
-          ))}
-        </VStack>
+        <Box className="catalog-product-results">
+          {viewMode === "table" ? (
+            <ProductTableResults items={items} selectedProductId={selectedProductId} onSelect={onSelect} />
+          ) : (
+            <ProductGridResults items={items} selectedProductId={selectedProductId} onSelect={onSelect} />
+          )}
+        </Box>
       ) : null}
 
       {!loading && !error && total ? (
         <HStack justify="space-between" mt={4} className="catalog-list-pagination">
-          <Text className="muted-text">Page {page} of {totalPages} · {total} products</Text>
+          <Text className="muted-text">Page {page} of {totalPages} - {total} products</Text>
           <HStack gap={2}>
             <Button type="button" size="sm" className="secondary-button" disabled={page <= 1} onClick={() => setPage(page - 1)}>
               <FiChevronLeft /> Previous
