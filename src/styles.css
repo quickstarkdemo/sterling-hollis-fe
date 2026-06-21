@@ -1590,21 +1590,25 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
     width: 100%;
   }
 
-  .chat-drawer-content {
+  .chat-drawer-content,
+  .catalog-assistant-drawer-content {
     width: 100vw !important;
     max-width: 100vw !important;
     border-left: 0 !important;
   }
 
-  .chat-drawer-header {
+  .chat-drawer-header,
+  .catalog-assistant-drawer-header {
     padding: 16px !important;
   }
 
-  .chat-thread-inner {
+  .chat-thread-inner,
+  .catalog-assistant-drawer-inner {
     padding: 16px;
   }
 
-  .chat-drawer-footer {
+  .chat-drawer-footer,
+  .catalog-assistant-drawer-footer {
     padding: 12px 16px 16px !important;
   }
 
@@ -2091,17 +2095,44 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   border-top: 1px solid rgba(23, 19, 15, 0.12);
 }
 
-.catalog-global-assistant {
-  padding: 18px;
-  border: 1px solid rgba(23, 19, 15, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+.catalog-assistant-drawer-content {
+  width: min(760px, max(540px, 44vw)) !important;
+  max-width: 100vw !important;
+  height: 100dvh !important;
+  border-left: 1px solid var(--line) !important;
+  background: #fffaf0 !important;
+  box-shadow: -24px 0 90px rgba(23, 19, 15, 0.16) !important;
+}
+
+.catalog-assistant-drawer-header {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: 0 0 auto;
+  padding: 18px 20px !important;
+  border-bottom: 1px solid rgba(23, 19, 15, 0.1);
+}
+
+.catalog-assistant-drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 !important;
+}
+
+.catalog-assistant-drawer-inner {
+  min-height: 100%;
+  padding: 18px 20px 22px;
+}
+
+.catalog-assistant-thread {
+  min-height: 280px;
+  max-height: min(48dvh, 520px);
 }
 
 .catalog-assistant-thread {
   display: grid;
   gap: 12px;
-  max-height: 352px;
   overflow: auto;
   padding: 12px;
   border: 1px solid rgba(23, 19, 15, 0.1);
@@ -2131,6 +2162,20 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
   max-width: 100%;
   white-space: normal;
   text-align: left;
+}
+
+.catalog-assistant-voice-panel {
+  padding-top: 16px;
+  border-top: 1px solid rgba(23, 19, 15, 0.12);
+}
+
+.catalog-assistant-drawer-footer {
+  display: grid !important;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding: 14px 20px 18px !important;
+  border-top: 1px solid rgba(23, 19, 15, 0.1);
+  background: rgba(255, 250, 240, 0.94);
 }
 
 .realtime-transcript {

@@ -1,6 +1,6 @@
-import { Badge, Box, Button, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, Drawer, HStack, IconButton, Portal, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiChevronDown, FiChevronUp, FiSend } from "react-icons/fi";
+import { FiSend, FiX } from "react-icons/fi";
 
 import { queryCatalogAssistant } from "../../utils/apiClient";
 import VoiceControls from "./VoiceControls";
@@ -91,18 +91,20 @@ function citationLabel(citation) {
 export default function CatalogGlobalAssistant({
   activeDetail,
   ensureWorkflow,
+  onOpenChange,
   onWorkflowEvent,
+  open = false,
   productVoiceContext,
   realtimeCapability,
   resetSignal = 0,
   workflowId,
 }) {
-  const [open, setOpen] = useState(true);
   const [scope, setScope] = useState("catalog");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const threadRef = useRef(null);
   const previousProductId = useRef(activeDetail?.product_id || "");
   const hasProductScope = Boolean(productSnapshot(activeDetail));
   const scopeLabel = scope === "product" && hasProductScope
@@ -111,6 +113,12 @@ export default function CatalogGlobalAssistant({
   const voiceContext = scope === "product" && productVoiceContext
     ? productVoiceContext
     : { mode: "workbench", query_scopes: ["catalog", "inventory"] };
+
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    }
+  }, [messages, open]);
 
   useEffect(() => {
     const nextProductId = activeDetail?.product_id || "";
@@ -180,89 +188,123 @@ export default function CatalogGlobalAssistant({
   };
 
   return (
-    <Box className="catalog-global-assistant">
-      <HStack justify="space-between" gap={3} flexWrap="wrap">
-        <Box>
-          <Text className="section-kicker">Catalog assistant</Text>
-          <Text className="panel-title">Ask across products, stores, and inventory</Text>
-          <Text className="muted-text" mt={1}>Active scope: {scopeLabel}</Text>
-        </Box>
-        <Button type="button" className="secondary-button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
-          {open ? <FiChevronUp /> : <FiChevronDown />} {open ? "Collapse" : "Open"}
-        </Button>
-      </HStack>
-
-      {open ? (
-        <VStack align="stretch" gap={4} mt={4}>
-          <HStack className="catalog-assistant-scope" role="radiogroup" aria-label="Assistant scope" gap={2} flexWrap="wrap">
-            <Button type="button" size="sm" className={scope === "catalog" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "catalog"} onClick={() => setScope("catalog")}>
-              Entire catalog & inventory
-            </Button>
-            <Button type="button" size="sm" className={scope === "product" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "product"} disabled={!hasProductScope} onClick={() => setScope("product")}>
-              Current product
-            </Button>
-          </HStack>
-
-          <Box className="catalog-assistant-thread" aria-live="polite">
-            {messages.length ? messages.map((item) => (
-              <Box key={item.id} className={`catalog-assistant-message ${item.role}`}>
-                <HStack gap={2} mb={1}>
-                  <Badge className="soft-badge">{item.role === "user" ? "You" : item.role === "system" ? "Context" : "Assistant"}</Badge>
-                  {item.scope ? <Text className="muted-text">{item.scope === "product" ? "Current product" : "Catalog"}</Text> : null}
-                </HStack>
-                <Text>{item.message}</Text>
-                {item.citations?.length ? (
-                  <HStack className="catalog-assistant-citations" gap={2} flexWrap="wrap" mt={2}>
-                    {item.citations.slice(0, 6).map((citation) => (
-                      <Badge key={`${citation.kind}-${citation.source_id}-${citation.label}`} className="workflow-status succeeded">
-                        {citation.kind}: {citationLabel(citation)}
-                      </Badge>
-                    ))}
-                  </HStack>
-                ) : null}
+    <Drawer.Root
+      open={open}
+      onOpenChange={(details) => onOpenChange?.(details.open)}
+      placement="end"
+      size="full"
+      modal={false}
+      trapFocus={false}
+      preventScroll={false}
+      restoreFocus={false}
+    >
+      <Portal>
+        <Drawer.Positioner pointerEvents="none">
+          <Drawer.Content className="catalog-assistant-drawer-content" pointerEvents="auto">
+            <Drawer.Header className="catalog-assistant-drawer-header">
+              <Box minW={0}>
+                <Drawer.Title asChild>
+                  <Text className="assistant-title">Catalog assistant</Text>
+                </Drawer.Title>
+                <Drawer.Description className="muted-mini">Active scope: {scopeLabel}</Drawer.Description>
               </Box>
-            )) : <Text className="muted-text">Ask about low stock, store coverage, assortment risk, or the selected product.</Text>}
-          </Box>
+              <IconButton type="button" size="sm" variant="ghost" className="icon-button" aria-label="Close catalog assistant" onClick={() => onOpenChange?.(false)}>
+                <FiX />
+              </IconButton>
+            </Drawer.Header>
 
-          <HStack className="chat-starters" gap={2} flexWrap="wrap">
-            {starters.map((starter) => (
-              <button key={starter} type="button" className="suggestion-chip" onClick={() => setQuestion(starter)}>
-                {starter}
-              </button>
-            ))}
-          </HStack>
+            <Drawer.Body className="catalog-assistant-drawer-body">
+              <VStack align="stretch" gap={4} className="catalog-assistant-drawer-inner">
+                <Box>
+                  <Text className="section-kicker">Ask AI</Text>
+                  <Text className="panel-title">Ask across products, stores, and inventory</Text>
+                </Box>
 
-          <Box as="form" onSubmit={submitQuestion}>
-            <Textarea
-              aria-label="Catalog assistant question"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask which stores have low stock, or what changed for the selected product..."
-              rows={3}
-              maxLength={1000}
-            />
-            <HStack justify="space-between" gap={3} mt={3} flexWrap="wrap">
-              <Text className="muted-text">Answers are read-only and cited. Field dictation stays in targeted product controls.</Text>
-              <Button type="submit" className="primary-button" disabled={!question.trim() || busy}>
-                <FiSend /> {busy ? "Asking..." : "Ask"}
-              </Button>
-            </HStack>
-          </Box>
-          {error ? <Text className="catalog-action-hint" role="alert">{error}</Text> : null}
+                <HStack className="catalog-assistant-scope" role="radiogroup" aria-label="Assistant scope" gap={2} flexWrap="wrap">
+                  <Button type="button" size="sm" className={scope === "catalog" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "catalog"} onClick={() => setScope("catalog")}>
+                    Entire catalog & inventory
+                  </Button>
+                  <Button type="button" size="sm" className={scope === "product" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "product"} disabled={!hasProductScope} onClick={() => setScope("product")}>
+                    Current product
+                  </Button>
+                </HStack>
 
-          <VoiceControls
-            workflowId={workflowId}
-            ensureWorkflow={ensureWorkflow}
-            assistantMode="read"
-            realtimeCapability={realtimeCapability}
-            resetSignal={resetSignal}
-            sessionContext={voiceContext}
-            contextLabel={scopeLabel}
-            onToolResult={voiceToolResult}
-            onWorkflowEvent={onWorkflowEvent}
-          />
-        </VStack>
-      ) : null}
-    </Box>
+                <Box ref={threadRef} className="catalog-assistant-thread" aria-live="polite">
+                  <VStack align="stretch" gap={3}>
+                    {messages.length ? messages.map((item) => (
+                      <Box key={item.id} className={`catalog-assistant-message ${item.role}`}>
+                        <HStack gap={2} mb={1}>
+                          <Badge className="soft-badge">{item.role === "user" ? "You" : item.role === "system" ? "Context" : "Assistant"}</Badge>
+                          {item.scope ? <Text className="muted-text">{item.scope === "product" ? "Current product" : "Catalog"}</Text> : null}
+                        </HStack>
+                        <Text>{item.message}</Text>
+                        {item.citations?.length ? (
+                          <HStack className="catalog-assistant-citations" gap={2} flexWrap="wrap" mt={2}>
+                            {item.citations.slice(0, 6).map((citation) => (
+                              <Badge key={`${citation.kind}-${citation.source_id}-${citation.label}`} className="workflow-status succeeded">
+                                {citation.kind}: {citationLabel(citation)}
+                              </Badge>
+                            ))}
+                          </HStack>
+                        ) : null}
+                      </Box>
+                    )) : <Text className="muted-text">Ask about low stock, store coverage, assortment risk, or the selected product.</Text>}
+                    {busy ? <Text className="chat-loading">Working...</Text> : null}
+                  </VStack>
+                </Box>
+
+                {error ? <Text className="catalog-action-hint" role="alert">{error}</Text> : null}
+
+                <Box className="catalog-assistant-voice-panel">
+                  <Text className="section-kicker">Read-only voice</Text>
+                  <VoiceControls
+                    workflowId={workflowId}
+                    ensureWorkflow={ensureWorkflow}
+                    assistantMode="read"
+                    realtimeCapability={realtimeCapability}
+                    resetSignal={resetSignal}
+                    sessionContext={voiceContext}
+                    contextLabel={scopeLabel}
+                    onToolResult={voiceToolResult}
+                    onWorkflowEvent={onWorkflowEvent}
+                  />
+                </Box>
+              </VStack>
+            </Drawer.Body>
+
+            <Drawer.Footer className="catalog-assistant-drawer-footer">
+              <HStack className="chat-starters" gap={2}>
+                {starters.map((starter) => (
+                  <Button key={starter} type="button" size="xs" className="suggestion-chip" onClick={() => setQuestion(starter)}>
+                    {starter}
+                  </Button>
+                ))}
+              </HStack>
+
+              <Box className="chat-form">
+                <Textarea
+                  aria-label="Catalog assistant question"
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      submitQuestion();
+                    }
+                  }}
+                  placeholder="Ask which stores have low stock, or what changed for the selected product..."
+                  rows={2}
+                  maxLength={1000}
+                />
+                <IconButton type="button" className="primary-button" loading={busy} onClick={() => submitQuestion()} aria-label="Ask catalog assistant">
+                  <FiSend />
+                </IconButton>
+              </Box>
+              <Text className="muted-mini">Answers are read-only and cited. Draft-changing voice controls stay in the product workspace.</Text>
+            </Drawer.Footer>
+          </Drawer.Content>
+        </Drawer.Positioner>
+      </Portal>
+    </Drawer.Root>
   );
 }
