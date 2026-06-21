@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ const products = [
 
 describe("CatalogProductList", () => {
   beforeEach(() => {
+    localStorage.clear();
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getCategories.mockReset().mockResolvedValue({
@@ -56,6 +57,29 @@ describe("CatalogProductList", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Silk Dress/i }));
     expect(onSelect).toHaveBeenCalledWith("cat_draft");
+  });
+
+  it("switches between grid and table results while preserving selection behavior", async () => {
+    const onSelect = vi.fn();
+    renderWithProviders(<CatalogProductList selectedProductId="cat_published" onSelect={onSelect} />);
+
+    expect(await screen.findByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Wool Coat/i })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Table view" }));
+
+    expect(localStorage.getItem("sterling-hollis:catalog-studio:product-view-mode")).toBe("table");
+    expect(screen.getByRole("button", { name: "Table view" })).toHaveAttribute("aria-pressed", "true");
+    const table = screen.getByRole("table", { name: "Catalog results table" });
+    expect(within(table).getByRole("button", { name: "Open Wool Coat" })).toBeInTheDocument();
+    expect(within(table).getByText("Handbags")).toBeInTheDocument();
+    expect(within(table).getByText((_, node) => node.textContent === "Draft v3")).toBeInTheDocument();
+
+    await userEvent.click(within(table).getByRole("button", { name: "Open Silk Dress" }));
+    expect(onSelect).toHaveBeenCalledWith("cat_draft");
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh catalog products" }));
+    expect(screen.getByRole("button", { name: "Table view" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("sends search and lifecycle filters to the administrator contract", async () => {
