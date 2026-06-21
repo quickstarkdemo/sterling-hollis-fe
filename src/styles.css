@@ -954,6 +954,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .trace-event-row:focus-visible,
 .trace-waterfall-row:focus-visible,
 .trace-artifact-card:focus-visible,
+.api-trace-view-tabs button:focus,
 .api-trace-view-tabs button:focus-visible,
 .api-trace-resize-handle:focus-visible {
   outline: 2px solid var(--sage);
@@ -2855,12 +2856,29 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
     left: 12px;
   }
 
-  body:has(.api-trace-dock.collapsed) .developer-tools-launcher {
-    bottom: 70px;
+  body:has(.api-trace-dock) .developer-tools-launcher {
+    display: none;
   }
 
   .developer-tools-button {
     width: 100%;
+  }
+
+  .api-trace-dock.collapsed {
+    height: 54px;
+  }
+
+  .api-trace-strip {
+    min-height: 36px !important;
+    padding-inline: 12px !important;
+  }
+
+  .api-trace-strip-name {
+    display: none;
+  }
+
+  body:has(.api-trace-dock.collapsed) .catalog-product-results {
+    padding-top: 46px;
   }
 
   body:has(.catalog-assistant-drawer-content) .api-trace-dock,
