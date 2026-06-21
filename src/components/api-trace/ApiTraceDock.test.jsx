@@ -55,16 +55,40 @@ function traceState(overrides = {}) {
 
 describe("ApiTraceDock", () => {
   beforeEach(() => {
+    sessionStorage.clear();
     useApiTrace.mockReturnValue(traceState());
   });
 
-  it("does not expose the dock to unauthorized or disabled users", () => {
-    useApiTrace.mockReturnValue(traceState({ authorized: false }));
+  it.each([
+    { authorized: false },
+    { available: false },
+    { enabled: false },
+  ])("does not expose the dock when trace access is %o", (overrides) => {
+    useApiTrace.mockReturnValue(traceState(overrides));
     renderWithProviders(<ApiTraceDock />);
     expect(screen.queryByLabelText("API trace visualizer")).not.toBeInTheDocument();
   });
 
+  it("opens from the compact Dev Tools tray and persists collapse preference", async () => {
+    renderWithProviders(<ApiTraceDock />);
+    const tray = screen.getByRole("button", { name: /Dev Tools/ });
+    expect(tray).toHaveAttribute("aria-expanded", "false");
+    expect(tray).toHaveTextContent("1");
+
+    await userEvent.click(tray);
+    expect(screen.getByRole("tab", { name: "Graph" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Waterfall" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Events" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Artifacts" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Inspector" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse API trace dock" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Dev Tools/ })).toHaveFocus());
+    expect(JSON.parse(sessionStorage.getItem("sterling-hollis:api-trace-dock:v1")).expanded).toBe(false);
+  });
+
   it("synchronizes event selection with the inspector and collapses with Escape", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     renderWithProviders(<ApiTraceDock />);
     await userEvent.click(screen.getByRole("tab", { name: "Events" }));
     await userEvent.click(screen.getByRole("option", { name: /Draft started/ }));
@@ -73,12 +97,13 @@ describe("ApiTraceDock", () => {
     expect(screen.getByText((_, element) => element.tagName === "PRE" && element.textContent.includes('"phase": "draft"'))).toBeInTheDocument();
 
     fireEvent.keyDown(screen.getByLabelText("API trace visualizer"), { key: "Escape" });
-    const collapsed = screen.getByRole("button", { name: /API traces/ });
+    const collapsed = screen.getByRole("button", { name: /Dev Tools/ });
     expect(collapsed).toHaveAttribute("aria-expanded", "false");
     await waitFor(() => expect(collapsed).toHaveFocus());
   });
 
   it("supports keyboard tab navigation and dock resizing", () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     renderWithProviders(<ApiTraceDock />);
     const waterfall = screen.getByRole("tab", { name: "Waterfall" });
     waterfall.focus();
@@ -91,6 +116,7 @@ describe("ApiTraceDock", () => {
   });
 
   it("synchronizes graph selection and replays the immutable projection without a request", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     renderWithProviders(<ApiTraceDock />);
 
@@ -108,6 +134,7 @@ describe("ApiTraceDock", () => {
   });
 
   it("copies a defense-in-depth sanitized projection", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     renderWithProviders(<ApiTraceDock />);
@@ -124,6 +151,7 @@ describe("ApiTraceDock", () => {
     ["partial", "partial"],
     ["expired", "expired"],
   ])("distinguishes the %s connection state", (connectionStatus, label) => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     useApiTrace.mockReturnValue(traceState({ connectionStatus, traceStatus: connectionStatus === "expired" ? "expired" : "ready" }));
     renderWithProviders(<ApiTraceDock />);
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);

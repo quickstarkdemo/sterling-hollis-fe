@@ -669,9 +669,6 @@ a {
   inset: auto 0 0;
   z-index: 60;
   color: var(--ink);
-  background: #fffaf0;
-  border-top: 1px solid rgba(23, 19, 15, 0.24);
-  box-shadow: 0 -18px 64px rgba(23, 19, 15, 0.16);
 }
 
 body:has(.api-trace-dock.expanded) .chat-widget {
@@ -687,33 +684,52 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   min-height: 300px;
   max-height: calc(100dvh - 72px);
   flex-direction: column;
+  background: #fffaf0;
+  border-top: 1px solid rgba(23, 19, 15, 0.16);
+  box-shadow: 0 -18px 64px rgba(23, 19, 15, 0.14);
 }
 
 .api-trace-dock.collapsed {
-  height: 52px;
+  display: flex;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .api-trace-strip {
-  width: 100%;
-  height: 52px !important;
-  justify-content: flex-start !important;
-  gap: 10px !important;
-  padding: 0 max(18px, calc((100vw - 1440px) / 2)) !important;
-  border-radius: 0 !important;
+  width: auto;
+  max-width: min(520px, calc(100vw - 32px));
+  min-height: 38px !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 0 14px !important;
+  border: 1px solid rgba(23, 19, 15, 0.14) !important;
+  border-radius: 999px !important;
   background: #fffaf0 !important;
   color: var(--ink) !important;
+  box-shadow: 0 10px 28px rgba(23, 19, 15, 0.14);
+  pointer-events: auto;
 }
 
 .api-trace-strip-name {
   min-width: 0;
+  max-width: 260px;
   overflow: hidden;
   color: var(--muted);
+  font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.api-trace-strip svg:last-child {
-  margin-left: auto;
+.api-trace-count {
+  min-width: 20px;
+  justify-content: center;
+  border: 1px solid rgba(23, 19, 15, 0.1) !important;
+  border-radius: 999px !important;
+  background: #eef1f4 !important;
+  color: var(--ink) !important;
+  font-size: 0.68rem !important;
 }
 
 .api-trace-resize-handle {
@@ -741,12 +757,13 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 
 .api-trace-toolbar {
   display: flex;
-  min-height: 66px;
+  min-height: 58px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--line);
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(23, 19, 15, 0.1);
+  background: rgba(255, 255, 255, 0.58);
 }
 
 .api-trace-mark {
@@ -763,8 +780,8 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 
 .api-trace-title {
   overflow: hidden;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
+  font-weight: 700;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1825,6 +1842,14 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   padding: 20px !important;
 }
 
+body:has(.catalog-assistant-drawer-content) .api-trace-dock {
+  right: min(760px, max(540px, 44vw));
+}
+
+body:has(.product-inspector-drawer-content) .api-trace-dock {
+  right: min(1040px, max(700px, 72vw));
+}
+
 .developer-tools-launcher {
   position: fixed;
   right: clamp(16px, 3vw, 28px);
@@ -1837,7 +1862,7 @@ body:has(.api-trace-dock) .developer-tools-launcher {
 }
 
 body:has(.api-trace-dock.expanded) .developer-tools-launcher {
-  bottom: calc(min(720px, 48dvh) + 24px);
+  display: none;
 }
 
 .developer-tools-button {
@@ -2830,8 +2855,17 @@ body:has(.api-trace-dock.expanded) .developer-tools-launcher {
     left: 12px;
   }
 
+  body:has(.api-trace-dock.collapsed) .developer-tools-launcher {
+    bottom: 70px;
+  }
+
   .developer-tools-button {
     width: 100%;
+  }
+
+  body:has(.catalog-assistant-drawer-content) .api-trace-dock,
+  body:has(.product-inspector-drawer-content) .api-trace-dock {
+    display: none;
   }
 
   .catalog-image-card {
