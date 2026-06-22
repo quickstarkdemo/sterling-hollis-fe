@@ -163,6 +163,32 @@ describe("VoiceControls", () => {
     expect(encoded).not.toContain("offer-sdp");
   });
 
+  it("keeps the SDP exchange out of API trace capture", async () => {
+    const events = [];
+    const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
+    const fetchSpy = vi.fn().mockResolvedValue(new Response("answer-sdp", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    try {
+      const { peer } = renderVoice({ props: { exchangeSdp: undefined } });
+
+      await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+      await waitFor(() => expect(peer.setRemoteDescription).toHaveBeenCalledWith({ type: "answer", sdp: "answer-sdp" }));
+
+      expect(fetchSpy).toHaveBeenCalledWith("https://api.openai.com/v1/realtime/calls", expect.objectContaining({
+        body: "offer-sdp",
+        headers: expect.objectContaining({ Authorization: "Bearer ephemeral-secret" }),
+      }));
+      const encoded = JSON.stringify(events);
+      expect(encoded).not.toContain("ephemeral-secret");
+      expect(encoded).not.toContain("offer-sdp");
+      expect(encoded).not.toContain("answer-sdp");
+    } finally {
+      unsubscribe();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("starts the shared microphone when an inline field control selects a pinned target", async () => {
     const channel = new FakeDataChannel();
     const peer = new FakePeerConnection(channel);
@@ -323,6 +349,24 @@ describe("VoiceControls", () => {
     expect(onToolResult).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("function_call_output"));
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("response.create"));
+  });
+
+  it("keeps the session open for provider error events on an active connection", async () => {
+    const { channel } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    act(() => channel.message({
+      type: "error",
+      error: {
+        code: "conversation_already_has_active_response",
+        message: "A response is already active.",
+      },
+    }));
+
+    expect(await screen.findByText("listening")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop voice" })).toBeInTheDocument();
+    expect(screen.getByText(/voice session is still open/i)).toBeInTheDocument();
   });
 
   it("publishes finalized transcript entries for compact chat composers", async () => {
@@ -523,13 +567,30 @@ describe("VoiceControls", () => {
     expect(screen.getByText("connecting")).toBeInTheDocument();
   });
 
-  it("preserves state on network disconnect and permits reconnect", async () => {
+  it("preserves state on hard network failure and permits reconnect", async () => {
     const { peer } = renderVoice();
     await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
-    peer.connectionState = "disconnected";
+    peer.connectionState = "failed";
     act(() => peer.onconnectionstatechange());
 
     expect(await screen.findByText("disconnected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start fresh session" })).toBeInTheDocument();
+  });
+
+  it("does not close immediately for transient browser disconnects", async () => {
+    const { channel, peer } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    peer.connectionState = "disconnected";
+    act(() => peer.onconnectionstatechange());
+
+    expect(await screen.findByText("listening")).toBeInTheDocument();
+    expect(screen.getByText(/browser reconnects/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop voice" })).toBeInTheDocument();
+
+    peer.connectionState = "connected";
+    act(() => peer.onconnectionstatechange());
+    await waitFor(() => expect(screen.queryByText(/browser reconnects/i)).not.toBeInTheDocument());
   });
 });
