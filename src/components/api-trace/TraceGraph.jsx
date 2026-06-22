@@ -126,8 +126,16 @@ export default function TraceGraph({ trace, selection, onSelect }) {
             "edge.a11yDescription.default": "Trace relationship between operations.",
           }}
         >
-          <Background gap={20} size={1} color="rgba(23, 19, 15, 0.08)" />
-          <MiniMap pannable zoomable className="trace-graph-minimap" aria-label="Trace graph overview" />
+          <Background gap={20} size={1} color="rgba(246, 237, 220, 0.12)" />
+          <MiniMap
+            pannable
+            zoomable
+            className="trace-graph-minimap"
+            aria-label="Trace graph overview"
+            maskColor="rgba(10, 15, 20, 0.66)"
+            nodeColor="#263746"
+            nodeStrokeColor="rgba(255, 250, 240, 0.24)"
+          />
           <Controls showInteractive={false} className="trace-graph-controls" />
         </ReactFlow>
       </Box>
