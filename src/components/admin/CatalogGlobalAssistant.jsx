@@ -143,7 +143,11 @@ export default function CatalogGlobalAssistant({
   ], [hasProductScope]);
 
   const addMessage = (message) => {
-    setMessages((current) => [...current, { id: `${Date.now()}-${current.length}`, ...message }].slice(-MAX_MESSAGES));
+    setMessages((current) => {
+      const previous = current[current.length - 1];
+      if (previous?.role === message.role && previous?.message === message.message) return current;
+      return [...current, { id: `${Date.now()}-${current.length}`, ...message }].slice(-MAX_MESSAGES);
+    });
   };
 
   const submitQuestion = async (event) => {
@@ -183,6 +187,15 @@ export default function CatalogGlobalAssistant({
       role: "assistant",
       message: result?.message || "The voice answer finished.",
       citations: result?.citations || [],
+      scope,
+    });
+  };
+
+  const voiceTranscript = (entry) => {
+    addMessage({
+      role: entry.role === "presenter" ? "user" : "assistant",
+      message: entry.text,
+      citations: [],
       scope,
     });
   };
@@ -292,6 +305,7 @@ export default function CatalogGlobalAssistant({
                   contextLabel={scopeLabel}
                   onToolResult={voiceToolResult}
                   onWorkflowEvent={onWorkflowEvent}
+                  onTranscriptEntry={voiceTranscript}
                   compact
                 />
                 <IconButton type="button" className="primary-button" loading={busy} onClick={() => submitQuestion()} aria-label="Ask catalog assistant">
