@@ -215,16 +215,31 @@ export default function ProductWorkbench({
   const submitInstruction = async (overrideInstruction) => {
     const nextInstruction = String(overrideInstruction ?? instruction).trim();
     if (!nextInstruction || commandInFlight.current) return;
+    const activeDraft = activeDetail?.current_draft;
+    const commandDraft = activeProductId && activeDraft ? {
+      id: activeDraft.revision.id,
+      product_id: activeDetail?.product_id || activeProductId,
+      draft_version: activeDraft.draft_version,
+    } : draft;
+    if (activeProductId && !commandDraft) {
+      setActionError({
+        kind: "draft",
+        retryable: false,
+        instruction: nextInstruction,
+        message: "Product context is still loading. Open Product details, then try again.",
+      });
+      return;
+    }
     commandInFlight.current = true;
     setSubmitting(true);
     setActionError(null);
     setMessage("");
-    const traceAction = startAction(draft ? "Refine catalog product draft" : "Create catalog product draft", {
+    const traceAction = startAction(commandDraft ? "Refine catalog product draft" : "Create catalog product draft", {
       surface: "catalog-studio",
       attributes: {
-        action: draft ? "draft_refine" : "draft_create",
-        draft_id: draft?.id || "",
-        product_id: draft?.product_id || activeProductId || "",
+        action: commandDraft ? "draft_refine" : "draft_create",
+        draft_id: commandDraft?.id || "",
+        product_id: commandDraft?.product_id || activeProductId || "",
         workflow_id: workflowId,
       },
     });
@@ -234,8 +249,8 @@ export default function ProductWorkbench({
 
       const commandPayload = {
         instruction: nextInstruction,
-        current_draft_id: draft?.id || null,
-        expected_draft_version: draft?.draft_version || 0,
+        current_draft_id: commandDraft?.id || null,
+        expected_draft_version: commandDraft?.draft_version || 0,
       };
       const result = await submitCatalogDraftCommand(
         activeWorkflowId,
@@ -246,23 +261,27 @@ export default function ProductWorkbench({
       setMessage(result.message);
       setInstruction("");
       if (result.status === "succeeded" && result.draft) {
-        setDraft(result.draft);
-        persist(activeWorkflowId, result.draft);
+        if (!activeProductId) {
+          setDraft(result.draft);
+          persist(activeWorkflowId, result.draft);
+          setActiveWorkbenchTab("product");
+        } else {
+          setSuggestionRefreshKey((current) => current + 1);
+        }
         setEditorRefreshKey((current) => current + 1);
-        setActiveWorkbenchTab("product");
         onCatalogChanged?.();
       }
       setWorkflow(result.workflow);
       trackCatalogStudioMilestone("draft_command_finished", {
-        product_id: result.draft?.product_id,
+        product_id: result.draft?.product_id || commandDraft?.product_id || activeProductId || "",
         source: "text",
         status: result.status,
         workflow_id: activeWorkflowId,
       });
       await refreshWorkflow(activeWorkflowId);
       traceAction.end(result.status === "succeeded" ? "completed" : "failed", {
-        draft_id: result.draft?.id || draft?.id || "",
-        product_id: result.draft?.product_id || draft?.product_id || activeProductId || "",
+        draft_id: result.draft?.id || commandDraft?.id || "",
+        product_id: result.draft?.product_id || commandDraft?.product_id || activeProductId || "",
         workflow_id: activeWorkflowId,
       });
     } catch (error) {
@@ -629,6 +648,15 @@ export default function ProductWorkbench({
     ...(!usesCanonicalEditor && draft ? [{ id: "legacyImages", label: "Legacy images" }] : []),
   ], [contextualDraft, draft, editorProductId, publishedProductId, usesCanonicalEditor, usesStructuredSuggestions]);
   const activeTabIsAvailable = availableTabs.some((tab) => tab.id === activeWorkbenchTab);
+  const chatDraftVersion = activeProductId ? contextualDraft?.draft_version : draft?.draft_version;
+  const chatReady = !activeProductId || Boolean(contextualDraft);
+  const chatPlaceholder = activeProductId
+    ? "Ask for reviewable product changes across copy, SEO, images, inventory, or publish readiness..."
+    : draft ? "Refine the current draft..." : "Create a tailored rose silk occasion dress for the Dallas assortment...";
+  const chatStatusText = activeProductId
+    ? chatDraftVersion ? `Draft version ${chatDraftVersion}` : "Load product details first"
+    : chatDraftVersion ? `Draft version ${chatDraftVersion}` : "No draft yet";
+  const chatActionLabel = activeProductId || draft ? "Refine draft" : "Create draft";
 
   useEffect(() => {
     if (activeTabIsAvailable) return;
@@ -639,15 +667,12 @@ export default function ProductWorkbench({
   return (
     <>
     <CatalogGlobalAssistant
-      activeDetail={activeDetail}
-      currentProductId={editorProductId}
       workflowId={workflowId}
       ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
       open={assistantOpen}
       onOpenChange={onAssistantOpenChange}
       realtimeCapability={catalogStudioSession?.capabilities?.realtime}
       resetSignal={voiceResetKey}
-      productVoiceContext={voiceContext}
       onWorkflowEvent={(activeWorkflowId) => { void refreshWorkflow(activeWorkflowId); }}
     />
 
@@ -740,23 +765,21 @@ export default function ProductWorkbench({
       <Box className="workflow-prompt-panel">
         <Text className="section-kicker">{editorProductId ? "Product chat" : "Draft assistant"}</Text>
         <Text className="panel-title">{editorProductId ? "Ask for product-wide changes" : "Describe the product outcome"}</Text>
-        {!activeProductId ? <>
         <Textarea
           aria-label="Catalog product instruction"
           value={instruction}
           onChange={(event) => setInstruction(event.target.value)}
-          placeholder={draft ? "Refine the current draft…" : "Create a tailored rose silk occasion dress for the Dallas assortment…"}
+          placeholder={chatPlaceholder}
           rows={4}
           maxLength={4000}
-          disabled={Boolean(publishedProductId)}
+          disabled={Boolean(publishedProductId) || !chatReady}
         />
         <HStack justify="space-between" gap={3} mt={3} flexWrap="wrap">
-          <Text className="muted-text">{draft ? `Draft version ${draft.draft_version}` : "No draft yet"}</Text>
-          <Button type="button" className="primary-button" disabled={Boolean(publishedProductId) || !instruction.trim() || submitting} onClick={() => submitInstruction()}>
-            <FiSend /> {submitting ? "Working…" : draft ? "Refine draft" : "Create draft"}
+          <Text className="muted-text">{chatStatusText}</Text>
+          <Button type="button" className="primary-button" disabled={Boolean(publishedProductId) || !chatReady || !instruction.trim() || submitting} onClick={() => submitInstruction()}>
+            <FiSend /> {submitting ? "Working..." : chatActionLabel}
           </Button>
         </HStack>
-        </> : <Text className="muted-text" mt={2}>Use voice for reviewable changes across copy, SEO, image context, inventory, and publish readiness. Nothing changes the draft until accepted.</Text>}
         <VoiceControls
           workflowId={workflowId}
           ensureWorkflow={ensureWorkflow}

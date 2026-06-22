@@ -236,40 +236,47 @@ describe("ProductWorkbench", () => {
     }, "start-workflow-key"));
   });
 
-  it("scopes selected-product assistant questions to the Product Panel automatically", async () => {
+  it("keeps the global assistant catalog-wide while a product is selected", async () => {
     renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat", assistantOpen: true });
-    expect(screen.queryByRole("button", { name: "Current product" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Entire catalog & inventory" })).not.toBeInTheDocument();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
+    expect(screen.getByText("Active scope: entire catalog and inventory")).toBeInTheDocument();
+    expect(screen.getByTestId("catalog-assistant-voice-controls")).toHaveTextContent("Voice mode workbench; target none; label entire catalog and inventory");
     const assistantQuestion = screen.getByLabelText("Catalog assistant question");
-    fireEvent.change(assistantQuestion, { target: { value: "What is low stock for this product?" } });
-    expect(assistantQuestion).toHaveValue("What is low stock for this product?");
+    fireEvent.change(assistantQuestion, { target: { value: "Summarize catalog inventory risk." } });
+    expect(assistantQuestion).toHaveValue("Summarize catalog inventory risk.");
     await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
+
+    await waitFor(() => expect(api.queryCatalogAssistant).toHaveBeenCalledWith({
+      question: "Summarize catalog inventory risk.",
+      query_scopes: ["catalog", "inventory"],
+    }));
+    expect(api.startCatalogWorkflow).not.toHaveBeenCalled();
+    expect(api.createCatalogRealtimeSession).not.toHaveBeenCalled();
+    expect(api.submitCatalogRealtimeV3ToolCall).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Low stock appears across the catalog/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close catalog assistant" }));
+    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
+  });
+
+  it("submits selected-product text chat through the product draft workflow", async () => {
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+    await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
+
+    const instruction = screen.getByLabelText("Catalog product instruction");
+    await userEvent.type(instruction, "Tighten the product copy for launch.");
+    await userEvent.click(screen.getByRole("button", { name: "Refine draft" }));
 
     await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
       title: "Product Catalog workbench for Studio Coat",
       business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
       draft_id: "draft_1",
     }, "start-workflow-key"));
-    expect(api.createCatalogRealtimeSession).toHaveBeenCalledWith("workflow_1", {
-      mode: "workbench",
-      product_id: "cat_coat",
-      draft_id: "draft_1",
+    expect(api.submitCatalogDraftCommand).toHaveBeenCalledWith("workflow_1", {
+      instruction: "Tighten the product copy for launch.",
+      current_draft_id: "draft_1",
       expected_draft_version: 2,
-      query_scopes: ["product", "catalog", "inventory", "readiness"],
-    });
-    expect(api.submitCatalogRealtimeV3ToolCall).toHaveBeenCalledWith("workflow_1", {
-      session_id: "realtime_session_1",
-      call_id: "catalog-assistant-call-key",
-      name: "read_inventory_status",
-      arguments: { question: "What is low stock for this product?" },
-    }, "catalog-assistant-read-key");
-    expect(api.queryCatalogAssistant).not.toHaveBeenCalledWith(expect.objectContaining({ query_scopes: expect.arrayContaining(["product"]) }));
-    expect(await screen.findByText(/product read tool: Oak Brook has 7 unit/i)).toBeInTheDocument();
-    expect(screen.getByText(/inventory: Oak Brook: 7 unit/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Close catalog assistant" }));
-    expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
+    }, "draft-command-key");
   });
 
   it("uses one product chat for product-wide voice context", async () => {

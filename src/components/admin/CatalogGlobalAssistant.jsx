@@ -371,7 +371,13 @@ export default function CatalogGlobalAssistant({
                           </Box>
                         ) : null}
                       </Box>
-                    )) : <Text className="muted-text">Ask about low stock, store coverage, assortment risk, or the selected product.</Text>}
+                    )) : (
+                      <Text className="muted-text">
+                        {scope === "product"
+                          ? "Ask about low stock, store coverage, assortment risk, or the selected product."
+                          : "Ask about low stock, store coverage, or assortment risk."}
+                      </Text>
+                    )}
                     {busy ? <Text className="chat-loading">Working...</Text> : null}
                   </VStack>
                 </Box>
@@ -421,7 +427,9 @@ export default function CatalogGlobalAssistant({
                       submitQuestion();
                     }
                   }}
-                  placeholder="Ask which stores have low stock, or what changed for the selected product..."
+                  placeholder={scope === "product"
+                    ? "Ask which stores have low stock, or what changed for the selected product..."
+                    : "Ask which stores have low stock, or summarize catalog inventory risk..."}
                   rows={2}
                   maxLength={1000}
                 />
@@ -444,7 +452,11 @@ export default function CatalogGlobalAssistant({
                   <FiSend />
                 </IconButton>
               </Box>
-              <Text className="muted-mini">Catalog readouts are cited. Product voice outcomes stay reviewable before publish.</Text>
+              <Text className="muted-mini">
+                {scope === "product"
+                  ? "Catalog readouts are cited. Product voice outcomes stay reviewable before publish."
+                  : "Catalog readouts are cited from catalog and inventory data."}
+              </Text>
             </Drawer.Footer>
           </Drawer.Content>
         </Drawer.Positioner>
