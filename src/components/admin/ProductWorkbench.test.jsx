@@ -225,6 +225,11 @@ describe("ProductWorkbench", () => {
   });
 
   it("enables current-product assistant drill-down only after product detail loads", async () => {
+    api.queryCatalogAssistant.mockResolvedValueOnce({
+      message: "Studio Coat inventory comes from the assistant API: Oak Brook has 7 unit(s).",
+      citations: [{ kind: "inventory", source_id: "cat_coat:1002:M", label: "Oak Brook: Studio Coat", value: { store_name: "Oak Brook", inventory_qty: 7 } }],
+      mutation: false,
+    });
     renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat", assistantOpen: true });
     expect(screen.getByRole("button", { name: "Current product" })).toBeDisabled();
 
@@ -235,8 +240,15 @@ describe("ProductWorkbench", () => {
     expect(assistantQuestion).toHaveValue("What is low stock for this product?");
     await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
 
-    expect(await screen.findByText(/Studio Coat inventory: 1001 has 3 unit/i)).toBeInTheDocument();
-    expect(api.queryCatalogAssistant).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.queryCatalogAssistant).toHaveBeenCalledWith({
+      question: "What is low stock for this product?",
+      query_scopes: ["product", "inventory", "readiness"],
+      product_id: "cat_coat",
+      draft_id: "draft_1",
+      expected_draft_version: 2,
+    }));
+    expect(await screen.findByText(/assistant API: Oak Brook has 7 unit/i)).toBeInTheDocument();
+    expect(screen.getByText(/inventory: Oak Brook: 7 unit/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Close catalog assistant" }));
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
   });

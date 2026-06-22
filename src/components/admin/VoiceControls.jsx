@@ -72,9 +72,11 @@ async function defaultSdpExchange(session, offerSdp, signal) {
 }
 
 function toolOutput(result) {
+  const status = result?.status || (result?.mutation === false ? "succeeded" : "failed");
   return JSON.stringify({
-    status: result?.status || "failed",
+    status,
     message: result?.message || "The draft tool finished.",
+    citations: result?.citations || [],
     retryable: Boolean(result?.retryable),
   });
 }
@@ -96,6 +98,7 @@ export default function VoiceControls({
   realtimeCapability,
   ensureWorkflow,
   onToolResult,
+  onResolveToolCall,
   onVoiceStateChange,
   onWorkflowEvent,
   onTranscriptEntry,
@@ -130,8 +133,8 @@ export default function VoiceControls({
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
   const traceActionRef = useRef(null);
-  const callbacksRef = useRef({ onToolResult, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry });
-  callbacksRef.current = { onToolResult, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry };
+  const callbacksRef = useRef({ onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry });
+  callbacksRef.current = { onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
   const clearResources = useCallback(() => {
@@ -239,7 +242,10 @@ export default function VoiceControls({
     handledCallsRef.current.add(callId);
 
     try {
-      const result = await submitToolCall(activeWorkflowId, event, voiceIdempotencyKey(callId));
+      const idempotencyKey = voiceIdempotencyKey(callId);
+      const result = callbacksRef.current.onResolveToolCall
+        ? await callbacksRef.current.onResolveToolCall({ event, idempotencyKey, workflowId: activeWorkflowId })
+        : await submitToolCall(activeWorkflowId, event, idempotencyKey);
       if (generationRef.current !== generation) return;
       callbacksRef.current.onToolResult?.(result, activeWorkflowId);
       callbacksRef.current.onWorkflowEvent?.(activeWorkflowId);
