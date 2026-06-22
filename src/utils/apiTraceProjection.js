@@ -16,10 +16,26 @@ export function sanitizeTraceValue(value, seen = new WeakSet(), depth = 0) {
   );
 }
 
-export function sanitizedTraceJson(value, maxChars = 60_000) {
-  const serialized = JSON.stringify(sanitizeTraceValue(value ?? {}), null, 2);
+export function fullTraceValue(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return "[CIRCULAR]";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => fullTraceValue(item, seen));
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, fullTraceValue(item, seen)]),
+  );
+}
+
+export function traceJson(value, { sanitize = true, maxChars = 60_000 } = {}) {
+  const projection = sanitize ? sanitizeTraceValue(value ?? {}) : fullTraceValue(value ?? {});
+  const serialized = JSON.stringify(projection, null, 2);
+  if (maxChars === Infinity) return { text: serialized, truncated: false };
   if (serialized.length <= maxChars) return { text: serialized, truncated: false };
   return { text: `${serialized.slice(0, maxChars)}\n… [TRUNCATED]`, truncated: true };
+}
+
+export function sanitizedTraceJson(value, maxChars = 60_000) {
+  return traceJson(value, { sanitize: true, maxChars });
 }
 
 export function formatTraceDuration(durationMs) {

@@ -5,7 +5,7 @@ import { renderWithProviders } from "../../test/render";
 import TraceInspector from "./TraceInspector";
 
 describe("TraceInspector", () => {
-  it("shows payload expiry and redacts nested secrets", () => {
+  it("shows payload expiry and full nested trace attributes", () => {
     const trace = {
       trace_id: "trace-1",
       name: "Draft product",
@@ -23,7 +23,7 @@ describe("TraceInspector", () => {
     expect(screen.getByText(/Detailed payloads have expired/)).toBeInTheDocument();
     expect(screen.getByText(/server truncated fields/)).toBeInTheDocument();
     expect(screen.getByText(/visible/)).toBeInTheDocument();
-    expect(screen.queryByText(/do-not-render/)).not.toBeInTheDocument();
-    expect(screen.getByText(/\[REDACTED\]/)).toBeInTheDocument();
+    expect(screen.getByText(/do-not-render/)).toBeInTheDocument();
+    expect(screen.getByText(/Full attributes/)).toBeInTheDocument();
   });
 });

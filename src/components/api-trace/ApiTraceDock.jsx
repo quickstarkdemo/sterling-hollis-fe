@@ -16,8 +16,8 @@ import { downloadAdminApiTrace } from "../../utils/apiClient";
 import {
   formatTraceDuration,
   formatTraceTime,
-  sanitizedTraceJson,
-  sanitizeTraceValue,
+  fullTraceValue,
+  traceJson,
 } from "../../utils/apiTraceProjection";
 import TraceArtifactViewer from "./TraceArtifactViewer";
 import TraceEventLog from "./TraceEventLog";
@@ -162,7 +162,7 @@ export default function ApiTraceDock() {
   const copyTrace = async () => {
     if (!selectedTrace) return;
     try {
-      await navigator.clipboard.writeText(sanitizedTraceJson(selectedTrace).text);
+      await navigator.clipboard.writeText(traceJson(selectedTrace, { sanitize: false, maxChars: Infinity }).text);
       setCopied(true);
       window.clearTimeout(copyTimer.current);
       copyTimer.current = window.setTimeout(() => setCopied(false), 1500);
@@ -180,9 +180,9 @@ export default function ApiTraceDock() {
         const response = await downloadAdminApiTrace(selectedTraceId);
         source = JSON.parse(await response.data.text());
       } catch {
-        // The selected server projection is already sanitized and is a safe fallback.
+        // The selected server projection is already loaded and is a safe fallback.
       }
-      const blob = new Blob([JSON.stringify(sanitizeTraceValue(source), null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(fullTraceValue(source), null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -382,7 +382,7 @@ export default function ApiTraceDock() {
           <TraceInspector trace={visibleTrace} selection={selection} />
         </Box>
       </Box>
-      {exportStatus === "error" ? <Text className="api-trace-export-error">The sanitized trace could not be exported.</Text> : null}
+      {exportStatus === "error" ? <Text className="api-trace-export-error">The trace could not be exported.</Text> : null}
     </Box>
   );
 }

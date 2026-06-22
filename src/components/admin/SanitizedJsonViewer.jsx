@@ -1,13 +1,16 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCheck, FiCopy } from "react-icons/fi";
-import { sanitizedTraceJson } from "../../utils/apiTraceProjection";
+import { traceJson } from "../../utils/apiTraceProjection";
 
-export default function SanitizedJsonViewer({ label, value, maxChars = 6000 }) {
+export default function SanitizedJsonViewer({ label, value, maxChars = 6000, raw = false }) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const resetTimer = useRef(null);
-  const projection = useMemo(() => sanitizedTraceJson(value, maxChars), [maxChars, value]);
+  const projection = useMemo(
+    () => traceJson(value, { sanitize: !raw, maxChars }),
+    [maxChars, raw, value],
+  );
 
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 

@@ -114,8 +114,9 @@ describe("apiTraceClient", () => {
       "http.completed",
       "ui.completed",
     ]);
-    expect(JSON.stringify(events)).not.toContain("clerk-secret");
-    expect(events[1].attributes.endpoint).not.toContain("secret=no");
+    expect(JSON.stringify(events)).toContain("clerk-secret");
+    expect(events[1].attributes.endpoint).toContain("secret=no");
+    expect(events[1].attributes.request_headers.Authorization).toBe("Bearer clerk-secret");
   });
 
   it("closes the root only after outstanding child spans settle", () => {
@@ -181,7 +182,7 @@ describe("apiTraceClient", () => {
     expect(events).toHaveLength(1);
   });
 
-  it("marks upload spans without inspecting FormData content", () => {
+  it("marks upload spans while retaining FormData content", () => {
     enableRuntime();
     const events = [];
     subscribeApiTraceEvents((event) => events.push(event));
@@ -199,7 +200,8 @@ describe("apiTraceClient", () => {
     });
 
     expect(events.at(-1).attributes.request_kind).toBe("upload");
-    expect(JSON.stringify(events)).not.toContain("secret-name.jpg");
+    expect(JSON.stringify(events)).toContain("secret-name.jpg");
+    expect(events.at(-1).attributes.request_body.private_supplier_filename).toBe("secret-name.jpg");
   });
 
   it("does not recursively trace the client-event transport", () => {
@@ -244,8 +246,8 @@ describe("apiTraceClient", () => {
 
     expect(transport).toHaveBeenCalledTimes(4);
     const encoded = JSON.stringify(transport.mock.calls);
-    expect(encoded).not.toContain("Bearer secret");
-    expect(encoded).not.toContain("authorization");
+    expect(encoded).toContain("Bearer secret");
+    expect(encoded).toContain("authorization");
     expect(transport.mock.calls[0][0]).toBe(action.traceId);
   });
 
@@ -267,12 +269,18 @@ describe("apiTraceClient", () => {
     expect(transport).not.toHaveBeenCalled();
   });
 
-  it("traces explicit fetch without exposing provider credentials, body, or query values", async () => {
+  it("traces explicit fetch with provider credentials, body, and query values for the dev tray", async () => {
     enableRuntime();
     const events = [];
     subscribeApiTraceEvents((event) => events.push(event));
     startApiTraceAction("Realtime voice");
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 201, headers: {} });
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      headers: new Headers({ "x-response-id": "resp_1" }),
+      body: {},
+      clone: () => ({ text: vi.fn().mockResolvedValue("provider response body") }),
+    });
 
     await traceApiFetch(
       "https://api.openai.com/v1/realtime/calls?token=private",
@@ -286,9 +294,11 @@ describe("apiTraceClient", () => {
 
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe("Bearer ephemeral-secret");
     const encoded = JSON.stringify(events);
-    expect(encoded).not.toContain("ephemeral-secret");
-    expect(encoded).not.toContain("private-sdp-body");
-    expect(encoded).not.toContain("token=private");
+    expect(encoded).toContain("ephemeral-secret");
+    expect(encoded).toContain("private-sdp-body");
+    expect(encoded).toContain("token=private");
+    expect(encoded).toContain("provider response body");
+    expect(encoded).toContain("x-response-id");
     expect(events.at(-1).attributes.status_code).toBe(201);
   });
 
@@ -310,7 +320,7 @@ describe("apiTraceClient", () => {
     );
   });
 
-  it("records only bounded Realtime lifecycle summaries", () => {
+  it("records full Realtime lifecycle attributes", () => {
     enableRuntime();
     const events = [];
     subscribeApiTraceEvents((event) => events.push(event));
@@ -327,13 +337,15 @@ describe("apiTraceClient", () => {
       { action, status: "connected" },
     );
 
-    expect(events.at(-1).attributes).toEqual({ transport: "webrtc" });
-    expect(JSON.stringify(events)).not.toContain("private-audio");
-    expect(JSON.stringify(events)).not.toContain("private transcript");
-    expect(JSON.stringify(events)).not.toContain("ephemeral-secret");
+    expect(events.at(-1).attributes).toEqual({
+      transport: "webrtc",
+      raw_audio: "private-audio",
+      transcript: "private transcript",
+      client_secret: "ephemeral-secret",
+    });
   });
 
-  it("redacts recognizable secrets and customer identifiers from display text", () => {
+  it("preserves recognizable secrets, customer identifiers, and query values in trace display text", () => {
     enableRuntime();
     const events = [];
     subscribeApiTraceEvents((event) => events.push(event));
@@ -351,10 +363,9 @@ describe("apiTraceClient", () => {
     action.end();
 
     const encoded = JSON.stringify(events);
-    expect(encoded).not.toContain("shopper@example.com");
-    expect(encoded).not.toContain("private-token");
-    expect(encoded).not.toContain("token=private");
-    expect(encoded).toContain("[REDACTED]");
+    expect(encoded).toContain("shopper@example.com");
+    expect(encoded).toContain("private-token");
+    expect(encoded).toContain("token=private");
   });
 
   it("finishes traced actions while preserving callback results and errors", async () => {

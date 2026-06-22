@@ -1,4 +1,4 @@
-import { sanitizeTraceValue } from "./apiTraceProjection";
+import { fullTraceValue } from "./apiTraceProjection";
 
 function timestamp(value) {
   const result = new Date(value).getTime();
@@ -20,7 +20,7 @@ function spanEnd(span, start) {
 
 export function createReplaySnapshot(trace) {
   if (!trace) return null;
-  const projection = sanitizeTraceValue(trace);
+  const projection = fullTraceValue(trace);
   const candidateStarts = [
     timestamp(projection.started_at),
     ...(projection.spans || []).map((span) => timestamp(span.started_at)),
