@@ -16,12 +16,12 @@ const api = vi.hoisted(() => ({
   submitCatalogMediaCommand: vi.fn(),
   archiveAdminCatalogProduct: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
-  getAdminCatalogProductV2: vi.fn(),
-  saveAdminCatalogProductDraftV2: vi.fn(),
-  startAdminCatalogProductRevisionV2: vi.fn(),
+  getAdminCatalogProductCompatibilityV2: vi.fn(),
+  saveAdminCatalogProductDraftCompatibilityV2: vi.fn(),
+  startAdminCatalogProductRevisionCompatibilityV2: vi.fn(),
   createAdminCatalogBrand: vi.fn(),
-  archiveAdminCatalogProductV2: vi.fn(),
-  publishAdminCatalogProductV2: vi.fn(),
+  archiveAdminCatalogProductCurrentV2: vi.fn(),
+  publishAdminCatalogProductCompatibilityV2: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
 
@@ -87,7 +87,7 @@ describe("ProductEditor", () => {
   });
 
   it("saves validated product, variant, price, and inventory data with draft versions", async () => {
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
     await userEvent.type(title, "Updated Studio Coat");
@@ -117,7 +117,7 @@ describe("ProductEditor", () => {
   });
 
   it("promotes existing imagery to core media without changing inventory", async () => {
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
 
     await screen.findByText("Images");
     await userEvent.click(screen.getByRole("button", { name: /Use current image as main/i }));
@@ -157,7 +157,7 @@ describe("ProductEditor", () => {
       intent: "scene",
     });
     api.approveCatalogImageJob.mockResolvedValue({ approval_status: "approved" });
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
 
     await userEvent.type(await screen.findByLabelText("Image variant instruction"), "bright living room");
     await userEvent.click(screen.getByRole("button", { name: /Generate image variant/i }));
@@ -182,7 +182,7 @@ describe("ProductEditor", () => {
   });
 
   it("maps local validation to the relevant field and does not call the server", async () => {
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
     await userEvent.click(screen.getByRole("button", { name: /Save draft/i }));
@@ -193,7 +193,7 @@ describe("ProductEditor", () => {
 
   it("preserves local edits after a version conflict and offers an explicit reload", async () => {
     api.saveAdminCatalogProductDraft.mockRejectedValueOnce({ response: { status: 409 } });
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
     await userEvent.type(title, "My Local Coat");
@@ -208,7 +208,7 @@ describe("ProductEditor", () => {
     api.saveAdminCatalogProductDraft.mockRejectedValueOnce({
       response: { status: 422, data: { detail: [{ loc: ["body", "product", "variants", 0, "inventory"], msg: "Invalid store" }] } },
     });
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
     await userEvent.type(title, "Changed Coat");
@@ -227,7 +227,7 @@ describe("ProductEditor", () => {
     api.saveAdminCatalogProductDraft
       .mockRejectedValueOnce({ response: { status: 409 } })
       .mockResolvedValueOnce(createdDraft.revision);
-    renderWithProviders(<ProductEditor productId="cat_coat" />);
+    renderWithProviders(<ProductEditor productId="cat_coat" authoringSchemaVersion={1} />);
 
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);

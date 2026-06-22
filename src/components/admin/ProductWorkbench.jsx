@@ -66,7 +66,7 @@ export default function ProductWorkbench({
   activeProductId = "",
   onDirtyChange,
   onCatalogChanged,
-  authoringSchemaVersion = 1,
+  authoringSchemaVersion = 3,
   references,
   referencesStatus,
   onRetryReferences,

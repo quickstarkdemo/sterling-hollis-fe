@@ -178,7 +178,7 @@ The route should become a workspace coordinator. Catalog browsing, assistant cha
 
 - Public Lovable design: `https://pixel-pilot-catalog.lovable.app`
 - Lovable project id: `646e8a28-70e7-404c-ad05-dea887144295`
-- Standalone design export: `C:/Users/dirkn/Downloads/Catalog Studio (standalone).html`
+- Standalone design export: local HTML export used during planning; not committed.
 - Existing product workflow guide: `docs/openai-catalog-studio-demo.md`
 - Existing chat pattern: `src/components/ChatWidget.jsx`
 - Existing Catalog Studio route and workflow: `src/pages/CatalogStudioPage.jsx`, `src/components/admin/ProductWorkbench.jsx`

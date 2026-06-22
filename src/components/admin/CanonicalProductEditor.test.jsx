@@ -8,23 +8,23 @@ import ProductEditor from "./ProductEditor";
 const api = vi.hoisted(() => ({
   approveCatalogImageJob: vi.fn(),
   archiveAdminCatalogProduct: vi.fn(),
-  archiveAdminCatalogProductV2: vi.fn(),
+  archiveAdminCatalogProductCurrentV2: vi.fn(),
   createAdminCatalogBrand: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
-  getAdminCatalogProductV2: vi.fn(),
+  getAdminCatalogProductCompatibilityV2: vi.fn(),
   getAdminCatalogProductV3: vi.fn(),
   getAdminCatalogProductPreviewV3: vi.fn(),
   getAdminCatalogProductReadinessV3: vi.fn(),
   getCatalogImageJob: vi.fn(),
   publishAdminCatalogProduct: vi.fn(),
-  publishAdminCatalogProductV2: vi.fn(),
+  publishAdminCatalogProductCompatibilityV2: vi.fn(),
   publishAdminCatalogProductV3: vi.fn(),
   saveAdminCatalogProductDraft: vi.fn(),
-  saveAdminCatalogProductDraftV2: vi.fn(),
+  saveAdminCatalogProductDraftCompatibilityV2: vi.fn(),
   saveAdminCatalogProductDraftV3: vi.fn(),
   startAdminCatalogProductRevision: vi.fn(),
-  startAdminCatalogProductRevisionV2: vi.fn(),
+  startAdminCatalogProductRevisionCompatibilityV2: vi.fn(),
   startAdminCatalogProductRevisionV3: vi.fn(),
   startCatalogWorkflow: vi.fn(),
   submitCatalogMediaCommand: vi.fn(),
@@ -91,8 +91,8 @@ function canonicalDetail() {
 describe("ProductEditor v2 merchandiser workflow", () => {
   beforeEach(() => {
     const fixture = canonicalDetail();
-    api.getAdminCatalogProductV2.mockReset().mockResolvedValue(fixture);
-    api.saveAdminCatalogProductDraftV2.mockReset().mockResolvedValue(fixture.current_draft.revision);
+    api.getAdminCatalogProductCompatibilityV2.mockReset().mockResolvedValue(fixture);
+    api.saveAdminCatalogProductDraftCompatibilityV2.mockReset().mockResolvedValue(fixture.current_draft.revision);
     api.createAdminCatalogBrand.mockReset();
     api.submitCatalogMediaCommand.mockReset();
     api.approveCatalogImageJob.mockReset();
@@ -119,7 +119,7 @@ describe("ProductEditor v2 merchandiser workflow", () => {
     fireEvent.change(screen.getByLabelText("Inventory 1 quantity"), { target: { value: "12" } });
     await userEvent.click(screen.getByRole("button", { name: "Save draft" }));
 
-    await waitFor(() => expect(api.saveAdminCatalogProductDraftV2).toHaveBeenCalledWith(
+    await waitFor(() => expect(api.saveAdminCatalogProductDraftCompatibilityV2).toHaveBeenCalledWith(
       "cat_pillow",
       expect.objectContaining({
         expected_version: 5,
@@ -146,7 +146,7 @@ describe("ProductEditor v2 merchandiser workflow", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save draft" }));
 
     expect(await screen.findByText("This store and size combination is already listed.")).toBeInTheDocument();
-    expect(api.saveAdminCatalogProductDraftV2).not.toHaveBeenCalled();
+    expect(api.saveAdminCatalogProductDraftCompatibilityV2).not.toHaveBeenCalled();
   });
 
   it("preserves product edits while approving a generated image candidate", async () => {
@@ -164,7 +164,7 @@ describe("ProductEditor v2 merchandiser workflow", () => {
       display_order: 2,
       provenance: {},
     });
-    api.getAdminCatalogProductV2.mockReset()
+    api.getAdminCatalogProductCompatibilityV2.mockReset()
       .mockResolvedValueOnce(initial)
       .mockResolvedValueOnce(afterApproval);
     api.submitCatalogMediaCommand.mockResolvedValue({
@@ -214,7 +214,7 @@ describe("ProductEditor v3 structured authoring", () => {
     };
     fixture.current_draft.readiness = { ready: false, blocking_errors: [{ code: "blocked", field_path: "/media", message: "Approve all media." }], recommendations: [] };
     api.getAdminCatalogProductV3.mockReset().mockResolvedValue(fixture);
-    api.saveAdminCatalogProductDraftV2.mockReset();
+    api.saveAdminCatalogProductDraftCompatibilityV2.mockReset();
     api.saveAdminCatalogProductDraftV3.mockReset().mockResolvedValue(fixture.current_draft.revision);
     api.getAdminCatalogProductReadinessV3.mockReset().mockResolvedValue(fixture.current_draft.readiness);
     api.getAdminCatalogProductPreviewV3.mockReset().mockResolvedValue({ draft_version: 3, preview: fixture.current_draft.product, readiness: fixture.current_draft.readiness });
@@ -239,7 +239,7 @@ describe("ProductEditor v3 structured authoring", () => {
       }),
       "save-v3-draft-key",
     ));
-    expect(api.saveAdminCatalogProductDraftV2).not.toHaveBeenCalled();
+    expect(api.saveAdminCatalogProductDraftCompatibilityV2).not.toHaveBeenCalled();
     expect(screen.getByText("Canonical storefront projection")).toBeInTheDocument();
     expect(screen.getByText("Approve all media.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Publish draft/i })).toBeDisabled();

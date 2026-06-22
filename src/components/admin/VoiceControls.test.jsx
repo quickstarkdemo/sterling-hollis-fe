@@ -13,7 +13,7 @@ import VoiceControls from "./VoiceControls";
 
 const api = vi.hoisted(() => ({
   createCatalogRealtimeSession: vi.fn(),
-  submitCatalogRealtimeToolCall: vi.fn(),
+  submitCatalogRealtimeCompatibilityToolCall: vi.fn(),
   submitCatalogRealtimeV3ToolCall: vi.fn(),
 }));
 
@@ -92,7 +92,7 @@ describe("VoiceControls", () => {
       surface: "catalog-studio",
     });
     api.createCatalogRealtimeSession.mockReset().mockResolvedValue(session());
-    api.submitCatalogRealtimeToolCall.mockReset().mockResolvedValue({
+    api.submitCatalogRealtimeCompatibilityToolCall.mockReset().mockResolvedValue({
       status: "succeeded",
       message: "Draft refined.",
       retryable: false,
@@ -349,7 +349,7 @@ describe("VoiceControls", () => {
       channel.message(toolEvent);
     });
 
-    await waitFor(() => expect(api.submitCatalogRealtimeToolCall).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.submitCatalogRealtimeCompatibilityToolCall).toHaveBeenCalledTimes(1));
     expect(onToolResult).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("function_call_output"));
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("response.create"));
@@ -456,7 +456,7 @@ describe("VoiceControls", () => {
       "voice-tool-call_inventory",
     ));
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining('\\"status\\":\\"succeeded\\"'));
-    expect(api.submitCatalogRealtimeToolCall).not.toHaveBeenCalled();
+    expect(api.submitCatalogRealtimeCompatibilityToolCall).not.toHaveBeenCalled();
   });
 
   it("lets read-mode assistant surfaces resolve Realtime tools through their own API path", async () => {
@@ -548,8 +548,8 @@ describe("VoiceControls", () => {
       }),
     }));
 
-    await waitFor(() => expect(api.submitCatalogRealtimeToolCall).toHaveBeenCalled());
-    const idempotencyKey = api.submitCatalogRealtimeToolCall.mock.calls[0][2];
+    await waitFor(() => expect(api.submitCatalogRealtimeCompatibilityToolCall).toHaveBeenCalled());
+    const idempotencyKey = api.submitCatalogRealtimeCompatibilityToolCall.mock.calls[0][2];
     expect(idempotencyKey.length).toBeLessThanOrEqual(128);
     expect(idempotencyKey).toMatch(/^voice-tool-/);
   });
@@ -570,7 +570,7 @@ describe("VoiceControls", () => {
         arguments: "{}",
       }));
     await Promise.resolve();
-    expect(api.submitCatalogRealtimeToolCall).not.toHaveBeenCalled();
+    expect(api.submitCatalogRealtimeCompatibilityToolCall).not.toHaveBeenCalled();
     expect(onToolResult).not.toHaveBeenCalled();
   });
 

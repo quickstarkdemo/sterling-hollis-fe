@@ -3,11 +3,38 @@
 Catalog Studio is a protected production workflow inside the public Sterling
 Hollis storefront. The presenter uses it to create, refine, review, and publish
 one catalog product. The same published product then appears on the storefront,
-in storefront chat, and through the existing ChatGPT/MCP product tools.
+in storefront chat, and through the backend persona-scoped ChatGPT/MCP product
+tools.
 
 This guide separates repeatable CI coverage from live-system preflight. A green
 frontend test run does not validate deployed credentials, provider availability,
 the durable image worker, object storage, or ChatGPT discovery.
+
+## Capability and MCP source of truth
+
+The backend generated capability map is authoritative for REST routes, chat
+tools, MCP tools, personas, and approval policy. Use these backend docs when
+preparing or debugging a demo:
+
+- `quickstarkdemo/sterling-hollis-be/docs/capability-map.md`
+- `quickstarkdemo/sterling-hollis-be/docs/openapi.json`
+
+The frontend keeps a compact derived manifest in
+`src/contracts/backendCapabilityManifest.json`, refreshed by
+`npm run refresh:api-contract`.
+
+| Persona surface | Expected use | Boundary |
+| --- | --- | --- |
+| `/mcp/public/` | anonymous catalog discovery | Public catalog/search/detail only. |
+| `/mcp/shopper/` | shopper or authenticated shopper assistant | Shopper-safe catalog and recommendation actions. |
+| `/mcp/catalog-admin/` | Catalog Studio/admin validation | Catalog admin capabilities; never exposed as normal storefront UI. |
+| associate/executive bundles | internal readouts and decision support | Persona-scoped views of the same registry. |
+| send-capable bundles | approval-sensitive external sends | Require explicit approval policy; do not present as ordinary shopper/admin controls. |
+
+Catalog Studio voice uses the workflow-scoped realtime v3 tool-call route for
+current bounded read/proposal tools. The older non-v3 realtime tool-call route
+remains only as an explicit compatibility shim for legacy create/refine draft
+tools.
 
 ## Choose the presentation depth
 
@@ -71,6 +98,10 @@ paths succeeded.
 Run this checklist on the production origin no more than a few hours before the
 session. Record the result and the product IDs in the meeting notes; do not add
 credentials or Clerk tokens.
+
+For unified capability parity across storefront chat, Catalog Studio assistant,
+trace tray, and MCP persona discovery, also use
+[`capability-parity-smoke-checklist.md`](capability-parity-smoke-checklist.md).
 
 ### 1. Runtime and public storefront
 
@@ -142,9 +173,11 @@ credentials or Clerk tokens.
 - Open **View published product**, verify the stable `cat_...` ID, and confirm
   only the approved review and published merchant response are visible.
 - Search for that ID or exact title in storefront chat.
-- In the configured ChatGPT/App experience, use the existing product search and
-  detail tools to find the same product. Confirm no draft, workflow event, or
-  developer metadata appears in tool or widget payloads.
+- In the configured ChatGPT/App experience, use the persona-scoped MCP bundle
+  appropriate to the audience. Search and detail the same product through public
+  or shopper tools, and use catalog-admin discovery only for admin validation.
+  Confirm no draft, workflow event, developer metadata, or send-capable action
+  appears in normal shopper/admin UI payloads.
 - Archive or retain the product according to the meeting plan.
 
 ## Recovery matrix
@@ -166,7 +199,7 @@ credentials or Clerk tokens.
 Before the session, select a stable, already-published product with complete
 images, variants, and inventory. Store its `cat_...` ID in the deployment secret
 `VITE_CATALOG_STUDIO_FALLBACK_PRODUCT_ID`. Verify it on the public PDP,
-storefront chat, and ChatGPT. This is preconfigured data, not evidence that the
+storefront chat, and the configured ChatGPT/MCP persona bundle. This is preconfigured data, not evidence that the
 live APIs succeeded during the meeting; say so when using it.
 
 Never reuse a private draft ID as the fallback. The value is exposed publicly in
@@ -187,7 +220,7 @@ rendered publicly.
 The deployed preflight is still required for Clerk authorization, OpenAI
 Responses and Moderation, the image worker and object storage, Realtime WebRTC,
 database migrations and seeded fixtures, publication, storefront reload, chat,
-and ChatGPT/MCP discovery. Record those results separately; a mocked test is not
+and ChatGPT/MCP persona discovery. Record those results separately; a mocked test is not
 evidence that a provider or deployed worker succeeded.
 
 ## Evidence and observability
@@ -211,7 +244,7 @@ Capture these items in meeting notes:
 - preflight time and presenter account (email only);
 - live product and fallback product IDs;
 - capability readiness;
-- storefront, chat, and ChatGPT discovery result;
+- storefront, chat, trace tray, and ChatGPT/MCP persona discovery result;
 - any recovery path used.
 
 Do not claim publication or ChatGPT discovery as CI coverage. The frontend suite

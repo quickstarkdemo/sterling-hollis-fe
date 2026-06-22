@@ -17,7 +17,7 @@ export default function CatalogStudioPage() {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const loadedReferenceVersion = useRef(0);
-  const authoringSchemaVersion = Number(session?.capabilities?.catalog?.authoring_schema_version || 1);
+  const authoringSchemaVersion = Number(session?.capabilities?.catalog?.authoring_schema_version || 3);
 
   const loadReferences = useCallback(async () => {
     if (authoringSchemaVersion < 2) return;

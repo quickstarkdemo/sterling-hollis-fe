@@ -16,7 +16,7 @@ vi.mock("../utils/apiClient", () => ({
   sendChat: vi.fn(),
 }));
 
-function renderChat() {
+function renderChat(props = {}) {
   return renderWithProviders(
     <ChatContext.Provider
       value={{
@@ -28,7 +28,7 @@ function renderChat() {
         setChatContext: () => {},
       }}
     >
-      <ChatWidget />
+      <ChatWidget {...props} />
     </ChatContext.Provider>,
     { route: "/product/cat_pillow" },
   );
@@ -85,5 +85,28 @@ describe("ChatWidget trace integration", () => {
         conversation_id: "conv_2",
       }),
     });
+  });
+
+  it("renders capability diagnostics only when diagnostics are enabled", async () => {
+    sendChat.mockResolvedValue({
+      conversation_id: "conv_3",
+      message: "The pillow is in stock.",
+      cards: [],
+      actions: [],
+      tool_trace: [{
+        capability_id: "public.catalog.product_detail",
+        surface: "public_shopper",
+        decision: "succeeded",
+        name: "read_product",
+      }],
+    });
+
+    renderChat({ showDiagnostics: true });
+    await userEvent.click(screen.getByRole("button", { name: "Chat" }));
+    await userEvent.type(screen.getByPlaceholderText("Ask a shopping question"), "Is this available?");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(await screen.findByText("The pillow is in stock.")).toBeInTheDocument();
+    expect(screen.getByText("Product detail - public_shopper - succeeded")).toBeInTheDocument();
   });
 });

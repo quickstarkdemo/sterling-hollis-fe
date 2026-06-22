@@ -16,8 +16,9 @@ vi.mock("axios", () => ({
 }));
 
 import {
+  API_HELPER_CONTRACTS,
   archiveAdminCatalogProduct,
-  archiveAdminCatalogProductV2,
+  archiveAdminCatalogProductCurrentV2,
   assistCatalogProductReview,
   approveCatalogImageJob,
   createAdminCatalogBrand,
@@ -31,12 +32,11 @@ import {
   getAdminApiTraces,
   getAdminCatalogProduct,
   getAdminCatalogProductReviews,
-  getAdminCatalogProductV2,
+  getAdminCatalogProductCompatibilityV2,
   getAdminCatalogProductV3,
   getAdminCatalogProductPreviewV3,
   getAdminCatalogProductReadinessV3,
-  getAdminCatalogProducts,
-  getAdminCatalogProductsV2,
+  getAdminCatalogProductsCompatibility,
   getAdminCatalogReferences,
   getCatalogImageJob,
   getCatalogSourceBundles,
@@ -47,28 +47,29 @@ import {
   getDemoObservabilityState,
   getProduct,
   publishAdminCatalogProduct,
-  publishAdminCatalogProductV2,
+  publishAdminCatalogProductCompatibilityV2,
   publishAdminCatalogProductV3,
   postApiTraceEvent,
   promoteCatalogSourceAsset,
   resetDemoObservabilityState,
   saveAdminCatalogProductDraft,
-  saveAdminCatalogProductDraftV2,
+  saveAdminCatalogProductDraftCompatibilityV2,
   saveAdminCatalogProductDraftV3,
   setAuthTokenGetter,
   startCatalogWorkflow,
   startAdminCatalogProductRevision,
-  startAdminCatalogProductRevisionV2,
+  startAdminCatalogProductRevisionCompatibilityV2,
   startAdminCatalogProductRevisionV3,
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
   submitCatalogMediaCommand,
-  submitCatalogRealtimeToolCall,
+  submitCatalogRealtimeCompatibilityToolCall,
   submitCatalogRealtimeV3ToolCall,
   subscribeAdminApiTraceEvents,
   updateDemoObservabilityState,
   uploadCatalogSourceBundle,
 } from "./apiClient";
+import backendCapabilityManifest from "../contracts/backendCapabilityManifest.json";
 
 beforeEach(() => {
   client.get.mockReset().mockResolvedValue({ data: {} });
@@ -208,52 +209,73 @@ it("keeps explicit canonical empty fields authoritative over legacy projections"
   });
 });
 
-it("uses the protected versioned catalog lifecycle contract", async () => {
-  await getAdminCatalogProducts({ lifecycle_status: "draft", page: 2 });
+it("uses the current catalog lifecycle contract with an explicit list compatibility dependency", async () => {
+  await getAdminCatalogProductsCompatibility({ lifecycle_status: "draft", page: 2 });
   await getAdminCatalogProduct("cat/one");
   await startAdminCatalogProductRevision("cat/one", { expected_version: 3 }, "revision-key");
   await saveAdminCatalogProductDraft("cat/one", { expected_version: 3 }, "save-key");
   await publishAdminCatalogProduct("cat/one", { draft_id: "draft_1", expected_version: 3 }, "publish-key");
   await archiveAdminCatalogProduct("cat/one", { expected_version: 4 }, "archive-key");
 
-  expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/catalog/products", {
+  expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/catalog/v2/products", {
     params: { lifecycle_status: "draft", page: 2 },
   });
-  expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/catalog/products/cat%2Fone", { params: {} });
+  expect(client.get).toHaveBeenNthCalledWith(2, "/api/admin/catalog/v3/products/cat%2Fone", { params: {} });
   expect(client.post).toHaveBeenNthCalledWith(
     1,
-    "/api/admin/catalog/products/cat%2Fone/revisions",
+    "/api/admin/catalog/v3/products/cat%2Fone/revisions",
     { expected_version: 3 },
     { headers: { "Idempotency-Key": "revision-key" } },
   );
   expect(client.put).toHaveBeenCalledWith(
-    "/api/admin/catalog/products/cat%2Fone/draft",
+    "/api/admin/catalog/v3/products/cat%2Fone/draft",
     { expected_version: 3 },
     { headers: { "Idempotency-Key": "save-key" } },
   );
   expect(client.post).toHaveBeenNthCalledWith(
     2,
-    "/api/admin/catalog/products/cat%2Fone/publish",
+    "/api/admin/catalog/v3/products/cat%2Fone/publish",
     { draft_id: "draft_1", expected_version: 3 },
     { headers: { "Idempotency-Key": "publish-key" } },
   );
   expect(client.post).toHaveBeenNthCalledWith(
     3,
-    "/api/admin/catalog/products/cat%2Fone/archive",
+    "/api/admin/catalog/v2/products/cat%2Fone/archive",
     { expected_version: 4 },
     { headers: { "Idempotency-Key": "archive-key" } },
   );
 });
 
-it("uses the canonical v2 catalog authoring contract", async () => {
+it("keeps frontend API helpers aligned with backend capability contract status", () => {
+  const manifestByRoute = new Map(
+    backendCapabilityManifest.operations.map((operation) => [
+      `${operation.method} ${operation.pathTemplate}`,
+      operation,
+    ]),
+  );
+
+  API_HELPER_CONTRACTS.forEach((helper) => {
+    const route = manifestByRoute.get(`${helper.method} ${helper.pathTemplate}`);
+    expect(route, `${helper.helperName} is missing from the backend capability manifest`).toBeTruthy();
+    const compatibilityRoute = route.contractStatus === "compatibility" || route.currentFrontendContract === false;
+    if (!compatibilityRoute) return;
+    expect(
+      helper.compatibilityShim,
+      `${helper.helperName} points at ${helper.method} ${helper.pathTemplate}, which backend marks ${route.contractStatus}`,
+    ).toBe(true);
+    expect(`${helper.helperName} ${helper.reason || ""}`).toMatch(/compatibility|exception/i);
+  });
+});
+
+it("keeps v2 compatibility product authoring helpers and current v2 exceptions explicit", async () => {
   await getAdminCatalogReferences();
   await createAdminCatalogBrand({ name: "August & Mercer" }, "brand-key");
-  await getAdminCatalogProductsV2({ lifecycle_status: "published" });
-  await getAdminCatalogProductV2("cat/one");
-  await startAdminCatalogProductRevisionV2("cat/one", { expected_version: 3 }, "revision-v2-key");
-  await saveAdminCatalogProductDraftV2("cat/one", { expected_version: 3 }, "save-v2-key");
-  await publishAdminCatalogProductV2("cat/one", { draft_id: "draft_1", expected_version: 3 }, "publish-v2-key");
-  await archiveAdminCatalogProductV2("cat/one", { expected_version: 4 }, "archive-v2-key");
+  await getAdminCatalogProductsCompatibility({ lifecycle_status: "published" });
+  await getAdminCatalogProductCompatibilityV2("cat/one");
+  await startAdminCatalogProductRevisionCompatibilityV2("cat/one", { expected_version: 3 }, "revision-v2-key");
+  await saveAdminCatalogProductDraftCompatibilityV2("cat/one", { expected_version: 3 }, "save-v2-key");
+  await publishAdminCatalogProductCompatibilityV2("cat/one", { draft_id: "draft_1", expected_version: 3 }, "publish-v2-key");
+  await archiveAdminCatalogProductCurrentV2("cat/one", { expected_version: 4 }, "archive-v2-key");
 
   expect(client.get).toHaveBeenNthCalledWith(1, "/api/admin/catalog/v2/references", { params: {} });
   expect(client.post).toHaveBeenNthCalledWith(1, "/api/admin/catalog/v2/brands", { name: "August & Mercer" }, { headers: { "Idempotency-Key": "brand-key" } });
@@ -372,7 +394,7 @@ it("uses production Catalog Workflow routes for guided creation and images", asy
 it("uses workflow-bound Realtime routes without exposing provider credentials", async () => {
   const context = { mode: "workbench", product_id: "cat_1", draft_id: "draft_1", expected_draft_version: 1, query_scopes: ["product"] };
   await createCatalogRealtimeSession("workflow/one", context);
-  await submitCatalogRealtimeToolCall("workflow/one", {
+  await submitCatalogRealtimeCompatibilityToolCall("workflow/one", {
     call_id: "call_1",
     name: "refine_catalog_draft",
     arguments: {

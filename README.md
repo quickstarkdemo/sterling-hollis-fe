@@ -5,6 +5,24 @@ a static browser app served by Nginx in production; all catalog,
 recommendation, MCP, OpenAI, Pinecone, and Datadog backend behavior stays in the
 FastAPI service.
 
+## Backend contract source of truth
+
+Frontend API helpers are checked against the backend generated OpenAPI contract
+metadata from `quickstarkdemo/sterling-hollis-be`. The compact manifest lives in
+`src/contracts/backendCapabilityManifest.json` and is refreshed from backend
+`docs/openapi.json`.
+
+```bash
+npm run refresh:api-contract
+```
+
+The manifest preserves Sterling OpenAPI extensions such as
+`x-sterling-capability-id`, `x-sterling-api-surface`,
+`x-sterling-contract-status`, `x-sterling-migration-target`, and
+`x-sterling-admin-generation`. Frontend helpers that depend on compatibility
+routes must use an explicit compatibility helper name or the API contract test
+will fail.
+
 ## Local Development
 
 ```bash
@@ -44,6 +62,7 @@ production.
 npm run lint
 npm run build
 npm run preview
+npm run refresh:api-contract
 ```
 
 ## Deployment

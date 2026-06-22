@@ -18,7 +18,7 @@ const api = vi.hoisted(() => ({
   generateCatalogSuggestionSet: vi.fn(),
   getAdminCatalogProduct: vi.fn(),
   getAdminCatalogProductReviews: vi.fn(),
-  getAdminCatalogProducts: vi.fn(),
+  getAdminCatalogProductsCompatibility: vi.fn(),
   getAdminCatalogReferences: vi.fn(),
   getCatalogImageJob: vi.fn(),
   getCatalogStudioSession: vi.fn(),
@@ -170,7 +170,7 @@ describe("Catalog Studio contract journey", () => {
       moderation: { ...customerReview.moderation, version: 2, state: "approved" },
     });
     api.generateCatalogSuggestionSet.mockReset();
-    api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getAdminCatalogProductsCompatibility.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
     api.getAdminCatalogReferences.mockReset().mockResolvedValue({ stores: [{ id: "1001", name: "Dallas" }], brands: [], categories: [], availability: [] });
     session.capabilities.catalog.authoring_schema_version = 1;
     telemetry.trackCatalogStudioMilestone.mockReset();
