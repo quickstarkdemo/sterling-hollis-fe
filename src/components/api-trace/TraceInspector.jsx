@@ -9,7 +9,7 @@ function selectionLabel(selection) {
 }
 
 export default function TraceInspector({ trace, selection }) {
-  if (!trace) return <Text className="api-trace-empty">Select a trace to inspect its sanitized projection.</Text>;
+  if (!trace) return <Text className="api-trace-empty">Select a trace to inspect its projection.</Text>;
   const value = traceSelectionValue(trace, selection) || trace;
   const status = value.status || trace.status || "unknown";
   const attributes = value.attributes || {};
@@ -32,7 +32,7 @@ export default function TraceInspector({ trace, selection }) {
       {Object.keys(trace.truncation || {}).length ? (
         <Box className="api-trace-notice partial">The server truncated fields in this projection.</Box>
       ) : null}
-      <SanitizedJsonViewer label="Sanitized attributes" value={attributes} maxChars={9000} />
+      <SanitizedJsonViewer label="Full attributes" value={attributes} maxChars={Infinity} raw />
     </Box>
   );
 }

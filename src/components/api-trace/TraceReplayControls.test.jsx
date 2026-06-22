@@ -28,11 +28,11 @@ const trace = {
 };
 
 describe("replay projection", () => {
-  it("reveals one immutable sanitized snapshot by recorded offsets", () => {
+  it("reveals one immutable full snapshot by recorded offsets", () => {
     const snapshot = createReplaySnapshot(trace);
     trace.attributes.nested.authorization = "changed after snapshot";
     expect(Object.isFrozen(snapshot.projection.spans[0])).toBe(true);
-    expect(snapshot.projection.attributes.nested.authorization).toBe("[REDACTED]");
+    expect(snapshot.projection.attributes.nested.authorization).toBe("Bearer secret");
 
     const initial = buildReplayProjection(snapshot, 0);
     expect(initial.spans.map((span) => span.span_id)).toEqual(["root"]);

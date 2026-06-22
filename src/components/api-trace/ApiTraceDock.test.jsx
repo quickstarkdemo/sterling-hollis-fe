@@ -134,7 +134,7 @@ describe("ApiTraceDock", () => {
     fetchSpy.mockRestore();
   });
 
-  it("copies a defense-in-depth sanitized projection", async () => {
+  it("copies the full trace projection for developer analysis", async () => {
     sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -143,8 +143,8 @@ describe("ApiTraceDock", () => {
     await userEvent.click(screen.getAllByRole("button", { name: /^Copy$/ })[0]);
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     const copied = writeText.mock.calls[0][0];
-    expect(copied).toContain("[REDACTED]");
-    expect(copied).not.toContain("Bearer secret");
+    expect(copied).toContain("Bearer secret");
+    expect(copied).toContain("Generate product draft");
   });
 
   it("supports deleting the current trace and batch selecting recent traces", async () => {

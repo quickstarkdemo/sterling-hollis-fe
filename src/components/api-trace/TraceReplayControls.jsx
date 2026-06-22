@@ -12,7 +12,7 @@ export default function TraceReplayControls({ replay, disabled = false }) {
         <HStack justify="space-between" gap={3}>
           <Box>
             <Text className="filter-label">Deterministic replay</Text>
-            <Text className="trace-replay-copy">Replay this sanitized snapshot without issuing API calls.</Text>
+            <Text className="trace-replay-copy">Replay this recorded snapshot without issuing API calls.</Text>
           </Box>
           <Button type="button" size="xs" className="secondary-button" onClick={replay.start} disabled={disabled}>
             <FiPlay /> Replay trace

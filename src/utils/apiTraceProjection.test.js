@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildWaterfallRows,
+  fullTraceValue,
   mergeTraceEvents,
   sanitizedTraceJson,
+  traceJson,
 } from "./apiTraceProjection";
 
 describe("apiTraceProjection", () => {
@@ -17,6 +19,23 @@ describe("apiTraceProjection", () => {
     expect(projection.text).toContain("[REDACTED]");
     expect(projection.text).not.toContain("secret-value");
     expect(projection.text).not.toContain("private prompt");
+  });
+
+  it("can render full trace values without redaction, object caps, or JSON truncation", () => {
+    const cyclic = { safe: "visible" };
+    cyclic.self = cyclic;
+    const value = {
+      access_token: "secret-value",
+      nested: Array.from({ length: 105 }, (_, index) => ({ index })),
+      cyclic,
+    };
+
+    const projection = traceJson(value, { sanitize: false, maxChars: Infinity });
+    expect(projection.truncated).toBe(false);
+    expect(projection.text).toContain("secret-value");
+    expect(projection.text).toContain('"index": 104');
+    expect(projection.text).toContain("[CIRCULAR]");
+    expect(fullTraceValue(value).access_token).toBe("secret-value");
   });
 
   it("clamps negative, zero, and unknown waterfall durations", () => {

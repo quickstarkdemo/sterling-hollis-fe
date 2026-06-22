@@ -3,13 +3,6 @@ const SPAN_ID_PATTERN = /^[0-9a-f]{16}$/;
 const ZERO_TRACE_ID = "0".repeat(32);
 const ZERO_SPAN_ID = "0".repeat(16);
 const MAX_PENDING_EVENTS = 100;
-const MAX_ATTRIBUTE_STRING = 200;
-const SECRET_PATTERNS = [
-  /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
-  /\bsk-[A-Za-z0-9_-]{8,}/g,
-  /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
-  /(?<!\d)\+[1-9]\d{7,14}(?!\d)/g,
-];
 
 const CLIENT_EVENT_TYPES = new Set([
   "ui.started",
@@ -21,26 +14,6 @@ const CLIENT_EVENT_TYPES = new Set([
   "realtime.connected",
   "realtime.disconnected",
   "realtime.error",
-]);
-
-const ATTRIBUTE_KEYS = new Set([
-  "cancelled",
-  "connection_state",
-  "action",
-  "conversation_id",
-  "draft_id",
-  "endpoint",
-  "error_code",
-  "http_method",
-  "job_id",
-  "operation",
-  "product_id",
-  "request_kind",
-  "status_code",
-  "surface",
-  "timeout_ms",
-  "transport",
-  "workflow_id",
 ]);
 
 const subscribers = new Set();
@@ -83,12 +56,8 @@ export function formatTraceparent(traceId, spanId, flags = "01") {
   return `00-${traceId}-${spanId}-${flags}`;
 }
 
-function safeText(value, maxLength = MAX_ATTRIBUTE_STRING) {
-  let text = String(value ?? "").replace(/[\r\n]/g, " ");
-  SECRET_PATTERNS.forEach((pattern) => {
-    text = text.replace(pattern, "[REDACTED]");
-  });
-  return text.slice(0, maxLength);
+function safeText(value) {
+  return String(value ?? "").replace(/[\r\n]/g, " ");
 }
 
 function safeSurface(value) {
@@ -98,16 +67,35 @@ function safeSurface(value) {
     : "developer";
 }
 
+function traceValue(value, seen = new WeakSet()) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "undefined") return null;
+  if (typeof value === "function" || typeof value === "symbol") return String(value);
+  if (typeof Headers !== "undefined" && value instanceof Headers) return Object.fromEntries(value.entries());
+  if (typeof URLSearchParams !== "undefined" && value instanceof URLSearchParams) return Object.fromEntries(value.entries());
+  if (typeof FormData !== "undefined" && value instanceof FormData) {
+    return Object.fromEntries([...value.entries()].map(([key, item]) => [key, traceValue(item, seen)]));
+  }
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return {
+      name: value.name || null,
+      size: value.size,
+      type: value.type,
+    };
+  }
+  if (value instanceof ArrayBuffer) return { byte_length: value.byteLength, type: "ArrayBuffer" };
+  if (ArrayBuffer.isView(value)) return { byte_length: value.byteLength, type: value.constructor?.name || "TypedArray" };
+  if (typeof value !== "object") return String(value);
+  if (seen.has(value)) return "[CIRCULAR]";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((item) => traceValue(item, seen));
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, traceValue(item, seen)]));
+}
+
 function sanitizeAttributes(attributes = {}) {
-  return Object.fromEntries(
-    Object.entries(attributes).flatMap(([key, value]) => {
-      if (!ATTRIBUTE_KEYS.has(key)) return [];
-      if (typeof value === "string") return [[key, safeText(value)]];
-      if (typeof value === "boolean") return [[key, value]];
-      if (typeof value === "number" && Number.isFinite(value)) return [[key, value]];
-      return [];
-    }),
-  );
+  return traceValue(attributes) || {};
 }
 
 function endpointFor(input) {
@@ -115,10 +103,9 @@ function endpointFor(input) {
   try {
     const base = globalThis.location?.origin || "http://localhost";
     const url = new URL(value, base);
-    const endpoint = url.origin === base ? url.pathname : `${url.origin}${url.pathname}`;
-    return safeText(endpoint, 160);
+    return url.origin === base ? `${url.pathname}${url.search}` : url.href;
   } catch {
-    return safeText(value, 160).split("?")[0];
+    return safeText(value);
   }
 }
 
@@ -175,9 +162,9 @@ function publish(action, eventType, details = {}) {
     parent_span_id: details.parentSpanId || null,
     local_sequence: action.sequence,
     event_id: `evt_${randomHex(16)}`,
-    name: safeText(details.name || eventType, 128),
+    name: safeText(details.name || eventType),
     event_type: eventType,
-    status: safeText(details.status || "", 32) || null,
+    status: safeText(details.status || "") || null,
     occurred_at: new Date().toISOString(),
     attributes: sanitizeAttributes(details.attributes),
   };
@@ -191,8 +178,8 @@ function publish(action, eventType, details = {}) {
 }
 
 function acceptAction(action, responseHeaders) {
-  const capture = safeText(headerValue(responseHeaders, "x-trace-capture"), 32).toLowerCase();
-  const returnedTraceId = safeText(headerValue(responseHeaders, "x-trace-id"), 64).toLowerCase();
+  const capture = safeText(headerValue(responseHeaders, "x-trace-capture")).toLowerCase();
+  const returnedTraceId = safeText(headerValue(responseHeaders, "x-trace-id")).toLowerCase();
   if (capture !== "active" || (returnedTraceId && returnedTraceId !== action.traceId)) return;
   action.accepted = true;
   const pending = action.pendingEvents.splice(0);
@@ -257,7 +244,7 @@ export function startApiTraceAction(name, options = {}) {
     accepted: false,
     ended: false,
     ending: false,
-    name: safeText(name || "Browser action", 128),
+    name: safeText(name || "Browser action"),
     surface: safeSurface(options.surface || runtime.surface),
     traceId,
     rootSpanId,
@@ -348,7 +335,7 @@ export async function runWithApiTrace(name, callback, options = {}) {
     const cancelled = error?.code === "ERR_CANCELED" || error?.name === "AbortError";
     action.end(cancelled ? "cancelled" : "failed", {
       cancelled,
-      error_code: safeText(error?.code || error?.name || "error", 64),
+      error_code: safeText(error?.code || error?.name || "error"),
     });
     throw error;
   }
@@ -362,12 +349,20 @@ function beginAxiosTrace(config, requestKind) {
   if (config.apiTrace === false || headerValue(config.headers, "traceparent")) return config;
   const action = actionForConfig(config);
   if (!action?.enabled || action.ended) return config;
-  const method = safeText(config.method || "get", 16).toUpperCase();
+  const method = safeText(config.method || "get").toUpperCase();
   const endpoint = endpointFor(config.url || "");
   const span = action.startSpan({
     name: `${method} ${endpoint}`,
     operation: "http.client",
-    attributes: { endpoint, http_method: method, request_kind: requestKind },
+    attributes: {
+      endpoint,
+      http_method: method,
+      request_body: config.data ?? null,
+      request_headers: config.headers || {},
+      request_kind: requestKind,
+      request_params: config.params || null,
+      request_url: endpoint,
+    },
   });
   setHeader(config, "traceparent", formatTraceparent(action.traceId, span.spanId));
   setHeader(config, "X-Trace-Surface", action.surface);
@@ -389,9 +384,11 @@ function completeAxiosTrace(value, failed = false) {
     attributes: {
       cancelled,
       endpoint: metadata.endpoint,
-      error_code: failed ? safeText(timeout ? "timeout" : value?.code || "request_failed", 64) : "",
+      error_code: failed ? safeText(timeout ? "timeout" : value?.code || "request_failed") : "",
       http_method: metadata.method,
       request_kind: metadata.requestKind,
+      response_body: response?.data ?? null,
+      response_headers: response?.headers || {},
       status_code: Number.isFinite(statusCode) ? statusCode : 0,
       timeout_ms: timeout ? Number(config?.timeout || 0) : 0,
     },
@@ -418,13 +415,22 @@ function fetchHeaders(init) {
   return new Headers(init.headers || {});
 }
 
+async function responseBodyForTrace(response) {
+  try {
+    if (!response?.clone || !response?.body) return null;
+    return await response.clone().text();
+  } catch {
+    return "[UNAVAILABLE_RESPONSE_BODY]";
+  }
+}
+
 export async function traceApiFetch(input, init = {}, options = {}) {
   const action = options.action?.enabled ? options.action : activeAction;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (!action?.enabled || action.ended || typeof fetchImpl !== "function") {
     return fetchImpl(input, init);
   }
-  const method = safeText(init.method || "GET", 16).toUpperCase();
+  const method = safeText(init.method || "GET").toUpperCase();
   const endpoint = endpointFor(input);
   const span = action.startSpan({
     name: `${method} ${endpoint}`,
@@ -432,7 +438,10 @@ export async function traceApiFetch(input, init = {}, options = {}) {
     attributes: {
       endpoint,
       http_method: method,
+      request_body: init.body ?? null,
+      request_headers: init.headers || {},
       request_kind: options.requestKind || "fetch",
+      request_url: endpoint,
       transport: options.transport || "fetch",
     },
   });
@@ -454,8 +463,13 @@ export async function traceApiFetch(input, init = {}, options = {}) {
   try {
     const response = await fetchImpl(input, nextInit);
     action.accept(response?.headers);
+    const responseBody = await responseBodyForTrace(response);
     span.end(response?.ok === false ? "failed" : "completed", {
-      attributes: { status_code: Number(response?.status || 0) },
+      attributes: {
+        response_body: responseBody,
+        response_headers: response?.headers || {},
+        status_code: Number(response?.status || 0),
+      },
     });
     return response;
   } catch (error) {
@@ -463,7 +477,7 @@ export async function traceApiFetch(input, init = {}, options = {}) {
     span.end(cancelled ? "cancelled" : "failed", {
       attributes: {
         cancelled,
-        error_code: safeText(error?.name || "fetch_failed", 64),
+        error_code: safeText(error?.name || "fetch_failed"),
       },
     });
     throw error;
