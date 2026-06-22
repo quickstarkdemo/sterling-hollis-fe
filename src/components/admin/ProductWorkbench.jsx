@@ -97,6 +97,7 @@ export default function ProductWorkbench({
   const [voiceResetKey, setVoiceResetKey] = useState(0);
   const [activeWorkbenchTab, setActiveWorkbenchTab] = useState(activeProductId ? "product" : "chat");
   const [activeDetail, setActiveDetail] = useState(null);
+  const [productDetailStatus, setProductDetailStatus] = useState(activeProductId ? "loading" : "idle");
   const [suggestionRefreshKey, setSuggestionRefreshKey] = useState(0);
   const commandInFlight = useRef(false);
   const workflowStartPromise = useRef(null);
@@ -106,6 +107,7 @@ export default function ProductWorkbench({
   const lastImagePayload = useRef(null);
   const workflowRequestId = useRef(0);
   const imageRequestId = useRef(0);
+  const productDetailRequestId = useRef(0);
   const approvedImageJobId = useRef(initial.approvedImageJobId || "");
   const ignoredImageJobId = useRef(initial.ignoredImageJobId || "");
 
@@ -174,10 +176,33 @@ export default function ProductWorkbench({
 
   useEffect(() => {
     setActiveDetail(null);
+    setProductDetailStatus(activeProductId ? "loading" : "idle");
     setEditorDirty(false);
     setVoiceResetKey((current) => current + 1);
     setActiveWorkbenchTab(activeProductId ? "product" : "chat");
   }, [activeProductId]);
+
+  useEffect(() => {
+    if (!activeProductId) return undefined;
+    const currentRequestId = productDetailRequestId.current + 1;
+    productDetailRequestId.current = currentRequestId;
+    setProductDetailStatus("loading");
+
+    Promise.resolve(getAdminCatalogProduct(activeProductId))
+      .then((nextDetail) => {
+        if (productDetailRequestId.current !== currentRequestId) return;
+        setActiveDetail(nextDetail || null);
+        setProductDetailStatus("ready");
+      })
+      .catch(() => {
+        if (productDetailRequestId.current !== currentRequestId) return;
+        setProductDetailStatus("error");
+      });
+
+    return () => {
+      productDetailRequestId.current += 1;
+    };
+  }, [activeProductId, editorRefreshKey]);
 
   const ensureWorkflow = async (options = {}) => {
     if (workflowId) return workflowId;
@@ -654,7 +679,11 @@ export default function ProductWorkbench({
     ? "Ask for reviewable product changes across copy, SEO, images, inventory, or publish readiness..."
     : draft ? "Refine the current draft..." : "Create a tailored rose silk occasion dress for the Dallas assortment...";
   const chatStatusText = activeProductId
-    ? chatDraftVersion ? `Draft version ${chatDraftVersion}` : "Load product details first"
+    ? chatDraftVersion
+      ? `Draft version ${chatDraftVersion}`
+      : productDetailStatus === "loading"
+        ? "Loading product details..."
+        : "Load product details first"
     : chatDraftVersion ? `Draft version ${chatDraftVersion}` : "No draft yet";
   const chatActionLabel = activeProductId || draft ? "Refine draft" : "Create draft";
 

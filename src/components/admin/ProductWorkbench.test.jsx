@@ -279,6 +279,30 @@ describe("ProductWorkbench", () => {
     }, "draft-command-key");
   });
 
+  it("hydrates selected-product details so product chat is usable without opening details first", async () => {
+    api.getAdminCatalogProduct.mockResolvedValueOnce({
+      product_id: "cat_coat",
+      title: "Studio Coat",
+      current_draft: {
+        revision: { id: "draft_1" },
+        draft_version: 2,
+      },
+    });
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
+    expect(await screen.findByText("Draft version 2")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Tighten the product copy for launch.");
+    await userEvent.click(screen.getByRole("button", { name: "Refine draft" }));
+
+    await waitFor(() => expect(api.submitCatalogDraftCommand).toHaveBeenCalledWith("workflow_1", {
+      instruction: "Tighten the product copy for launch.",
+      current_draft_id: "draft_1",
+      expected_draft_version: 2,
+    }, "draft-command-key"));
+  });
+
   it("uses one product chat for product-wide voice context", async () => {
     renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
     await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
