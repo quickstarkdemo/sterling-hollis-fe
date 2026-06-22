@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { DEFAULT_STORE_ID } from "../utils/apiClient";
 import { ChatContext } from "./ChatContext";
 
 export default function ChatContextProvider({ children }) {
@@ -15,7 +14,6 @@ export default function ChatContextProvider({ children }) {
   const chatContext = useMemo(
     () => ({
       page_type: "home",
-      store_id: DEFAULT_STORE_ID || undefined,
       ...pageContext,
       route: pageContext.route || location.pathname,
     }),

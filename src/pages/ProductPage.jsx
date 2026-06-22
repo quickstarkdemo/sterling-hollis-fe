@@ -17,7 +17,7 @@ import ProductCard from "../components/ProductCard";
 import ProductImage from "../components/ProductImage";
 import ProductGrid from "../components/ProductGrid";
 import { ErrorState, LoadingState } from "../components/StatusState";
-import { DEFAULT_STORE_ID, getProduct, getProductRecommendations, getRelatedProducts } from "../utils/apiClient";
+import { getProduct, getProductRecommendations, getRelatedProducts } from "../utils/apiClient";
 import { detailImages, inventoryByStore, money, titleize } from "../utils/format";
 import { trackAction } from "../utils/datadog";
 
@@ -36,7 +36,6 @@ export default function ProductPage() {
       page_type: "product",
       product_id: product?.id || productId,
       category: product?.category,
-      store_id: DEFAULT_STORE_ID || undefined,
     };
 
     if (!product) return baseContext;

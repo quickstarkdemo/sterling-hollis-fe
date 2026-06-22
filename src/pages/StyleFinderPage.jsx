@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AiPanel from "../components/AiPanel";
 import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
-import { DEFAULT_STORE_ID, getImageRecommendations } from "../utils/apiClient";
+import { getImageRecommendations } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -43,7 +43,6 @@ export default function StyleFinderPage() {
   const chatContext = useMemo(
     () => ({
       page_type: "style_finder",
-      store_id: DEFAULT_STORE_ID || undefined,
     }),
     [],
   );

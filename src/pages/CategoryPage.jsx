@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePageChatContext } from "../components/ChatContext";
 import ProductGrid from "../components/ProductGrid";
 import { ErrorState, LoadingState } from "../components/StatusState";
-import { DEFAULT_STORE_ID, getCategories, getProducts } from "../utils/apiClient";
+import { getCategories, getProducts } from "../utils/apiClient";
 import { titleize } from "../utils/format";
 
 const PAGE_SIZE = 24;
@@ -44,7 +44,6 @@ export default function CategoryPage() {
     () => ({
       page_type: "category",
       category,
-      store_id: DEFAULT_STORE_ID || undefined,
     }),
     [category],
   );
