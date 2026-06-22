@@ -669,6 +669,20 @@ a {
   inset: auto 0 0;
   z-index: 60;
   color: var(--ink);
+  --trace-bg: #0b1015;
+  --trace-panel: #111923;
+  --trace-panel-raised: #16212c;
+  --trace-panel-soft: rgba(255, 250, 240, 0.08);
+  --trace-border: rgba(255, 250, 240, 0.14);
+  --trace-border-strong: rgba(255, 183, 43, 0.34);
+  --trace-text: #f6eddc;
+  --trace-muted: rgba(246, 237, 220, 0.68);
+  --trace-faint: rgba(246, 237, 220, 0.44);
+  --trace-accent: var(--saffron);
+  --trace-success: #9fbe83;
+  --trace-danger: #f1a79d;
+  --trace-warning: #e1b84e;
+  --trace-link: #8fb6d8;
 }
 
 body:has(.api-trace-dock.expanded) .chat-widget {
@@ -1006,28 +1020,72 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   box-shadow: 0 -20px 72px rgba(0, 0, 0, 0.42);
 }
 
+.api-trace-dock.collapsed .api-trace-strip {
+  border-color: var(--trace-border) !important;
+  background: var(--trace-panel) !important;
+  color: var(--trace-text) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+}
+
+.api-trace-dock.collapsed .api-trace-strip:hover,
+.api-trace-dock.collapsed .api-trace-strip:focus-visible {
+  border-color: var(--trace-border-strong) !important;
+  background: var(--trace-panel-raised) !important;
+}
+
+.api-trace-dock.collapsed .api-trace-count {
+  border-color: rgba(159, 190, 131, 0.34) !important;
+  background: rgba(159, 190, 131, 0.16) !important;
+  color: #d9efc4 !important;
+}
+
+.api-trace-dock.collapsed .api-trace-strip-name {
+  color: var(--trace-muted);
+}
+
 .api-trace-dock.expanded .api-trace-toolbar,
 .api-trace-dock.expanded .api-trace-section-heading,
 .api-trace-dock.expanded .api-trace-view-tabs,
 .api-trace-dock.expanded .trace-replay-bar {
-  border-color: rgba(255, 250, 240, 0.12);
-  background: #121a22;
+  border-color: var(--trace-border);
+  background: var(--trace-panel);
 }
 
 .api-trace-dock.expanded .api-trace-recents,
 .api-trace-dock.expanded .api-trace-workspace {
-  border-right-color: rgba(255, 250, 240, 0.12);
+  border-right-color: var(--trace-border);
+}
+
+.api-trace-dock.expanded .api-trace-recents,
+.api-trace-dock.expanded .api-trace-workspace,
+.api-trace-dock.expanded .api-trace-inspector-pane,
+.api-trace-dock.expanded .api-trace-view {
+  background: var(--trace-bg);
 }
 
 .api-trace-dock.expanded .api-trace-mark {
   border-color: rgba(255, 183, 43, 0.36);
   background: #05070a;
-  color: var(--saffron);
+  color: var(--trace-accent);
+}
+
+.api-trace-dock.expanded .api-trace-resize-handle::after {
+  background: rgba(246, 237, 220, 0.36);
+}
+
+.api-trace-dock.expanded .api-trace-title,
+.api-trace-dock.expanded .panel-title,
+.api-trace-dock.expanded .trace-waterfall-label strong,
+.api-trace-dock.expanded .trace-event-copy strong,
+.api-trace-dock.expanded .trace-artifact-card strong,
+.api-trace-dock.expanded .trace-inspector-metadata,
+.api-trace-dock.expanded .trace-mono {
+  color: var(--trace-text);
 }
 
 .api-trace-dock.expanded .section-kicker,
 .api-trace-dock.expanded .filter-label {
-  color: #d3a331;
+  color: #d3a331 !important;
 }
 
 .api-trace-dock.expanded .api-trace-list-item,
@@ -1035,8 +1093,13 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-waterfall-row,
 .api-trace-dock.expanded .trace-artifact-card,
 .api-trace-dock.expanded .api-trace-view-tabs button,
-.api-trace-dock.expanded .trace-icon-button {
-  color: #f6eddc !important;
+.api-trace-dock.expanded .trace-icon-button,
+.api-trace-dock.expanded .trace-list-action,
+.api-trace-dock.expanded .trace-density,
+.api-trace-dock.expanded .trace-speed,
+.api-trace-dock.expanded .secondary-button,
+.api-trace-dock.expanded .text-button {
+  color: var(--trace-text) !important;
 }
 
 .api-trace-dock.expanded .api-trace-list-item small,
@@ -1046,8 +1109,12 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .api-trace-strip-name,
 .api-trace-dock.expanded .trace-replay-copy,
 .api-trace-dock.expanded .trace-replay-time,
-.api-trace-dock.expanded .trace-graph-summary {
-  color: rgba(246, 237, 220, 0.66);
+.api-trace-dock.expanded .trace-graph-summary,
+.api-trace-dock.expanded .trace-event-sequence,
+.api-trace-dock.expanded .trace-graph-kind,
+.api-trace-dock.expanded .trace-graph-attempt,
+.api-trace-dock.expanded .trace-graph-node-meta {
+  color: var(--trace-muted) !important;
 }
 
 .api-trace-dock.expanded .api-trace-list-item:hover,
@@ -1059,20 +1126,115 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-waterfall-row.selected,
 .api-trace-dock.expanded .trace-artifact-card:hover,
 .api-trace-dock.expanded .trace-artifact-card.selected {
-  border-color: rgba(255, 183, 43, 0.32);
-  background: rgba(255, 250, 240, 0.08);
+  border-color: var(--trace-border-strong);
+  background: var(--trace-panel-soft);
 }
 
 .api-trace-dock.expanded .api-trace-view-tabs button[aria-selected="true"] {
-  border-bottom-color: var(--saffron);
-  color: #fffaf0 !important;
+  border-bottom-color: var(--trace-accent);
+  color: var(--trace-text) !important;
 }
 
 .api-trace-dock.expanded .trace-icon-button:hover,
 .api-trace-dock.expanded .trace-icon-button:focus-visible,
 .api-trace-dock.expanded .trace-list-action:hover,
-.api-trace-dock.expanded .trace-list-action:focus-visible {
-  background: rgba(255, 250, 240, 0.1) !important;
+.api-trace-dock.expanded .trace-list-action:focus-visible,
+.api-trace-dock.expanded .trace-density:hover,
+.api-trace-dock.expanded .trace-density:focus-visible,
+.api-trace-dock.expanded .trace-speed:hover,
+.api-trace-dock.expanded .trace-speed:focus-visible,
+.api-trace-dock.expanded .secondary-button:hover,
+.api-trace-dock.expanded .secondary-button:focus-visible,
+.api-trace-dock.expanded .text-button:hover,
+.api-trace-dock.expanded .text-button:focus-visible {
+  border-color: var(--trace-border-strong) !important;
+  background: rgba(255, 250, 240, 0.11) !important;
+  color: var(--trace-text) !important;
+}
+
+.api-trace-dock.expanded .secondary-button,
+.api-trace-dock.expanded .trace-icon-button,
+.api-trace-dock.expanded .trace-list-action,
+.api-trace-dock.expanded .trace-density,
+.api-trace-dock.expanded .trace-speed,
+.api-trace-dock.expanded .text-button {
+  border-color: var(--trace-border) !important;
+  background: transparent !important;
+}
+
+.api-trace-dock.expanded .secondary-button,
+.api-trace-dock.expanded .trace-density.active,
+.api-trace-dock.expanded .trace-speed.active {
+  background: var(--trace-panel-raised) !important;
+}
+
+.api-trace-dock.expanded button:disabled,
+.api-trace-dock.expanded button[disabled] {
+  color: var(--trace-faint) !important;
+  opacity: 0.72;
+}
+
+.api-trace-dock.expanded .api-trace-state,
+.api-trace-dock.expanded .api-trace-connection,
+.api-trace-dock.expanded .api-trace-artifact-type {
+  border-color: var(--trace-border) !important;
+  background: rgba(246, 237, 220, 0.1) !important;
+  color: var(--trace-muted) !important;
+}
+
+.api-trace-dock.expanded .api-trace-state.live,
+.api-trace-dock.expanded .api-trace-state.running,
+.api-trace-dock.expanded .api-trace-connection.live {
+  border-color: rgba(159, 190, 131, 0.34) !important;
+  background: rgba(159, 190, 131, 0.16) !important;
+  color: #d9efc4 !important;
+}
+
+.api-trace-dock.expanded .api-trace-state.completed {
+  border-color: rgba(159, 190, 131, 0.34) !important;
+  background: rgba(159, 190, 131, 0.13) !important;
+  color: #cde5b6 !important;
+}
+
+.api-trace-dock.expanded .api-trace-state.failed,
+.api-trace-dock.expanded .api-trace-state.error,
+.api-trace-dock.expanded .api-trace-state.expired,
+.api-trace-dock.expanded .api-trace-connection.expired {
+  border-color: rgba(241, 167, 157, 0.38) !important;
+  background: rgba(241, 167, 157, 0.14) !important;
+  color: #ffd0ca !important;
+}
+
+.api-trace-dock.expanded .api-trace-state.partial,
+.api-trace-dock.expanded .api-trace-state.reconnecting,
+.api-trace-dock.expanded .api-trace-state.metadata-only,
+.api-trace-dock.expanded .api-trace-state.replay,
+.api-trace-dock.expanded .api-trace-state.replaying,
+.api-trace-dock.expanded .api-trace-state.paused,
+.api-trace-dock.expanded .api-trace-connection.partial,
+.api-trace-dock.expanded .api-trace-connection.reconnecting,
+.api-trace-dock.expanded .api-trace-connection.connecting {
+  border-color: rgba(225, 184, 78, 0.4) !important;
+  background: rgba(225, 184, 78, 0.15) !important;
+  color: #ffe2a0 !important;
+}
+
+.api-trace-dock.expanded .api-trace-list-item:focus-visible,
+.api-trace-dock.expanded .trace-event-row:focus-visible,
+.api-trace-dock.expanded .trace-waterfall-row:focus-visible,
+.api-trace-dock.expanded .trace-artifact-card:focus-visible,
+.api-trace-dock.expanded .api-trace-view-tabs button:focus,
+.api-trace-dock.expanded .api-trace-view-tabs button:focus-visible,
+.api-trace-dock.expanded .api-trace-resize-handle:focus-visible {
+  outline-color: var(--trace-accent);
+}
+
+.api-trace-dock.expanded .trace-delete-mark {
+  color: #ffe2a0;
+}
+
+.api-trace-dock.expanded .trace-list-action.danger {
+  color: #ffd0ca !important;
 }
 
 .trace-list-action {
@@ -1283,9 +1445,105 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   color: var(--ink) !important;
 }
 
+.api-trace-dock.expanded .trace-replay-bar.active {
+  border-left-color: var(--trace-accent);
+  background: var(--trace-panel);
+}
+
+.api-trace-dock.expanded .trace-replay-scrubber > input {
+  accent-color: var(--trace-accent);
+}
+
+.api-trace-dock.expanded .trace-graph-shell {
+  border-color: var(--trace-border);
+  background: var(--trace-bg);
+}
+
+.api-trace-dock.expanded .trace-graph-toolbar {
+  border-bottom-color: var(--trace-border);
+  background: var(--trace-panel);
+}
+
+.api-trace-dock.expanded .trace-graph-canvas,
+.api-trace-dock.expanded .trace-graph-canvas .react-flow {
+  background: #0a0f14;
+}
+
+.api-trace-dock.expanded .trace-graph-node {
+  border-color: rgba(255, 250, 240, 0.16);
+  background: #121b24;
+  color: var(--trace-text);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
+}
+
+.api-trace-dock.expanded .trace-graph-node.browser { border-left-color: var(--trace-text); }
+.api-trace-dock.expanded .trace-graph-node.http { border-left-color: var(--trace-link); }
+.api-trace-dock.expanded .trace-graph-node.openai { border-left-color: var(--trace-accent); }
+.api-trace-dock.expanded .trace-graph-node.realtime { border-left-color: #d59c68; }
+.api-trace-dock.expanded .trace-graph-node.worker { border-left-color: #ad9b89; }
+.api-trace-dock.expanded .trace-graph-node.data { border-left-color: var(--trace-success); }
+.api-trace-dock.expanded .trace-graph-node.failed { border-color: var(--trace-danger); }
+.api-trace-dock.expanded .trace-graph-node.selected {
+  outline-color: var(--trace-accent);
+  box-shadow: 0 0 0 5px rgba(192, 139, 18, 0.16), 0 12px 28px rgba(0, 0, 0, 0.26);
+}
+
+.api-trace-dock.expanded .trace-graph-node-title {
+  color: var(--trace-text);
+}
+
+.api-trace-dock.expanded .trace-graph-handle {
+  border-color: #0a0f14 !important;
+  background: var(--trace-muted) !important;
+}
+
+.api-trace-dock.expanded .trace-graph-link-edge .react-flow__edge-path {
+  stroke: rgba(246, 237, 220, 0.44);
+}
+
+.api-trace-dock.expanded .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--trace-accent);
+}
+
+.api-trace-dock.expanded .trace-graph-controls,
+.api-trace-dock.expanded .trace-graph-minimap {
+  border-color: var(--trace-border) !important;
+  background: var(--trace-panel) !important;
+}
+
+.api-trace-dock.expanded .trace-graph-controls button {
+  border-bottom-color: var(--trace-border) !important;
+  background: var(--trace-panel) !important;
+  color: var(--trace-text) !important;
+}
+
+.api-trace-dock.expanded .trace-graph-controls button:hover,
+.api-trace-dock.expanded .trace-graph-controls button:focus-visible {
+  background: var(--trace-panel-raised) !important;
+}
+
+.api-trace-dock.expanded .react-flow__minimap-mask {
+  fill: rgba(10, 15, 20, 0.66);
+}
+
+.api-trace-dock.expanded .react-flow__minimap-node {
+  fill: #263746;
+  stroke: rgba(255, 250, 240, 0.24);
+}
+
+.api-trace-dock.expanded .react-flow__attribution {
+  background: rgba(17, 25, 35, 0.86);
+  color: var(--trace-muted);
+}
+
 .trace-event-row.related {
   border-color: rgba(192, 139, 18, 0.35);
   background: rgba(255, 244, 200, 0.45);
+}
+
+.api-trace-dock.expanded .trace-event-row.related {
+  border-color: rgba(225, 184, 78, 0.38);
+  background: rgba(225, 184, 78, 0.11);
 }
 
 @keyframes trace-node-change {
@@ -1339,6 +1597,22 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .trace-waterfall-bar.completed { background: var(--sage); }
 .trace-waterfall-bar.failed { background: var(--oxblood); }
 .trace-waterfall-bar.running { background: var(--saffron); animation: trace-pulse 1.4s ease-in-out infinite; }
+
+.api-trace-dock.expanded .trace-waterfall-axis {
+  color: var(--trace-muted);
+}
+
+.api-trace-dock.expanded .trace-waterfall-track {
+  background: rgba(255, 250, 240, 0.11);
+}
+
+.api-trace-dock.expanded .trace-waterfall-bar {
+  background: var(--trace-accent);
+}
+
+.api-trace-dock.expanded .trace-waterfall-bar.completed { background: var(--trace-success); }
+.api-trace-dock.expanded .trace-waterfall-bar.failed { background: var(--trace-danger); }
+.api-trace-dock.expanded .trace-waterfall-bar.running { background: var(--trace-warning); }
 
 @keyframes trace-pulse {
   50% { opacity: 0.45; }
@@ -1410,6 +1684,11 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   background: var(--paper);
 }
 
+.api-trace-dock.expanded .trace-inspector-metadata > div {
+  border-color: var(--trace-border);
+  background: var(--trace-panel);
+}
+
 .trace-mono {
   overflow: hidden;
   font-family: "SFMono-Regular", Consolas, monospace;
@@ -1430,6 +1709,16 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   color: var(--oxblood);
 }
 
+.api-trace-dock.expanded .api-trace-empty {
+  color: var(--trace-muted);
+}
+
+.api-trace-dock.expanded .api-trace-error,
+.api-trace-dock.expanded .api-trace-export-error,
+.api-trace-dock.expanded .field-error {
+  color: #ffd0ca;
+}
+
 .api-trace-notice {
   margin-bottom: 10px;
   padding: 9px 11px;
@@ -1442,6 +1731,17 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-notice.error,
 .api-trace-notice.expired {
   border-left-color: var(--oxblood);
+}
+
+.api-trace-dock.expanded .api-trace-notice {
+  border-left-color: var(--trace-accent);
+  background: rgba(255, 250, 240, 0.08);
+  color: var(--trace-muted);
+}
+
+.api-trace-dock.expanded .api-trace-notice.error,
+.api-trace-dock.expanded .api-trace-notice.expired {
+  border-left-color: var(--trace-danger);
 }
 
 .api-trace-export-error {
@@ -2476,6 +2776,16 @@ body:has(.product-inspector-drawer-content) .api-trace-dock {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.api-trace-dock.expanded .sanitized-json-code {
+  border-color: var(--trace-border);
+  background: #080d12;
+  color: #f7ead2;
+}
+
+.api-trace-dock.expanded .sanitized-json-code[data-truncated="true"] {
+  border-color: rgba(225, 184, 78, 0.42);
 }
 
 .catalog-product-list,

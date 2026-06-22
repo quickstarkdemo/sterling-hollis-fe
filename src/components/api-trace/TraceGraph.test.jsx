@@ -7,10 +7,17 @@ import { buildTraceGraph } from "../../utils/apiTraceGraph";
 import TraceGraph from "./TraceGraph";
 
 vi.mock("@xyflow/react", () => ({
-  Background: () => null,
+  Background: ({ color }) => <div data-testid="graph-background" data-color={color} />,
   Controls: () => <div data-testid="graph-controls" />,
   Handle: () => null,
-  MiniMap: () => <div data-testid="graph-minimap" />,
+  MiniMap: ({ maskColor, nodeColor, nodeStrokeColor }) => (
+    <div
+      data-testid="graph-minimap"
+      data-mask-color={maskColor}
+      data-node-color={nodeColor}
+      data-node-stroke-color={nodeStrokeColor}
+    />
+  ),
   Position: { Left: "left", Right: "right" },
   ReactFlow: ({ nodes, edges, onNodeClick, children, nodesFocusable, edgesFocusable }) => (
     <div data-testid="react-flow" data-nodes-focusable={String(nodesFocusable)} data-edges-focusable={String(edgesFocusable)}>
@@ -104,6 +111,9 @@ describe("TraceGraph", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "span", id: "persist" });
     expect(screen.getByTestId("react-flow")).toHaveAttribute("data-nodes-focusable", "true");
     expect(screen.getByTestId("react-flow")).toHaveAttribute("data-edges-focusable", "true");
+    expect(screen.getByTestId("graph-background")).toHaveAttribute("data-color", "rgba(246, 237, 220, 0.12)");
+    expect(screen.getByTestId("graph-minimap")).toHaveAttribute("data-mask-color", "rgba(10, 15, 20, 0.66)");
+    expect(screen.getByTestId("graph-minimap")).toHaveAttribute("data-node-color", "#263746");
   });
 
   it("keeps existing positions stable across incremental updates and exposes compact density", () => {
