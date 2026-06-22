@@ -53,7 +53,7 @@ describe("ChatWidget trace integration", () => {
   });
 
   it("registers storefront chat turns with the shared trace runtime", async () => {
-    configureApiTraceRuntime({ authorized: true, enabled: true, surface: "storefront-chat" });
+    configureApiTraceRuntime({ authorized: true, enabled: true, surface: "catalog-studio" });
     const events = [];
     subscribeApiTraceEvents((event) => events.push(event));
     sendChat.mockResolvedValue({

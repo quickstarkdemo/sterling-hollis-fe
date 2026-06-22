@@ -69,16 +69,18 @@ describe("useTraceReplay", () => {
     expect(result.current.active).toBe(true);
     expect(result.current.playing).toBe(true);
     act(() => vi.advanceTimersByTime(400));
-    expect(result.current.cursorMs).toBe(400);
+    expect(result.current.cursorMs).toBe(200);
+    expect(result.current.activeItem).toEqual(expect.objectContaining({ kind: "event", id: "event-0" }));
 
     act(() => result.current.pause());
     act(() => vi.advanceTimersByTime(300));
-    expect(result.current.cursorMs).toBe(400);
+    expect(result.current.cursorMs).toBe(200);
 
     act(() => result.current.setSpeed(2));
     act(() => result.current.resume());
     act(() => vi.advanceTimersByTime(300));
-    expect(result.current.cursorMs).toBe(960);
+    expect(result.current.cursorMs).toBe(760);
+    expect(result.current.activeItem).toEqual(expect.objectContaining({ kind: "event", id: "event-1" }));
 
     act(() => result.current.seek(1900));
     expect(result.current.playing).toBe(false);
@@ -102,11 +104,12 @@ describe("TraceReplayControls", () => {
   it("wires replay actions and exposes an accessible scrubber", () => {
     const replay = {
       active: true,
+      activeItem: { kind: "span", id: "child", label: "Child", status: "running" },
       completed: false,
       cursorMs: 500,
       durationMs: 2000,
       playing: false,
-      speed: 1,
+      speed: 0.5,
       pause: vi.fn(),
       restart: vi.fn(),
       resume: vi.fn(),
@@ -118,9 +121,10 @@ describe("TraceReplayControls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     fireEvent.change(screen.getByRole("slider", { name: "Replay position" }), { target: { value: "1200" } });
-    fireEvent.click(screen.getByRole("button", { name: "2×" }));
+    expect(screen.getByText("Child")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "1x" }));
     expect(replay.resume).toHaveBeenCalled();
     expect(replay.seek).toHaveBeenCalledWith("1200");
-    expect(replay.setSpeed).toHaveBeenCalledWith(2);
+    expect(replay.setSpeed).toHaveBeenCalledWith(1);
   });
 });

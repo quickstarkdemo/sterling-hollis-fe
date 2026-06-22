@@ -7,9 +7,13 @@ import {
   FiChevronUp,
   FiCopy,
   FiDownload,
+  FiGrid,
+  FiMaximize2,
+  FiMinimize2,
   FiRefreshCw,
   FiTrash2,
 } from "react-icons/fi";
+import { Link as RouterLink } from "react-router-dom";
 
 import { useApiTrace } from "../ApiTraceContext";
 import { downloadAdminApiTrace } from "../../utils/apiClient";
@@ -42,10 +46,11 @@ function initialPreference() {
     return {
       expanded: stored.expanded === true,
       height: Math.max(300, Math.min(720, Number(stored.height) || 430)),
+      mode: stored.mode === "fullscreen" ? "fullscreen" : "dock",
       view: VIEWS.some((view) => view.id === stored.view) ? stored.view : "graph",
     };
   } catch {
-    return { expanded: false, height: 430, view: "graph" };
+    return { expanded: false, height: 430, mode: "dock", view: "graph" };
   }
 }
 
@@ -90,6 +95,7 @@ export default function ApiTraceDock() {
   const [deleteSelection, setDeleteSelection] = useState(() => new Set());
   const replay = useTraceReplay(selectedTrace);
   const visibleTrace = replay.projection;
+  const isFullscreen = preference.mode === "fullscreen";
   const copyTimer = useRef(null);
   const dockRef = useRef(null);
   const collapsedButtonRef = useRef(null);
@@ -103,6 +109,14 @@ export default function ApiTraceDock() {
     resizeCleanup.current?.();
   }, []);
   useEffect(() => setSelection({ kind: "trace", id: selectedTraceId }), [selectedTraceId]);
+  useEffect(() => {
+    if (!replay.active) return;
+    if (replay.activeItem?.id) {
+      setSelection({ kind: replay.activeItem.kind, id: replay.activeItem.id });
+      return;
+    }
+    setSelection({ kind: "trace", id: selectedTraceId });
+  }, [replay.active, replay.activeItem?.id, replay.activeItem?.kind, selectedTraceId]);
   useEffect(() => {
     if (previousExpanded.current === preference.expanded) return;
     previousExpanded.current = preference.expanded;
@@ -133,6 +147,7 @@ export default function ApiTraceDock() {
   );
 
   const onResizeStart = useCallback((event) => {
+    if (isFullscreen) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
     const startY = event.clientY;
@@ -157,7 +172,7 @@ export default function ApiTraceDock() {
     resizeCleanup.current = removeListeners;
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish, { once: true });
-  }, [preference.height]);
+  }, [isFullscreen, preference.height]);
 
   const copyTrace = async () => {
     if (!selectedTrace) return;
@@ -242,25 +257,27 @@ export default function ApiTraceDock() {
   return (
     <Box
       ref={dockRef}
-      className="api-trace-dock expanded"
-      style={{ height: `${preference.height}px` }}
+      className={`api-trace-dock expanded ${isFullscreen ? "fullscreen" : "dock"}`}
+      style={isFullscreen ? undefined : { height: `${preference.height}px` }}
       aria-label="API trace visualizer"
       onKeyDown={(event) => {
-        if (event.key === "Escape") updatePreference({ expanded: false });
+        if (event.key === "Escape") updatePreference(isFullscreen ? { mode: "dock" } : { expanded: false });
       }}
     >
-      <button
-        type="button"
-        className="api-trace-resize-handle"
-        aria-label="Resize API trace dock"
-        onPointerDown={onResizeStart}
-        onKeyDown={(event) => {
-          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-          event.preventDefault();
-          const direction = event.key === "ArrowUp" ? 24 : -24;
-          updatePreference({ height: Math.max(300, Math.min(720, preference.height + direction)) });
-        }}
-      />
+      {!isFullscreen ? (
+        <button
+          type="button"
+          className="api-trace-resize-handle"
+          aria-label="Resize API trace dock"
+          onPointerDown={onResizeStart}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+            event.preventDefault();
+            const direction = event.key === "ArrowUp" ? 24 : -24;
+            updatePreference({ height: Math.max(300, Math.min(720, preference.height + direction)) });
+          }}
+        />
+      ) : null}
       <Box className="api-trace-toolbar">
         <HStack gap={3} minW={0}>
           <Box className="api-trace-mark"><FiActivity /></Box>
@@ -272,6 +289,9 @@ export default function ApiTraceDock() {
           <Badge className={`api-trace-connection ${connectionStatus}`}>{connectionStatus}</Badge>
         </HStack>
         <HStack gap={1}>
+          <Button as={RouterLink} to="/catalog-studio" size="xs" variant="ghost" className="trace-icon-button" aria-label="Return to product catalog">
+            <FiGrid /> Catalog
+          </Button>
           <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={refreshTraces} aria-label="Refresh traces">
             <FiRefreshCw />
           </Button>
@@ -283,6 +303,17 @@ export default function ApiTraceDock() {
           </Button>
           <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={exportTrace} disabled={!selectedTrace || exportStatus === "working"}>
             <FiDownload /> {exportStatus === "working" ? "Exporting" : "JSON"}
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            className="trace-icon-button"
+            onClick={() => updatePreference({ mode: isFullscreen ? "dock" : "fullscreen", expanded: true })}
+            aria-label={isFullscreen ? "Return trace dock to tray size" : "Open trace dock full screen"}
+          >
+            {isFullscreen ? <FiMinimize2 /> : <FiMaximize2 />}
+            {isFullscreen ? "Dock" : "Full screen"}
           </Button>
           <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={() => updatePreference({ expanded: false })} aria-expanded="true" aria-label="Collapse API trace dock">
             <FiChevronDown />
