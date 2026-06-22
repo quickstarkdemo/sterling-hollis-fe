@@ -4,13 +4,15 @@ import { FiMic, FiMicOff, FiRefreshCw } from "react-icons/fi";
 
 import useCatalogRealtimeSession from "../../hooks/useCatalogRealtimeSession";
 import { useApiTrace } from "../ApiTraceContext";
-import { recordApiTraceEvent, traceApiFetch } from "../../utils/apiTraceClient";
+import { recordApiTraceEvent } from "../../utils/apiTraceClient";
 import RealtimeTranscript from "./RealtimeTranscript";
 
 const ACTIVE_STATES = new Set(["requesting", "connecting", "listening"]);
 const REALTIME_WEBRTC_URL = "https://api.openai.com/v1/realtime/calls";
 const MAX_TRANSCRIPT_ENTRIES = 24;
 const MAX_TRANSCRIPT_CHARS = 4000;
+const DISCONNECT_GRACE_MS = 8000;
+const DISCONNECT_NOTICE = "Voice connection is unstable. Keeping the session open while the browser reconnects.";
 
 const statusCopy = {
   idle: "Voice is off. Text controls remain available.",
@@ -49,24 +51,16 @@ function defaultMicrophoneRequest() {
 
 async function defaultSdpExchange(session, offerSdp, signal) {
   if (session.webrtc_url !== REALTIME_WEBRTC_URL) throw new Error("realtime_invalid_url");
-  const response = await traceApiFetch(
-    session.webrtc_url,
-    {
-      method: "POST",
-      body: offerSdp,
-      signal,
-      headers: {
-        Authorization: `Bearer ${session.client_secret}`,
-        "Content-Type": "application/sdp",
-      },
+  if (typeof fetch !== "function") throw new Error("realtime_unsupported");
+  const response = await fetch(session.webrtc_url, {
+    method: "POST",
+    body: offerSdp,
+    signal,
+    headers: {
+      Authorization: `Bearer ${session.client_secret}`,
+      "Content-Type": "application/sdp",
     },
-    {
-      operation: "realtime.sdp",
-      propagate: false,
-      requestKind: "realtime",
-      transport: "webrtc",
-    },
-  );
+  });
   if (!response.ok) throw new Error("realtime_connection_failed");
   return response.text();
 }
@@ -133,11 +127,18 @@ export default function VoiceControls({
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
   const traceActionRef = useRef(null);
+  const disconnectTimeoutRef = useRef(null);
   const callbacksRef = useRef({ onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry });
   callbacksRef.current = { onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
+  const clearDisconnectTimer = useCallback(() => {
+    if (disconnectTimeoutRef.current) clearTimeout(disconnectTimeoutRef.current);
+    disconnectTimeoutRef.current = null;
+  }, []);
+
   const clearResources = useCallback(() => {
+    clearDisconnectTimer();
     if (expiryRef.current) clearTimeout(expiryRef.current);
     expiryRef.current = null;
     abortRef.current?.abort();
@@ -163,7 +164,7 @@ export default function VoiceControls({
     peerRef.current = null;
     streamRef.current = null;
     audioRef.current = null;
-  }, []);
+  }, [clearDisconnectTimer]);
 
   const endSession = useCallback((nextStatus, nextNotice = "") => {
     const traceAction = traceActionRef.current;
@@ -293,12 +294,20 @@ export default function VoiceControls({
         void executeToolCall(event, activeWorkflowId, generation);
         break;
       case "error":
-        recordApiTraceEvent(
-          "realtime.error",
-          { error_code: "provider_event", transport: "webrtc" },
-          { action: traceActionRef.current, status: "failed" },
-        );
-        endSession("error");
+        {
+          const errorCode = String(event.error?.code || event.error?.type || event.code || "provider_event");
+          const expired = /expired|invalid_session|session_not_found/i.test(errorCode);
+          recordApiTraceEvent(
+            "realtime.error",
+            { error_code: errorCode, transport: "webrtc" },
+            { action: traceActionRef.current, status: expired ? "failed" : "warning" },
+          );
+          if (expired) {
+            endSession("expired");
+            break;
+          }
+          setNotice("Realtime reported an issue, but the voice session is still open. Try the question again or continue with text.");
+        }
         break;
       default:
         break;
@@ -395,7 +404,25 @@ export default function VoiceControls({
       });
       peer.onconnectionstatechange = () => {
         if (generationRef.current !== generation) return;
-        if (["failed", "disconnected", "closed"].includes(peer.connectionState)) {
+        if (peer.connectionState === "disconnected") {
+          if (!disconnectTimeoutRef.current) {
+            setNotice(DISCONNECT_NOTICE);
+            disconnectTimeoutRef.current = setTimeout(() => {
+              disconnectTimeoutRef.current = null;
+              if (generationRef.current === generation && peer.connectionState === "disconnected") {
+                endSession("disconnected");
+              }
+            }, DISCONNECT_GRACE_MS);
+          }
+          return;
+        }
+        if (["connected", "connecting", "new"].includes(peer.connectionState)) {
+          clearDisconnectTimer();
+          setNotice((current) => current === DISCONNECT_NOTICE ? "" : current);
+          return;
+        }
+        if (["failed", "closed"].includes(peer.connectionState)) {
+          clearDisconnectTimer();
           endSession("disconnected");
         }
       };
