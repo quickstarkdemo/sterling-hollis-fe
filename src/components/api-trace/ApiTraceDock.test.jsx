@@ -116,6 +116,19 @@ describe("ApiTraceDock", () => {
     expect(screen.getByLabelText("API trace visualizer")).toHaveStyle({ height: "454px" });
   });
 
+  it("opens full screen and keeps a return path to the product catalog", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
+    renderWithProviders(<ApiTraceDock />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open trace dock full screen" }));
+    expect(screen.getByLabelText("API trace visualizer")).toHaveClass("fullscreen");
+    expect(screen.getByRole("link", { name: "Return to product catalog" })).toHaveAttribute("href", "/catalog-studio");
+    expect(screen.queryByRole("button", { name: "Resize API trace dock" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByLabelText("API trace visualizer"), { key: "Escape" });
+    expect(screen.getByLabelText("API trace visualizer")).toHaveClass("dock");
+  });
+
   it("synchronizes graph selection and replays the immutable projection without a request", async () => {
     sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -132,6 +145,34 @@ describe("ApiTraceDock", () => {
     expect(screen.getByText("complete")).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+
+  it("moves waterfall selection to the replayed operation", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true, view: "waterfall" }));
+    const trace = {
+      ...projection,
+      duration_ms: 240,
+      spans: [
+        projection.spans[0],
+        { span_id: "child", parent_span_id: "root", name: "Backend call", operation: "http.client", service: "api", status: "completed", started_at: "2026-06-20T00:00:00.100Z", completed_at: "2026-06-20T00:00:00.180Z", duration_ms: 80, attributes: {} },
+      ],
+      events: [
+        projection.events[0],
+        { event_id: "event-2", span_id: "child", sequence: 1, name: "Backend completed", event_type: "http.completed", status: "completed", occurred_at: "2026-06-20T00:00:00.180Z", attributes: { endpoint: "/api/products" } },
+      ],
+    };
+    useApiTrace.mockReturnValue(traceState({
+      recentTraces: [trace],
+      selectedTrace: trace,
+      selectedTraceId: trace.trace_id,
+    }));
+    renderWithProviders(<ApiTraceDock />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Replay trace" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Replay position" }), { target: { value: "200" } });
+
+    await waitFor(() => expect(screen.getAllByText("Backend completed").length).toBeGreaterThan(0));
+    expect(screen.getByRole("option", { name: /Backend call/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("copies the full trace projection for developer analysis", async () => {

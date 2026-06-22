@@ -12,7 +12,14 @@ const api = vi.hoisted(() => ({
   getProductRecommendations: vi.fn(),
   getRelatedProducts: vi.fn(),
 }));
+const trace = vi.hoisted(() => ({
+  end: vi.fn(),
+  startAction: vi.fn(),
+}));
 vi.mock("../utils/apiClient", () => ({ DEFAULT_STORE_ID: "1001", ...api }));
+vi.mock("../components/ApiTraceContext", () => ({
+  useApiTrace: () => ({ startAction: trace.startAction }),
+}));
 vi.mock("../utils/datadog", () => ({ trackAction: vi.fn() }));
 
 const product = {
@@ -56,6 +63,8 @@ function renderPage() {
 
 describe("ProductPage media gallery", () => {
   beforeEach(() => {
+    trace.end.mockReset();
+    trace.startAction.mockReset().mockReturnValue({ end: trace.end });
     api.getProduct.mockReset().mockResolvedValue(product);
     api.getRelatedProducts.mockReset().mockResolvedValue({ items: [] });
     api.getProductRecommendations.mockReset().mockResolvedValue({ recommendations: [] });
@@ -69,6 +78,15 @@ describe("ProductPage media gallery", () => {
     expect(screen.getByRole("img", { name: "Augustin Mercer Black Pillow view 2" })).toHaveAttribute("src", "https://example.com/room.jpg");
     expect(screen.getByText("7 in stock")).toBeInTheDocument();
     expect(screen.getByText("$120")).toBeInTheDocument();
+    expect(trace.startAction).toHaveBeenCalledWith("Storefront product view", expect.objectContaining({
+      surface: "storefront-product",
+      attributes: expect.objectContaining({ product_id: "cat_pillow" }),
+    }));
+    expect(trace.end).toHaveBeenCalledWith("completed", expect.objectContaining({
+      product_id: "cat_pillow",
+      recommendation_count: 0,
+      related_count: 0,
+    }));
     expect(screen.getByRole("heading", { name: "Store availability" })).toBeInTheDocument();
     expect(screen.getByText("Store 1001")).toBeInTheDocument();
     expect(screen.queryByText("Sellable options and inventory")).not.toBeInTheDocument();

@@ -12,6 +12,7 @@ import { Link as RouterLink, useParams } from "react-router-dom";
 import { FiArrowLeft, FiHeart, FiMail, FiMapPin } from "react-icons/fi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useApiTrace } from "../components/ApiTraceContext";
 import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
 import ProductImage from "../components/ProductImage";
@@ -30,6 +31,7 @@ export default function ProductPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState("");
   const [selectedView, setSelectedView] = useState(0);
+  const { startAction } = useApiTrace();
 
   const chatContext = useMemo(() => {
     const baseContext = {
@@ -56,6 +58,13 @@ export default function ProductPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const traceAction = startAction("Storefront product view", {
+      surface: "storefront-product",
+      attributes: {
+        action: "product_view",
+        product_id: productId,
+      },
+    });
     try {
       const detail = await getProduct(productId);
       const [relatedData, recData] = await Promise.all([
@@ -66,12 +75,22 @@ export default function ProductPage() {
       setSelectedView(0);
       setRelated(relatedData.items || []);
       setRecommendations(recData.recommendations || []);
+      traceAction.end("completed", {
+        product_id: detail.id || productId,
+        category: detail.category || "",
+        recommendation_count: recData.recommendations?.length || 0,
+        related_count: relatedData.items?.length || 0,
+      });
     } catch (err) {
       setError(err);
+      traceAction.end("failed", {
+        error_code: err?.response?.status || err?.code || err?.name || "product_view_error",
+        product_id: productId,
+      });
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [productId, startAction]);
 
   useEffect(() => {
     load();

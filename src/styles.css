@@ -703,6 +703,17 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   box-shadow: 0 -18px 64px rgba(23, 19, 15, 0.14);
 }
 
+.api-trace-dock.expanded.fullscreen {
+  inset: 0;
+  height: 100dvh !important;
+  max-height: none;
+  border-top: 0;
+}
+
+.api-trace-dock.expanded.fullscreen .api-trace-body {
+  grid-template-columns: minmax(260px, 0.62fr) minmax(520px, 1.7fr) minmax(340px, 0.9fr);
+}
+
 .api-trace-dock.collapsed {
   display: flex;
   height: 58px;
@@ -973,6 +984,10 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-resize-handle:focus-visible {
   outline: 2px solid var(--sage);
   outline-offset: 1px;
+}
+
+.api-trace-dock.expanded.fullscreen .api-trace-resize-handle {
+  display: none;
 }
 
 .api-trace-view-tabs {
@@ -1283,6 +1298,24 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   margin-top: 7px;
 }
 
+.trace-replay-step {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(255, 250, 240, 0.52);
+}
+
+.trace-replay-step > p:nth-child(2) {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .trace-replay-scrubber > input {
   width: 100%;
   min-width: 120px;
@@ -1448,6 +1481,15 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-replay-bar.active {
   border-left-color: var(--trace-accent);
   background: var(--trace-panel);
+}
+
+.api-trace-dock.expanded .trace-replay-step {
+  border-color: var(--trace-border);
+  background: rgba(255, 250, 240, 0.06);
+}
+
+.api-trace-dock.expanded .trace-replay-step > p:nth-child(2) {
+  color: var(--trace-text);
 }
 
 .api-trace-dock.expanded .trace-replay-scrubber > input {
@@ -1764,6 +1806,10 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 @media (max-width: 700px) {
   .api-trace-dock.expanded {
     height: min(72dvh, 620px) !important;
+  }
+
+  .api-trace-dock.expanded.fullscreen {
+    height: 100dvh !important;
   }
 
   .api-trace-toolbar {

@@ -3,7 +3,53 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildReplayProjection, createReplaySnapshot } from "../utils/apiTraceReplay";
 
 const TICK_MS = 40;
-const INITIAL_STATE = { active: false, completed: false, cursorMs: 0, playing: false, speed: 1 };
+const INITIAL_STATE = { active: false, completed: false, cursorMs: 0, playing: false, speed: 0.5 };
+
+function timestamp(value) {
+  const result = new Date(value).getTime();
+  return Number.isFinite(result) ? result : null;
+}
+
+function itemOffset(snapshot, value) {
+  return Math.max(0, (timestamp(value) ?? snapshot.origin) - snapshot.origin);
+}
+
+function activeReplayItem(snapshot, cursorMs) {
+  if (!snapshot) return null;
+  const cursor = Math.max(0, Math.min(snapshot.durationMs, Number(cursorMs) || 0));
+  const projection = snapshot.projection;
+  const candidates = [
+    ...(projection.spans || []).map((span) => ({
+      kind: "span",
+      id: span.span_id,
+      label: span.name,
+      offset: itemOffset(snapshot, span.started_at),
+      status: span.status,
+    })),
+    ...(projection.events || []).map((event) => ({
+      kind: "event",
+      id: event.event_id,
+      label: event.name || event.event_type,
+      offset: itemOffset(snapshot, event.occurred_at),
+      status: event.status,
+    })),
+    ...(projection.artifacts || []).map((artifact) => ({
+      kind: "artifact",
+      id: artifact.artifact_id,
+      label: artifact.name || artifact.artifact_type,
+      offset: itemOffset(snapshot, artifact.created_at || artifact.updated_at || projection.completed_at),
+      status: artifact.status || "available",
+    })),
+  ]
+    .filter((item) => item.id && item.offset <= cursor)
+    .sort((left, right) => {
+      const offset = right.offset - left.offset;
+      if (offset !== 0) return offset;
+      const rank = { artifact: 3, event: 2, span: 1 };
+      return rank[right.kind] - rank[left.kind];
+    });
+  return candidates[0] || null;
+}
 
 export default function useTraceReplay(trace) {
   const [snapshot, setSnapshot] = useState(null);
@@ -58,5 +104,9 @@ export default function useTraceReplay(trace) {
     () => state.active ? buildReplayProjection(snapshot, state.cursorMs) : trace,
     [snapshot, state.active, state.cursorMs, trace],
   );
-  return { ...state, durationMs: snapshot?.durationMs || 0, pause, projection, restart, resume, seek, setSpeed, start, stop };
+  const activeItem = useMemo(
+    () => (state.active ? activeReplayItem(snapshot, state.cursorMs) : null),
+    [snapshot, state.active, state.cursorMs],
+  );
+  return { ...state, activeItem, durationMs: snapshot?.durationMs || 0, pause, projection, restart, resume, seek, setSpeed, start, stop };
 }
