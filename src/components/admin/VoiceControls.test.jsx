@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../test/render";
 import {
@@ -103,6 +103,10 @@ describe("VoiceControls", () => {
       message: "Dallas is low on stock.",
       citations: [],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("requests microphone permission and transitions from connecting to listening", async () => {
@@ -367,6 +371,35 @@ describe("VoiceControls", () => {
     expect(await screen.findByText("listening")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop voice" })).toBeInTheDocument();
     expect(screen.getByText(/voice session is still open/i)).toBeInTheDocument();
+  });
+
+  it("does not mark a connected voice trace as failed when the browser disconnects later", async () => {
+    const events = [];
+    const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
+    const { channel, peer } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    expect(await screen.findByText("listening")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    peer.connectionState = "disconnected";
+    act(() => peer.onconnectionstatechange());
+    act(() => vi.advanceTimersByTime(8000));
+    unsubscribe();
+
+    expect(screen.getByText("disconnected")).toBeInTheDocument();
+    expect(events.some((event) => event.event_type === "ui.failed")).toBe(false);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        event_type: "ui.completed",
+        status: "completed",
+        attributes: expect.objectContaining({
+          connection_state: "disconnected",
+          transport: "webrtc",
+        }),
+      }),
+    ]));
   });
 
   it("publishes finalized transcript entries for compact chat composers", async () => {

@@ -130,6 +130,7 @@ export default function VoiceControls({
   const disconnectTimeoutRef = useRef(null);
   const callbacksRef = useRef({ onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry });
   callbacksRef.current = { onToolResult, onResolveToolCall, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry };
+  const sessionConnectedRef = useRef(false);
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
   const clearDisconnectTimer = useCallback(() => {
@@ -168,6 +169,7 @@ export default function VoiceControls({
 
   const endSession = useCallback((nextStatus, nextNotice = "") => {
     const traceAction = traceActionRef.current;
+    const completedTrace = nextStatus === "idle" || (nextStatus === "disconnected" && sessionConnectedRef.current);
     if (traceAction?.enabled) {
       if (["idle", "disconnected", "expired"].includes(nextStatus)) {
         recordApiTraceEvent(
@@ -176,12 +178,13 @@ export default function VoiceControls({
           { action: traceAction, status: nextStatus },
         );
       }
-      traceAction.end(nextStatus === "idle" ? "completed" : "failed", {
+      traceAction.end(completedTrace ? "completed" : "failed", {
         connection_state: nextStatus,
         transport: "webrtc",
       });
     }
     traceActionRef.current = null;
+    sessionConnectedRef.current = false;
     generationRef.current += 1;
     clearResources();
     resetBackendSession();
@@ -325,6 +328,7 @@ export default function VoiceControls({
     generationRef.current = generation;
     clearResources();
     handledCallsRef.current = new Set();
+    sessionConnectedRef.current = false;
     setNotice("");
     setEntries([]);
     presenterPartialRef.current = "";
@@ -382,6 +386,7 @@ export default function VoiceControls({
       channelRef.current = channel;
       channel.addEventListener("open", () => {
         if (generationRef.current === generation) {
+          sessionConnectedRef.current = true;
           recordApiTraceEvent(
             "realtime.connected",
             { connection_state: "open", transport: "webrtc" },
