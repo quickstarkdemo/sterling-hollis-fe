@@ -640,6 +640,7 @@ export default function ProductWorkbench({
     <>
     <CatalogGlobalAssistant
       activeDetail={activeDetail}
+      currentProductId={editorProductId}
       workflowId={workflowId}
       ensureWorkflow={() => ensureWorkflow({ purpose: "assistant" })}
       open={assistantOpen}

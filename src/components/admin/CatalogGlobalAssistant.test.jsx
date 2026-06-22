@@ -7,7 +7,10 @@ import { queryCatalogAssistant } from "../../utils/apiClient";
 import CatalogGlobalAssistant from "./CatalogGlobalAssistant";
 
 vi.mock("../../utils/apiClient", () => ({
+  createCatalogRealtimeSession: vi.fn(),
+  createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   queryCatalogAssistant: vi.fn(),
+  submitCatalogRealtimeV3ToolCall: vi.fn(),
 }));
 
 vi.mock("./VoiceControls", () => ({

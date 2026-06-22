@@ -8,6 +8,7 @@ import ProductWorkbench from "./ProductWorkbench";
 
 const api = vi.hoisted(() => ({
   approveCatalogImageJob: vi.fn(),
+  createCatalogRealtimeSession: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
   generateCatalogSuggestionSet: vi.fn(),
@@ -15,6 +16,7 @@ const api = vi.hoisted(() => ({
   getCatalogWorkflow: vi.fn(),
   queryCatalogAssistant: vi.fn(),
   startCatalogWorkflow: vi.fn(),
+  submitCatalogRealtimeV3ToolCall: vi.fn(),
   submitCatalogDraftCommand: vi.fn(),
   submitCatalogImageCommand: vi.fn(),
 }));
@@ -121,6 +123,16 @@ describe("ProductWorkbench", () => {
       citations: [{ kind: "inventory", source_id: "cat:1001:M", label: "Dallas: Studio Coat", value: { store_name: "Dallas", inventory_qty: 2 } }],
       mutation: false,
     });
+    api.createCatalogRealtimeSession.mockReset().mockResolvedValue({
+      session_id: "realtime_session_1",
+      expires_at: Math.floor(Date.now() / 1000) + 60,
+    });
+    api.submitCatalogRealtimeV3ToolCall.mockReset().mockResolvedValue({
+      status: "succeeded",
+      message: "Studio Coat inventory comes from the product read tool: Oak Brook has 7 unit(s).",
+      citations: [{ kind: "inventory", source_id: "cat_coat:1002:M", label: "Oak Brook: Studio Coat", value: { store_name: "Oak Brook", inventory_qty: 7 } }],
+      mutation: false,
+    });
     api.submitCatalogDraftCommand.mockReset().mockResolvedValue({ status: "succeeded", message: "Draft created.", retryable: false, replayed: false, draft, workflow: baseWorkflow });
     api.submitCatalogImageCommand.mockReset();
     api.getCatalogImageJob.mockReset();
@@ -224,30 +236,37 @@ describe("ProductWorkbench", () => {
     }, "start-workflow-key"));
   });
 
-  it("enables current-product assistant drill-down only after product detail loads", async () => {
-    api.queryCatalogAssistant.mockResolvedValueOnce({
-      message: "Studio Coat inventory comes from the assistant API: Oak Brook has 7 unit(s).",
-      citations: [{ kind: "inventory", source_id: "cat_coat:1002:M", label: "Oak Brook: Studio Coat", value: { store_name: "Oak Brook", inventory_qty: 7 } }],
-      mutation: false,
-    });
+  it("scopes selected-product assistant questions to the Product Panel automatically", async () => {
     renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat", assistantOpen: true });
-    expect(screen.getByRole("button", { name: "Current product" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Current product" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Entire catalog & inventory" })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole("button", { name: "Load authoring draft" }));
-    await userEvent.click(screen.getByRole("button", { name: "Current product" }));
     const assistantQuestion = screen.getByLabelText("Catalog assistant question");
     fireEvent.change(assistantQuestion, { target: { value: "What is low stock for this product?" } });
     expect(assistantQuestion).toHaveValue("What is low stock for this product?");
     await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
 
-    await waitFor(() => expect(api.queryCatalogAssistant).toHaveBeenCalledWith({
-      question: "What is low stock for this product?",
-      query_scopes: ["product", "inventory", "readiness"],
+    await waitFor(() => expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
+      title: "Product Catalog workbench for Studio Coat",
+      business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
+      draft_id: "draft_1",
+    }, "start-workflow-key"));
+    expect(api.createCatalogRealtimeSession).toHaveBeenCalledWith("workflow_1", {
+      mode: "workbench",
       product_id: "cat_coat",
       draft_id: "draft_1",
       expected_draft_version: 2,
-    }));
-    expect(await screen.findByText(/assistant API: Oak Brook has 7 unit/i)).toBeInTheDocument();
+      query_scopes: ["product", "catalog", "inventory", "readiness"],
+    });
+    expect(api.submitCatalogRealtimeV3ToolCall).toHaveBeenCalledWith("workflow_1", {
+      session_id: "realtime_session_1",
+      call_id: "catalog-assistant-call-key",
+      name: "read_inventory_status",
+      arguments: { question: "What is low stock for this product?" },
+    }, "catalog-assistant-read-key");
+    expect(api.queryCatalogAssistant).not.toHaveBeenCalledWith(expect.objectContaining({ query_scopes: expect.arrayContaining(["product"]) }));
+    expect(await screen.findByText(/product read tool: Oak Brook has 7 unit/i)).toBeInTheDocument();
     expect(screen.getByText(/inventory: Oak Brook: 7 unit/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Close catalog assistant" }));
     expect(screen.getByTestId("product-editor")).toHaveTextContent("cat_coat");
