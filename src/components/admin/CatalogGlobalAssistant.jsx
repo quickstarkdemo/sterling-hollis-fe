@@ -2,7 +2,13 @@ import { Badge, Box, Button, Drawer, HStack, IconButton, Portal, Text, Textarea,
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiSend, FiX } from "react-icons/fi";
 
-import { queryCatalogAssistant } from "../../utils/apiClient";
+import { useApiTrace } from "../ApiTraceContext";
+import {
+  createCatalogRealtimeSession,
+  createIdempotencyKey,
+  queryCatalogAssistant,
+  submitCatalogRealtimeV3ToolCall,
+} from "../../utils/apiClient";
 import RealtimeTranscript from "./RealtimeTranscript";
 import VoiceControls from "./VoiceControls";
 
@@ -65,8 +71,20 @@ function assistantQuestionFromTool(event) {
   return String(args.question || args.query || args.prompt || fallback[event.name] || "Summarize the current catalog context.").trim();
 }
 
+function productReadToolName(nextQuestion) {
+  const normalized = String(nextQuestion || "").toLowerCase();
+  if (/\b(readiness|ready|publish|publication|blocker|blocked)\b/.test(normalized)) {
+    return "read_publish_readiness";
+  }
+  if (/\b(stock|inventory|store|stores|unit|units|availability|available|replenish|low)\b/.test(normalized)) {
+    return "read_inventory_status";
+  }
+  return "read_product_summary";
+}
+
 export default function CatalogGlobalAssistant({
   activeDetail,
+  currentProductId = "",
   ensureWorkflow,
   onOpenChange,
   onWorkflowEvent,
@@ -76,7 +94,6 @@ export default function CatalogGlobalAssistant({
   resetSignal = 0,
   workflowId,
 }) {
-  const [scope, setScope] = useState("catalog");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [voiceState, setVoiceState] = useState({
@@ -91,11 +108,13 @@ export default function CatalogGlobalAssistant({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const { startAction } = useApiTrace();
   const threadRef = useRef(null);
-  const previousProductId = useRef(activeDetail?.product_id || "");
-  const hasProductScope = Boolean(activeDetail?.product_id);
-  const scopeLabel = scope === "product" && hasProductScope
-    ? activeDetail?.title || activeDetail?.product_id || "current product"
+  const activeProductId = activeDetail?.product_id || currentProductId || "";
+  const previousProductId = useRef(activeProductId);
+  const scope = activeProductId ? "product" : "catalog";
+  const scopeLabel = scope === "product"
+    ? activeDetail?.title || activeProductId || "current product"
     : "entire catalog and inventory";
   const voiceContext = scope === "product" && productVoiceContext
     ? productVoiceContext
@@ -108,39 +127,89 @@ export default function CatalogGlobalAssistant({
   }, [messages, open]);
 
   useEffect(() => {
-    const nextProductId = activeDetail?.product_id || "";
+    const nextProductId = activeProductId;
     if (previousProductId.current === nextProductId) return;
     previousProductId.current = nextProductId;
-    if (scope === "product") setScope("catalog");
     setMessages((current) => [
       ...current,
       {
         id: `context-${Date.now()}`,
         role: "system",
-        message: "Product context changed. Scope reset to entire catalog and inventory.",
+        message: nextProductId
+          ? `Product context changed. Assistant is scoped to ${activeDetail?.title || nextProductId}.`
+          : "Product context cleared. Assistant is scoped to the entire catalog and inventory.",
         citations: [],
       },
     ].slice(-MAX_MESSAGES));
-  }, [activeDetail?.product_id, scope]);
+  }, [activeDetail?.title, activeProductId]);
 
   const starters = useMemo(() => [
+    ...(scope === "product" ? ["What should I know about this product?"] : []),
     "Which stores have low stock?",
     "Summarize catalog inventory risk.",
-    ...(hasProductScope ? ["What should I know about this product?"] : []),
-  ], [hasProductScope]);
+  ], [scope]);
 
   const assistantPayload = (nextQuestion, requestedScope = scope) => {
-    const productScope = requestedScope === "product" && activeDetail?.product_id;
-    const currentDraft = activeDetail?.current_draft;
+    const catalogScope = requestedScope !== "product" || !activeProductId;
     return {
       question: nextQuestion,
-      query_scopes: productScope ? ["product", "inventory", "readiness"] : ["catalog", "inventory"],
-      ...(productScope ? {
-        product_id: activeDetail.product_id,
-        draft_id: currentDraft?.revision?.id,
-        expected_draft_version: currentDraft?.draft_version,
-      } : {}),
+      query_scopes: catalogScope ? ["catalog", "inventory"] : ["product"],
+      ...(catalogScope ? {} : { product_id: activeProductId }),
     };
+  };
+
+  const askProductAssistant = async (nextQuestion) => {
+    if (!productVoiceContext) {
+      const contextError = new Error("product_context_unavailable");
+      contextError.userMessage = "Product context is still loading. Open the Product Panel details, then ask again.";
+      throw contextError;
+    }
+    const activeWorkflowId = workflowId || await ensureWorkflow?.();
+    if (!activeWorkflowId) {
+      const workflowError = new Error("workflow_unavailable");
+      workflowError.userMessage = "The assistant could not start a product read workflow. Try again in a moment.";
+      throw workflowError;
+    }
+    const session = await createCatalogRealtimeSession(activeWorkflowId, productVoiceContext);
+    const toolName = productReadToolName(nextQuestion);
+    return submitCatalogRealtimeV3ToolCall(activeWorkflowId, {
+      session_id: session.session_id,
+      call_id: createIdempotencyKey("catalog-assistant-call"),
+      name: toolName,
+      arguments: { question: nextQuestion },
+    }, createIdempotencyKey("catalog-assistant-read"));
+  };
+
+  const askAssistant = async (nextQuestion, requestedScope = scope, source = "text") => {
+    const payload = assistantPayload(nextQuestion, requestedScope);
+    const productScope = requestedScope === "product" && activeProductId;
+    const traceAction = startAction("Ask catalog assistant", {
+      surface: "catalog-studio",
+      attributes: {
+        action: source === "voice" ? "assistant_voice_query" : "assistant_text_query",
+        product_id: payload.product_id || "",
+        query_scopes: payload.query_scopes,
+        workflow_id: workflowId || "",
+      },
+    });
+    try {
+      const result = productScope
+        ? await askProductAssistant(nextQuestion)
+        : await queryCatalogAssistant(payload);
+      traceAction.end("completed", {
+        citation_count: result?.citations?.length || 0,
+        product_id: payload.product_id || "",
+        workflow_id: workflowId || "",
+      });
+      return result;
+    } catch (requestError) {
+      traceAction.end("failed", {
+        error_code: requestError?.response?.status || requestError?.code || requestError?.name || "assistant_query_error",
+        product_id: payload.product_id || "",
+        workflow_id: workflowId || "",
+      });
+      throw requestError;
+    }
   };
 
   const addMessage = (message) => {
@@ -167,7 +236,7 @@ export default function CatalogGlobalAssistant({
     setError("");
     addMessage({ role: "user", message: nextQuestion, citations: [], scope });
     try {
-      const result = await queryCatalogAssistant(assistantPayload(nextQuestion));
+      const result = await askAssistant(nextQuestion);
       addMessage({
         role: "assistant",
         message: result.message || "No answer was returned.",
@@ -176,9 +245,11 @@ export default function CatalogGlobalAssistant({
       });
     } catch (requestError) {
       setError(
-        [502, 503, 504].includes(requestError?.response?.status)
-          ? "The assistant backend is temporarily unavailable. Product edits are preserved and text entry remains available."
-          : "The assistant could not answer that question. Product edits are preserved.",
+        requestError?.userMessage
+          ? requestError.userMessage
+          : [502, 503, 504].includes(requestError?.response?.status)
+            ? "The assistant backend is temporarily unavailable. Product edits are preserved and text entry remains available."
+            : "The assistant could not answer that question. Product edits are preserved.",
       );
     } finally {
       setBusy(false);
@@ -200,7 +271,7 @@ export default function CatalogGlobalAssistant({
     const requestedScope = event.name === "read_product_summary" || event.name === "read_publish_readiness"
       ? "product"
       : scope;
-    return queryCatalogAssistant(assistantPayload(assistantQuestionFromTool(event), requestedScope));
+    return askAssistant(assistantQuestionFromTool(event), requestedScope, "voice");
   };
 
   const voiceTranscript = (entry) => {
@@ -250,17 +321,10 @@ export default function CatalogGlobalAssistant({
               <VStack align="stretch" gap={4} className="catalog-assistant-drawer-inner">
                 <Box>
                   <Text className="section-kicker">Ask AI</Text>
-                  <Text className="panel-title">Ask across products, stores, and inventory</Text>
+                  <Text className="panel-title">
+                    {scope === "product" ? "Ask about this product, stores, and inventory" : "Ask across products, stores, and inventory"}
+                  </Text>
                 </Box>
-
-                <HStack className="catalog-assistant-scope" role="radiogroup" aria-label="Assistant scope" gap={2} flexWrap="wrap">
-                  <Button type="button" size="sm" className={scope === "catalog" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "catalog"} onClick={() => setScope("catalog")}>
-                    Entire catalog & inventory
-                  </Button>
-                  <Button type="button" size="sm" className={scope === "product" ? "product-workbench-tab active" : "product-workbench-tab"} aria-pressed={scope === "product"} disabled={!hasProductScope} onClick={() => setScope("product")}>
-                    Current product
-                  </Button>
-                </HStack>
 
                 <Box ref={threadRef} className="catalog-assistant-thread" aria-live="polite">
                   <VStack align="stretch" gap={3}>
