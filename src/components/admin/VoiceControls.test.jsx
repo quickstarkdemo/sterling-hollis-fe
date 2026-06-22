@@ -119,6 +119,22 @@ describe("VoiceControls", () => {
     expect(document.body).not.toHaveTextContent("ephemeral-secret");
   });
 
+  it("attaches and plays remote assistant audio when a Realtime track arrives", async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const { peer, media } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    await waitFor(() => expect(peer.setRemoteDescription).toHaveBeenCalled());
+    act(() => peer.ontrack?.({ streams: [media.stream] }));
+
+    expect(document.querySelector("audio[data-realtime-audio='true']")).toBeInTheDocument();
+    expect(play).toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Stop voice" }));
+    expect(document.querySelector("audio[data-realtime-audio='true']")).not.toBeInTheDocument();
+    play.mockRestore();
+  });
+
   it("records bounded Realtime lifecycle events without audio, credentials, SDP, or transcript text", async () => {
     const events = [];
     const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
@@ -307,6 +323,30 @@ describe("VoiceControls", () => {
     expect(onToolResult).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("function_call_output"));
     expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("response.create"));
+  });
+
+  it("publishes finalized transcript entries for compact chat composers", async () => {
+    const onTranscriptEntry = vi.fn();
+    const { channel } = renderVoice({ props: { compact: true, onTranscriptEntry } });
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+
+    act(() => {
+      channel.message({ type: "conversation.item.input_audio_transcription.completed", transcript: "Which stores are low?" });
+      channel.message({ type: "response.output_audio_transcript.done", transcript: "Dallas is low on stock." });
+    });
+
+    expect(onTranscriptEntry).toHaveBeenCalledWith(expect.objectContaining({
+      role: "presenter",
+      text: "Which stores are low?",
+      workflowId: "workflow_1",
+    }));
+    expect(onTranscriptEntry).toHaveBeenCalledWith(expect.objectContaining({
+      role: "assistant",
+      text: "Dallas is low on stock.",
+      workflowId: "workflow_1",
+    }));
+    expect(screen.queryByText("Which stores are low?")).not.toBeInTheDocument();
   });
 
   it("pins workbench voice calls to the active product session", async () => {

@@ -97,6 +97,7 @@ export default function VoiceControls({
   ensureWorkflow,
   onToolResult,
   onWorkflowEvent,
+  onTranscriptEntry,
   resetSignal = 0,
   startSignal = 0,
   sessionContext,
@@ -128,8 +129,8 @@ export default function VoiceControls({
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
   const traceActionRef = useRef(null);
-  const callbacksRef = useRef({ onToolResult, onWorkflowEvent });
-  callbacksRef.current = { onToolResult, onWorkflowEvent };
+  const callbacksRef = useRef({ onToolResult, onWorkflowEvent, onTranscriptEntry });
+  callbacksRef.current = { onToolResult, onWorkflowEvent, onTranscriptEntry };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
   const clearResources = useCallback(() => {
@@ -140,7 +141,20 @@ export default function VoiceControls({
     channelRef.current?.close?.();
     peerRef.current?.close?.();
     streamRef.current?.getTracks?.().forEach((track) => track.stop());
-    if (audioRef.current) audioRef.current.srcObject = null;
+    if (audioRef.current) {
+      const isJsdomMediaShim = /jsdom/i.test(window.navigator?.userAgent ?? "");
+      try {
+        if (!isJsdomMediaShim) audioRef.current.pause?.();
+      } catch {
+        // Non-browser media shims may expose pause() but not implement it.
+      }
+      try {
+        audioRef.current.srcObject = null;
+      } catch {
+        // Some test/browser shims do not expose srcObject as a writable field.
+      }
+      audioRef.current.remove?.();
+    }
     channelRef.current = null;
     peerRef.current = null;
     streamRef.current = null;
@@ -191,14 +205,20 @@ export default function VoiceControls({
     if (disabled && ACTIVE_STATES.has(status)) endSession("idle");
   }, [disabled, endSession, status]);
 
-  const completeTranscript = (role, text) => {
+  const completeTranscript = (role, text, activeWorkflowId) => {
     const normalized = String(text || "").trim();
     if (!normalized) return;
+    const clippedText = normalized.slice(-MAX_TRANSCRIPT_CHARS);
     entrySequenceRef.current += 1;
     setEntries((current) => [
       ...current,
-      { id: `${role}-${entrySequenceRef.current}`, role, text: normalized.slice(-MAX_TRANSCRIPT_CHARS) },
+      { id: `${role}-${entrySequenceRef.current}`, role, text: clippedText },
     ].slice(-MAX_TRANSCRIPT_ENTRIES));
+    callbacksRef.current.onTranscriptEntry?.({
+      role,
+      text: clippedText,
+      workflowId: activeWorkflowId,
+    });
     if (role === "presenter") {
       presenterPartialRef.current = "";
       setPresenterPartial("");
@@ -251,7 +271,7 @@ export default function VoiceControls({
         setPresenterPartial(presenterPartialRef.current);
         break;
       case "conversation.item.input_audio_transcription.completed":
-        completeTranscript("presenter", event.transcript || presenterPartialRef.current);
+        completeTranscript("presenter", event.transcript || presenterPartialRef.current, activeWorkflowId);
         break;
       case "response.output_audio_transcript.delta":
       case "response.audio_transcript.delta":
@@ -260,7 +280,7 @@ export default function VoiceControls({
         break;
       case "response.output_audio_transcript.done":
       case "response.audio_transcript.done":
-        completeTranscript("assistant", event.transcript || assistantPartialRef.current);
+        completeTranscript("assistant", event.transcript || assistantPartialRef.current, activeWorkflowId);
         break;
       case "response.function_call_arguments.done":
         void executeToolCall(event, activeWorkflowId, generation);
@@ -322,9 +342,23 @@ export default function VoiceControls({
       peerRef.current = peer;
       const audio = document.createElement("audio");
       audio.autoplay = true;
+      audio.playsInline = true;
+      audio.setAttribute("data-realtime-audio", "true");
+      audio.style.display = "none";
+      document.body?.appendChild(audio);
       audioRef.current = audio;
       peer.ontrack = (trackEvent) => {
-        if (generationRef.current === generation) audio.srcObject = trackEvent.streams?.[0] || null;
+        if (generationRef.current !== generation) return;
+        try {
+          audio.srcObject = trackEvent.streams?.[0] || null;
+          audio.play?.().catch?.(() => {
+            if (generationRef.current === generation) {
+              setNotice("Voice connected, but browser audio playback was blocked. The transcript remains available.");
+            }
+          });
+        } catch {
+          setNotice("Voice connected, but browser audio playback was blocked. The transcript remains available.");
+        }
       };
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
