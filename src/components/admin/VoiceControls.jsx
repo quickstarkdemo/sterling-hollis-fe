@@ -96,6 +96,7 @@ export default function VoiceControls({
   realtimeCapability,
   ensureWorkflow,
   onToolResult,
+  onVoiceStateChange,
   onWorkflowEvent,
   onTranscriptEntry,
   resetSignal = 0,
@@ -129,8 +130,8 @@ export default function VoiceControls({
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
   const traceActionRef = useRef(null);
-  const callbacksRef = useRef({ onToolResult, onWorkflowEvent, onTranscriptEntry });
-  callbacksRef.current = { onToolResult, onWorkflowEvent, onTranscriptEntry };
+  const callbacksRef = useRef({ onToolResult, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry });
+  callbacksRef.current = { onToolResult, onVoiceStateChange, onWorkflowEvent, onTranscriptEntry };
   const { resetBackendSession, startBackendSession, submitToolCall } = useCatalogRealtimeSession(sessionContext);
 
   const clearResources = useCallback(() => {
@@ -454,6 +455,28 @@ export default function VoiceControls({
       : contextLabel && status === "listening"
         ? listeningContextCopy
       : statusCopy[status];
+
+  useEffect(() => {
+    callbacksRef.current.onVoiceStateChange?.({
+      active,
+      assistantPartial,
+      configured: !configurationUnavailable,
+      displayCopy,
+      entries,
+      notice,
+      presenterPartial,
+      status: displayStatus,
+    });
+  }, [
+    active,
+    assistantPartial,
+    configurationUnavailable,
+    displayCopy,
+    displayStatus,
+    entries,
+    notice,
+    presenterPartial,
+  ]);
 
   if (compact) {
     return (

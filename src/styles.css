@@ -2040,7 +2040,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
   }
 
   .chat-form {
-    grid-template-columns: minmax(0, 1fr) 48px;
+    grid-template-columns: minmax(0, 1fr) 48px 48px;
   }
 
   .chat-form button {
@@ -2664,9 +2664,18 @@ body:has(.product-inspector-drawer-content) .api-trace-dock {
   text-align: left;
 }
 
+.catalog-assistant-outcome {
+  padding: 10px 12px;
+  border: 1px solid rgba(96, 114, 77, 0.18);
+  border-radius: 7px;
+  background: rgba(96, 114, 77, 0.08);
+}
+
 .catalog-assistant-voice-panel {
-  padding-top: 16px;
-  border-top: 1px solid rgba(23, 19, 15, 0.12);
+  padding: 14px;
+  border: 1px solid rgba(23, 19, 15, 0.1);
+  border-radius: 8px;
+  background: rgba(250, 248, 243, 0.72);
 }
 
 .catalog-assistant-drawer-footer {
