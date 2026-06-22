@@ -529,6 +529,17 @@ export default function CanonicalProductEditor({
         <Text className="muted-text">Changes remain private until publication. Archive removes the product from shopping surfaces while retaining its history.</Text>
       </Box>
 
+      <ProductMediaEditor
+        media={product.media || []}
+        busy={mediaBusy}
+        job={mediaJob}
+        mutationsDisabled={mediaCandidateActive}
+        onChange={updateMedia}
+        onGenerate={generateMedia}
+        onApprove={approveMedia}
+        enableAltText={schemaVersion >= 3}
+      />
+
       <Box className="editor-section merchandiser-product-details">
         <Text className="panel-title" mb={1}>Product details</Text>
         <Text className="muted-text" mb={4}>Edit the customer-facing facts that define this product.</Text>
@@ -556,16 +567,6 @@ export default function CanonicalProductEditor({
           onChange={updateContent}
         />
       ) : null}
-      <ProductMediaEditor
-        media={product.media || []}
-        busy={mediaBusy}
-        job={mediaJob}
-        mutationsDisabled={mediaCandidateActive}
-        onChange={updateMedia}
-        onGenerate={generateMedia}
-        onApprove={approveMedia}
-        enableAltText={schemaVersion >= 3}
-      />
       <ProductInventoryEditor inventory={product.inventory || []} stores={references.stores} availability={references.availability} referencesReady={referencesReady} errors={errors} onChange={updateInventory} />
       <FieldError message={errors.inventory} />
       {schemaVersion >= 3 && detail.current_draft ? (

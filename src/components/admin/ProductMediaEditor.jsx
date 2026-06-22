@@ -170,6 +170,7 @@ export default function ProductMediaEditor({
                   {enableAltText ? (
                     <Box>
                       <Text className="filter-label">Alt text</Text>
+                      <Text className="muted-mini">Describe the image for accessibility and search.</Text>
                       <Input
                         aria-label={`${label} alt text`}
                         value={asset.alt_text || ""}

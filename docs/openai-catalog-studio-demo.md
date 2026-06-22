@@ -42,8 +42,8 @@ mocked tests validated live provider credentials.
 ### Trace path (15 minutes)
 
 Use this path when the shared API trace capability is configured. Turn on
-**Developer tools** from the persistent bottom launcher, then open the compact
-bottom **Dev Tools** tray. Perform these actions in order:
+**Developer tools** from the Clerk profile menu, then open the compact bottom
+**Dev Tools** tray. Perform these actions in order:
 
 1. Create or refine a product draft from the **Product inspector**.
 2. Open **Ask AI** and ask one read-only inventory or assortment question.

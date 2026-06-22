@@ -8,6 +8,7 @@ import {
   FiCopy,
   FiDownload,
   FiRefreshCw,
+  FiTrash2,
 } from "react-icons/fi";
 
 import { useApiTrace } from "../ApiTraceContext";
@@ -78,12 +79,15 @@ export default function ApiTraceDock() {
     connectionStatus,
     traceError,
     selectTrace,
+    deleteTraceIds,
     refreshTraces,
   } = useApiTrace();
   const [preference, setPreference] = useState(initialPreference);
   const [selection, setSelection] = useState({ kind: "trace", id: "" });
   const [copied, setCopied] = useState(false);
   const [exportStatus, setExportStatus] = useState("idle");
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteSelection, setDeleteSelection] = useState(() => new Set());
   const replay = useTraceReplay(selectedTrace);
   const visibleTrace = replay.projection;
   const copyTimer = useRef(null);
@@ -110,6 +114,9 @@ export default function ApiTraceDock() {
       }
     });
   }, [preference.expanded]);
+  useEffect(() => {
+    setDeleteSelection((current) => new Set([...current].filter((traceId) => recentTraces.some((trace) => trace.trace_id === traceId))));
+  }, [recentTraces]);
 
   const updatePreference = useCallback((updates) => {
     setPreference((current) => {
@@ -201,6 +208,22 @@ export default function ApiTraceDock() {
     }
   };
 
+  const toggleDeleteSelection = (traceId) => {
+    setDeleteSelection((current) => {
+      const next = new Set(current);
+      if (next.has(traceId)) next.delete(traceId);
+      else next.add(traceId);
+      return next;
+    });
+  };
+
+  const deleteSelectedTraces = () => {
+    const traceIds = deleteSelection.size ? [...deleteSelection] : [selectedTraceId].filter(Boolean);
+    deleteTraceIds(traceIds);
+    setDeleteSelection(new Set());
+    setDeleteMode(false);
+  };
+
   if (!authorized || !available || !enabled) return null;
 
   if (!preference.expanded) {
@@ -252,6 +275,9 @@ export default function ApiTraceDock() {
           <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={refreshTraces} aria-label="Refresh traces">
             <FiRefreshCw />
           </Button>
+          <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={() => deleteTraceIds([selectedTraceId])} disabled={!selectedTraceId} aria-label="Delete current trace">
+            <FiTrash2 /> Delete
+          </Button>
           <Button type="button" size="xs" variant="ghost" className="trace-icon-button" onClick={copyTrace} disabled={!selectedTrace}>
             {copied ? <FiCheck /> : <FiCopy />} {copied ? "Copied" : "Copy"}
           </Button>
@@ -268,7 +294,28 @@ export default function ApiTraceDock() {
         <Box as="nav" className="api-trace-recents" aria-label="Recent API traces">
           <Box className="api-trace-section-heading">
             <Text className="filter-label">Recent traces</Text>
-            <Text>{recentTraces.length}</Text>
+            <HStack gap={2}>
+              {deleteMode ? (
+                <>
+                  <Button type="button" size="xs" variant="ghost" className="trace-list-action" onClick={() => setDeleteSelection(new Set(recentTraces.map((trace) => trace.trace_id)))}>
+                    All
+                  </Button>
+                  <Button type="button" size="xs" variant="ghost" className="trace-list-action danger" disabled={!deleteSelection.size} onClick={deleteSelectedTraces}>
+                    Delete {deleteSelection.size || ""}
+                  </Button>
+                  <Button type="button" size="xs" variant="ghost" className="trace-list-action" onClick={() => { setDeleteMode(false); setDeleteSelection(new Set()); }}>
+                    Done
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Text>{recentTraces.length}</Text>
+                  <Button type="button" size="xs" variant="ghost" className="trace-list-action" onClick={() => setDeleteMode(true)}>
+                    Manage
+                  </Button>
+                </>
+              )}
+            </HStack>
           </Box>
           {recentStatus === "loading" ? <Text className="api-trace-empty">Loading recent traces…</Text> : null}
           {recentStatus === "error" ? <Text className="api-trace-error">{traceError}</Text> : null}
@@ -280,8 +327,11 @@ export default function ApiTraceDock() {
                 role="option"
                 aria-selected={trace.trace_id === selectedTraceId}
                 key={trace.trace_id}
-                className={`api-trace-list-item${trace.trace_id === selectedTraceId ? " selected" : ""}`}
-                onClick={() => selectTrace(trace.trace_id)}
+                className={`api-trace-list-item${trace.trace_id === selectedTraceId ? " selected" : ""}${deleteSelection.has(trace.trace_id) ? " marked" : ""}`}
+                onClick={() => {
+                  if (deleteMode) toggleDeleteSelection(trace.trace_id);
+                  else selectTrace(trace.trace_id);
+                }}
                 onKeyDown={(event) => navigateTraceList(event, trace.trace_id)}
               >
                 <span><strong>{trace.name}</strong><small>{trace.surface} · {formatTraceTime(trace.started_at)}</small></span>

@@ -6,6 +6,8 @@ import { renderWithProviders } from "../../test/render";
 import CatalogProductList from "./CatalogProductList";
 
 const api = vi.hoisted(() => ({
+  getAdminCatalogProduct: vi.fn(),
+  getAdminCatalogProductV2: vi.fn(),
   getAdminCatalogProducts: vi.fn(),
   getAdminCatalogProductsV2: vi.fn(),
   getCategories: vi.fn(),
@@ -13,7 +15,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../../utils/apiClient", () => api);
 
 const products = [
-  { product_id: "cat_published", lifecycle_status: "published", version: 2, title: "Wool Coat", brand: "Sterling Hollis", category: "womens_apparel", has_draft: false, updated_at: "2026-06-17T12:00:00Z" },
+  { product_id: "cat_published", lifecycle_status: "published", version: 2, title: "Wool Coat", brand: "Sterling Hollis", category: "womens_apparel", has_draft: false, images: { thumbnail_url: "https://example.com/wool-coat-thumb.jpg" }, updated_at: "2026-06-17T12:00:00Z" },
   { product_id: "cat_draft", lifecycle_status: "draft", version: 0, title: "Silk Dress", brand: "Sterling Hollis", category: "womens_apparel", has_draft: true, current_draft_version: 3, updated_at: "2026-06-17T12:00:00Z" },
   { product_id: "cat_archived", lifecycle_status: "archived", version: 4, title: "Leather Tote", brand: "Sterling Hollis", category: "handbags", has_draft: false, updated_at: "2026-06-17T12:00:00Z" },
 ];
@@ -21,6 +23,8 @@ const products = [
 describe("CatalogProductList", () => {
   beforeEach(() => {
     localStorage.clear();
+    api.getAdminCatalogProduct.mockReset().mockResolvedValue({ published_snapshot: { variants: [] } });
+    api.getAdminCatalogProductV2.mockReset().mockResolvedValue({ published_snapshot: { variants: [] } });
     api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getCategories.mockReset().mockResolvedValue({
@@ -51,6 +55,7 @@ describe("CatalogProductList", () => {
     renderWithProviders(<CatalogProductList selectedProductId="" onSelect={onSelect} />);
 
     expect(await screen.findByText("Wool Coat")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Wool Coat" })).toHaveAttribute("src", "https://example.com/wool-coat-thumb.jpg");
     expect(screen.getByText("Silk Dress")).toBeInTheDocument();
     expect(screen.getByText("Leather Tote")).toBeInTheDocument();
     expect(screen.getByText("Draft v3")).toBeInTheDocument();

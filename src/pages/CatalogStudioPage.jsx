@@ -1,15 +1,13 @@
 import { Box, Button, Container, Flex, Text } from "@chakra-ui/react";
-import { FiCode, FiMessageSquare, FiPlus } from "react-icons/fi";
+import { FiMessageSquare, FiPlus } from "react-icons/fi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useDeveloperLens } from "../components/DeveloperLensContext";
 import { useCatalogStudioAccess } from "../components/CatalogStudioAccessContext";
 import CatalogProductList from "../components/admin/CatalogProductList";
 import ProductWorkbench from "../components/admin/ProductWorkbench";
 import { getAdminCatalogReferences } from "../utils/apiClient";
 
 export default function CatalogStudioPage() {
-  const { enabled: developerToolsEnabled, toggle } = useDeveloperLens();
   const { session } = useCatalogStudioAccess();
   const [selectedProductId, setSelectedProductId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
@@ -130,18 +128,6 @@ export default function CatalogStudioPage() {
           />
         </Box>
       </Container>
-
-      <Box className="developer-tools-launcher">
-        <Button
-          type="button"
-          className={developerToolsEnabled ? "developer-tools-button enabled" : "developer-tools-button"}
-          aria-pressed={developerToolsEnabled}
-          onClick={toggle}
-        >
-          <FiCode />
-          {developerToolsEnabled ? "Hide Developer tools" : "Developer tools"}
-        </Button>
-      </Box>
     </Box>
   );
 }

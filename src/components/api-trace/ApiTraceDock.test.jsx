@@ -48,6 +48,7 @@ function traceState(overrides = {}) {
     connectionStatus: "live",
     traceError: "",
     selectTrace: vi.fn(),
+    deleteTraceIds: vi.fn(),
     refreshTraces: vi.fn(),
     ...overrides,
   };
@@ -144,6 +145,21 @@ describe("ApiTraceDock", () => {
     const copied = writeText.mock.calls[0][0];
     expect(copied).toContain("[REDACTED]");
     expect(copied).not.toContain("Bearer secret");
+  });
+
+  it("supports deleting the current trace and batch selecting recent traces", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
+    const deleteTraceIds = vi.fn();
+    useApiTrace.mockReturnValue(traceState({ deleteTraceIds }));
+    renderWithProviders(<ApiTraceDock />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete current trace" }));
+    expect(deleteTraceIds).toHaveBeenCalledWith(["trace-1"]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Manage" }));
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
+    await userEvent.click(screen.getByRole("button", { name: /Delete 1/ }));
+    expect(deleteTraceIds).toHaveBeenLastCalledWith(["trace-1"]);
   });
 
   it.each([

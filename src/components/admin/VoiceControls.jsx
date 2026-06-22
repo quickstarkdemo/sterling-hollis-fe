@@ -101,6 +101,7 @@ export default function VoiceControls({
   startSignal = 0,
   sessionContext,
   contextLabel = "",
+  compact = false,
   createPeerConnection = defaultPeerConnection,
   requestMicrophone = defaultMicrophoneRequest,
   exchangeSdp = defaultSdpExchange,
@@ -418,7 +419,31 @@ export default function VoiceControls({
       ? idleContextCopy
       : contextLabel && status === "listening"
         ? listeningContextCopy
-        : statusCopy[status];
+      : statusCopy[status];
+
+  if (compact) {
+    return (
+      <HStack className={`voice-compact-control ${active ? "active" : ""}`} gap={2}>
+        {active || status !== "idle" ? (
+          <Box className={`voice-eq-pill ${active ? "active" : displayStatus}`} aria-label={`Voice ${displayStatus}`}>
+            <span />
+            <span />
+            <span />
+            <span />
+          </Box>
+        ) : null}
+        <Button
+          type="button"
+          className={`voice-composer-button ${active ? "active" : ""}`}
+          disabled={!active && (disabled || configurationUnavailable)}
+          onClick={active ? () => endSession("idle") : startSession}
+          aria-label={active ? "Stop voice" : "Start voice"}
+        >
+          {active ? <FiMicOff /> : <FiMic />}
+        </Button>
+      </HStack>
+    );
+  }
 
   return (
     <Box className="voice-controls">

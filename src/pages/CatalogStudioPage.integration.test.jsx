@@ -191,7 +191,7 @@ describe("Catalog Studio contract journey", () => {
     expect(screen.getByTestId("contract-product-editor")).toHaveTextContent("cat_contract_coat");
     expect(screen.queryByText("Sanitized API metadata")).not.toBeInTheDocument();
     expect(screen.queryByText("gpt-5")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
+    expect(sessionStorage.getItem("sterling-hollis:catalog-studio:developer-lens")).toBe("enabled");
     expect(document.body).not.toHaveTextContent("never-render");
 
     api.getCatalogWorkflow.mockResolvedValue({

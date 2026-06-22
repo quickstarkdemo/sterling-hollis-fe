@@ -46,9 +46,28 @@ export function ApiTraceCapabilityBridge() {
   return null;
 }
 
+const HIDDEN_TRACES_KEY = "sterling-hollis:api-trace-hidden:v1";
+
+function initialHiddenTraces() {
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(HIDDEN_TRACES_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistHiddenTraces(traceIds) {
+  try {
+    sessionStorage.setItem(HIDDEN_TRACES_KEY, JSON.stringify([...traceIds]));
+  } catch {
+    // Hidden trace preferences are session-only UI state.
+  }
+}
+
 export default function ApiTraceProvider({ children }) {
   const [capture, setCapture] = useState(INITIAL_API_TRACE_CAPTURE);
   const [recentTraces, setRecentTraces] = useState([]);
+  const [hiddenTraceIds, setHiddenTraceIds] = useState(initialHiddenTraces);
   const [recentStatus, setRecentStatus] = useState("idle");
   const [selectedTraceId, setSelectedTraceId] = useState("");
   const [selectedTrace, setSelectedTrace] = useState(null);
@@ -75,7 +94,7 @@ export default function ApiTraceProvider({ children }) {
     setRecentStatus((current) => current === "ready" ? "refreshing" : "loading");
     try {
       const response = await getAdminApiTraces({ limit: 30 });
-      const items = response?.items || [];
+      const items = (response?.items || []).filter((item) => !hiddenTraceIds.has(item.trace_id));
       setRecentTraces(items);
       setSelectedTraceId((current) => {
         if (current && items.some((item) => item.trace_id === current)) return current;
@@ -89,10 +108,26 @@ export default function ApiTraceProvider({ children }) {
       setTraceError(error?.response?.data?.detail || error?.message || "Recent traces could not be loaded.");
       return [];
     }
-  }, [capture.authorized, capture.enabled]);
+  }, [capture.authorized, capture.enabled, hiddenTraceIds]);
 
   const selectTrace = useCallback((traceId) => {
     setSelectedTraceId(String(traceId || ""));
+  }, []);
+
+  const deleteTraceIds = useCallback((traceIds = []) => {
+    const ids = new Set(traceIds.filter(Boolean));
+    if (!ids.size) return;
+    setHiddenTraceIds((current) => {
+      const next = new Set([...current, ...ids]);
+      persistHiddenTraces(next);
+      return next;
+    });
+    setRecentTraces((current) => {
+      const remaining = current.filter((trace) => !ids.has(trace.trace_id));
+      setSelectedTraceId((currentTraceId) => (ids.has(currentTraceId) ? remaining[0]?.trace_id || "" : currentTraceId));
+      return remaining;
+    });
+    setSelectedTrace((current) => (ids.has(current?.trace_id) ? null : current));
   }, []);
 
   useEffect(() => {
@@ -230,11 +265,13 @@ export default function ApiTraceProvider({ children }) {
       connectionStatus,
       traceError,
       selectTrace,
+      deleteTraceIds,
       refreshTraces,
     }),
     [
       capture,
       connectionStatus,
+      deleteTraceIds,
       recentStatus,
       recentTraces,
       refreshTraces,

@@ -255,20 +255,6 @@ export default function CatalogGlobalAssistant({
 
                 {error ? <Text className="catalog-action-hint" role="alert">{error}</Text> : null}
 
-                <Box className="catalog-assistant-voice-panel">
-                  <Text className="section-kicker">Read-only voice</Text>
-                  <VoiceControls
-                    workflowId={workflowId}
-                    ensureWorkflow={ensureWorkflow}
-                    assistantMode="read"
-                    realtimeCapability={realtimeCapability}
-                    resetSignal={resetSignal}
-                    sessionContext={voiceContext}
-                    contextLabel={scopeLabel}
-                    onToolResult={voiceToolResult}
-                    onWorkflowEvent={onWorkflowEvent}
-                  />
-                </Box>
               </VStack>
             </Drawer.Body>
 
@@ -296,11 +282,23 @@ export default function CatalogGlobalAssistant({
                   rows={2}
                   maxLength={1000}
                 />
+                <VoiceControls
+                  workflowId={workflowId}
+                  ensureWorkflow={ensureWorkflow}
+                  assistantMode="read"
+                  realtimeCapability={realtimeCapability}
+                  resetSignal={resetSignal}
+                  sessionContext={voiceContext}
+                  contextLabel={scopeLabel}
+                  onToolResult={voiceToolResult}
+                  onWorkflowEvent={onWorkflowEvent}
+                  compact
+                />
                 <IconButton type="button" className="primary-button" loading={busy} onClick={() => submitQuestion()} aria-label="Ask catalog assistant">
                   <FiSend />
                 </IconButton>
               </Box>
-              <Text className="muted-mini">Answers are read-only and cited. Draft-changing voice controls stay in the product workspace.</Text>
+              <Text className="muted-mini">Answers are read-only and cited.</Text>
             </Drawer.Footer>
           </Drawer.Content>
         </Drawer.Positioner>

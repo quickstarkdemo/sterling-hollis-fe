@@ -2,12 +2,20 @@ import { Badge, Box, Button, HStack, Input, NativeSelect, SimpleGrid, Text, VSta
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FiChevronLeft, FiChevronRight, FiGrid, FiList, FiRefreshCw, FiSearch, FiX } from "react-icons/fi";
 
+import ProductImage from "../ProductImage";
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
-import { getAdminCatalogProducts, getAdminCatalogProductsV2, getCategories } from "../../utils/apiClient";
-import { titleize } from "../../utils/format";
+import {
+  getAdminCatalogProduct,
+  getAdminCatalogProductV2,
+  getAdminCatalogProducts,
+  getAdminCatalogProductsV2,
+  getCategories,
+} from "../../utils/apiClient";
+import { imageFor, titleize } from "../../utils/format";
 
 const PAGE_SIZE = 12;
 const VIEW_MODE_KEY = "sterling-hollis:catalog-studio:product-view-mode";
+const EMPTY_ITEMS = [];
 
 function preferredViewMode() {
   try {
@@ -26,7 +34,14 @@ function ProductStatusBadges({ item, align = "end" }) {
   );
 }
 
-function ProductGridResults({ items, selectedProductId, onSelect }) {
+function detailImage(detail) {
+  return imageFor(detail)
+    || imageFor(detail?.current_draft?.product)
+    || imageFor(detail?.published_snapshot)
+    || "";
+}
+
+function ProductGridResults({ items, selectedProductId, onSelect, thumbnailById }) {
   return (
     <Box className="catalog-product-grid">
       {items.map((item) => (
@@ -38,7 +53,13 @@ function ProductGridResults({ items, selectedProductId, onSelect }) {
           aria-pressed={selectedProductId === item.product_id}
           onClick={() => onSelect(item.product_id)}
         >
-          <Box minW={0} textAlign="left">
+          <ProductImage
+            src={imageFor(item) || thumbnailById[item.product_id] || ""}
+            alt={item.title}
+            className="catalog-product-card-image"
+            ratio="4 / 5"
+          />
+          <Box minW={0} textAlign="left" className="catalog-product-card-body">
             <Text className="catalog-product-row-title">{item.title}</Text>
             <Text className="catalog-product-row-meta">{item.brand}</Text>
             <Text className="catalog-product-card-category">{titleize(item.category)}</Text>
@@ -103,6 +124,7 @@ export default function CatalogProductList({
   const [brand, setBrand] = useState("");
   const [page, setPage] = useState(1);
   const [payload, setPayload] = useState(null);
+  const [thumbnailById, setThumbnailById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState(preferredViewMode);
@@ -142,9 +164,39 @@ export default function CatalogProductList({
     }
   }, []);
 
+  const items = payload?.items || EMPTY_ITEMS;
+
   useEffect(() => {
     load();
   }, [load, refreshKey]);
+
+  useEffect(() => {
+    const missingItems = items.filter((item) => item.product_id && !imageFor(item) && !thumbnailById[item.product_id]);
+    if (!missingItems.length) return undefined;
+    let active = true;
+    const loadThumbnails = async () => {
+      const readProduct = authoringSchemaVersion >= 2 ? getAdminCatalogProductV2 : getAdminCatalogProduct;
+      const entries = await Promise.all(missingItems.map(async (item) => {
+        try {
+          const detail = await readProduct(item.product_id);
+          return [item.product_id, detailImage(detail)];
+        } catch {
+          return [item.product_id, ""];
+        }
+      }));
+      if (!active) return;
+      const hydrated = Object.fromEntries(entries.filter(([, url]) => Boolean(url)));
+      if (!Object.keys(hydrated).length) return;
+      setThumbnailById((current) => ({
+        ...current,
+        ...hydrated,
+      }));
+    };
+    loadThumbnails();
+    return () => {
+      active = false;
+    };
+  }, [authoringSchemaVersion, items, thumbnailById]);
 
   useEffect(() => {
     if (authoringSchemaVersion >= 2) {
@@ -164,7 +216,6 @@ export default function CatalogProductList({
     setPage(1);
   };
 
-  const items = payload?.items || [];
   const total = payload?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / (payload?.page_size || PAGE_SIZE)));
   const hasFilters = Boolean(query || lifecycleStatus || category || brand);
@@ -281,7 +332,12 @@ export default function CatalogProductList({
           {viewMode === "table" ? (
             <ProductTableResults items={items} selectedProductId={selectedProductId} onSelect={onSelect} />
           ) : (
-            <ProductGridResults items={items} selectedProductId={selectedProductId} onSelect={onSelect} />
+            <ProductGridResults
+              items={items}
+              selectedProductId={selectedProductId}
+              onSelect={onSelect}
+              thumbnailById={thumbnailById}
+            />
           )}
         </Box>
       ) : null}

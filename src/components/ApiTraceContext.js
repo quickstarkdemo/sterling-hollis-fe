@@ -31,6 +31,7 @@ export const ApiTraceContext = createContext({
   connectionStatus: "offline",
   traceError: "",
   selectTrace: () => {},
+  deleteTraceIds: () => {},
   refreshTraces: async () => {},
 });
 

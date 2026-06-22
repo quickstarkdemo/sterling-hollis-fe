@@ -38,7 +38,7 @@ vi.mock("@clerk/clerk-react", () => ({
   UserButton: Object.assign(({ children }) => <div data-testid="user-button">{children}</div>, {
     MenuItems: ({ children }) => <div>{children}</div>,
     Link: ({ href, label }) => <a href={href}>{label}</a>,
-    Action: ({ label }) => <button type="button">{label}</button>,
+    Action: ({ label, onClick }) => <button type="button" onClick={onClick}>{label}</button>,
     UserProfilePage: ({ children }) => <div>{children}</div>,
   }),
   SignInButton: ({ children }) => children,
@@ -111,7 +111,7 @@ describe("CatalogStudioPage", () => {
     expect(screen.queryByRole("button", { name: "Create with OpenAI" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Manage catalog" })).not.toBeInTheDocument();
     expect(screen.queryByText("System readiness")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Developer tools" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Developer tools" })).toBeInTheDocument();
     const studioLinks = screen.getAllByRole("link", { name: "Catalog Studio" });
     expect(studioLinks).toHaveLength(2);
     expect(studioLinks[0]).toHaveAttribute("href", "/catalog-studio");
@@ -136,20 +136,20 @@ describe("CatalogStudioPage", () => {
     expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
   });
 
-  it("persists the developer tools launcher for the browser session", async () => {
+  it("persists the developer tools user menu action for the browser session", async () => {
     const user = userEvent.setup();
     const firstRender = renderStudio();
     await screen.findByRole("heading", { name: "Catalog Studio" });
 
     await user.click(screen.getByRole("button", { name: "Developer tools" }));
 
-    expect(screen.getByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Hide Developer tools" })).toBeInTheDocument();
     expect(sessionStorage.getItem("sterling-hollis:catalog-studio:developer-lens")).toBe("enabled");
 
     firstRender.unmount();
     renderStudio();
 
-    expect(await screen.findByRole("button", { name: "Hide Developer tools" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: "Hide Developer tools" })).toBeInTheDocument();
   });
 
   it("warns before switching away from a dirty product", async () => {

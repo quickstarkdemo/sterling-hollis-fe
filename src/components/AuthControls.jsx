@@ -1,18 +1,24 @@
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Button, HStack } from "@chakra-ui/react";
-import { FiGrid, FiLogIn, FiSliders } from "react-icons/fi";
+import { FiCode, FiGrid, FiLogIn, FiSliders } from "react-icons/fi";
+import { Link as RouterLink } from "react-router-dom";
 
 import DemoObservabilityPanel from "./DemoObservabilityPanel";
 import { CLERK_ENABLED, isDemoObservabilityUiEnabled } from "../utils/clerkConfig";
+import { useDeveloperLens } from "./DeveloperLensContext";
 import { useCatalogStudioAccess } from "./CatalogStudioAccessContext";
 
-function StorefrontUserButton({ showCatalogStudio }) {
+function StorefrontUserButton({ showCatalogStudio, developerToolsEnabled, onToggleDeveloperTools }) {
   const showDemoControls = isDemoObservabilityUiEnabled();
-  if (!showCatalogStudio && !showDemoControls) return <UserButton />;
 
   return (
     <UserButton>
       <UserButton.MenuItems>
+        <UserButton.Action
+          label={developerToolsEnabled ? "Hide Developer tools" : "Developer tools"}
+          labelIcon={<FiCode />}
+          onClick={onToggleDeveloperTools}
+        />
         {showCatalogStudio ? (
           <UserButton.Link label="Catalog Studio" labelIcon={<FiGrid />} href="/catalog-studio" />
         ) : null}
@@ -31,6 +37,7 @@ function StorefrontUserButton({ showCatalogStudio }) {
 
 function ClerkControls() {
   const { status: catalogStudioStatus } = useCatalogStudioAccess();
+  const { enabled: developerToolsEnabled, toggle: toggleDeveloperTools } = useDeveloperLens();
 
   return (
     <HStack gap={2} className="auth-controls">
@@ -43,13 +50,26 @@ function ClerkControls() {
         </SignInButton>
       </SignedOut>
       <SignedIn>
-        <StorefrontUserButton showCatalogStudio={catalogStudioStatus === "authorized"} />
+        <StorefrontUserButton
+          showCatalogStudio={catalogStudioStatus === "authorized"}
+          developerToolsEnabled={developerToolsEnabled}
+          onToggleDeveloperTools={toggleDeveloperTools}
+        />
       </SignedIn>
     </HStack>
   );
 }
 
 export default function AuthControls() {
-  if (!CLERK_ENABLED) return null;
+  if (!CLERK_ENABLED) {
+    return (
+      <HStack gap={2} className="auth-controls">
+        <Button as={RouterLink} to="/sign-in" size="sm" className="secondary-button">
+          <FiLogIn />
+          Sign in
+        </Button>
+      </HStack>
+    );
+  }
   return <ClerkControls />;
 }

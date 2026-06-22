@@ -14,7 +14,25 @@ export function titleize(value) {
 }
 
 export function imageFor(product) {
-  return product?.images?.thumbnail_url || product?.images?.primary_url || product?.image_url || "";
+  const mediaImage = [...(product?.media || [])]
+    .sort((left, right) => Number(left.display_order || 0) - Number(right.display_order || 0))
+    .find((asset) => asset?.image_set?.thumbnail_url || asset?.image_set?.primary_url || asset?.image_set?.detail_urls?.[0])
+    ?.image_set;
+  const variantImage = (product?.variants || [])
+    .find((variant) => variant?.image_link || variant?.image_set?.thumbnail_url || variant?.image_set?.primary_url || variant?.image_set?.detail_urls?.[0]);
+  return product?.images?.thumbnail_url
+    || product?.images?.primary_url
+    || product?.image_set?.thumbnail_url
+    || product?.image_set?.primary_url
+    || product?.image_url
+    || mediaImage?.thumbnail_url
+    || mediaImage?.primary_url
+    || mediaImage?.detail_urls?.[0]
+    || variantImage?.image_link
+    || variantImage?.image_set?.thumbnail_url
+    || variantImage?.image_set?.primary_url
+    || variantImage?.image_set?.detail_urls?.[0]
+    || "";
 }
 
 export function detailImages(product) {
