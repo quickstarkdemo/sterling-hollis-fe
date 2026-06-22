@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiSend, FiX } from "react-icons/fi";
 
 import { queryCatalogAssistant } from "../../utils/apiClient";
+import RealtimeTranscript from "./RealtimeTranscript";
 import VoiceControls from "./VoiceControls";
 
 const MAX_MESSAGES = 12;
@@ -88,6 +89,36 @@ function citationLabel(citation) {
   return citation.label || citation.kind;
 }
 
+function voiceOutcome(result) {
+  if (!result) return null;
+  if (result.status === "succeeded" && result.draft) {
+    const version = result.draft.draft_version ? `Draft version ${result.draft.draft_version}` : "Draft updated";
+    return {
+      label: "Product draft updated",
+      detail: `${version}. Review the product inspector before publishing.`,
+    };
+  }
+  if (result.status === "succeeded" && result.suggestion_set) {
+    return {
+      label: "Review proposal created",
+      detail: "Open Suggestions in the product inspector to accept or reject the change.",
+    };
+  }
+  if (result.mutation === false) {
+    return {
+      label: "Catalog readout",
+      detail: "The answer was produced from catalog, store, inventory, or readiness data.",
+    };
+  }
+  if (result.status) {
+    return {
+      label: result.status === "succeeded" ? "Agent action finished" : "Agent action needs review",
+      detail: result.retryable ? "You can try this voice action again." : "No product data changed without review.",
+    };
+  }
+  return null;
+}
+
 export default function CatalogGlobalAssistant({
   activeDetail,
   ensureWorkflow,
@@ -102,6 +133,16 @@ export default function CatalogGlobalAssistant({
   const [scope, setScope] = useState("catalog");
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
+  const [voiceState, setVoiceState] = useState({
+    active: false,
+    assistantPartial: "",
+    configured: true,
+    displayCopy: "",
+    entries: [],
+    notice: "",
+    presenterPartial: "",
+    status: "idle",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const threadRef = useRef(null);
@@ -145,7 +186,14 @@ export default function CatalogGlobalAssistant({
   const addMessage = (message) => {
     setMessages((current) => {
       const previous = current[current.length - 1];
-      if (previous?.role === message.role && previous?.message === message.message) return current;
+      if (previous?.role === message.role && previous?.message === message.message) {
+        return current.map((item, index) => index === current.length - 1 ? {
+          ...item,
+          citations: message.citations?.length ? message.citations : item.citations,
+          outcome: message.outcome || item.outcome,
+          scope: message.scope || item.scope,
+        } : item);
+      }
       return [...current, { id: `${Date.now()}-${current.length}`, ...message }].slice(-MAX_MESSAGES);
     });
   };
@@ -187,6 +235,7 @@ export default function CatalogGlobalAssistant({
       role: "assistant",
       message: result?.message || "The voice answer finished.",
       citations: result?.citations || [],
+      outcome: voiceOutcome(result),
       scope,
     });
   };
@@ -199,6 +248,14 @@ export default function CatalogGlobalAssistant({
       scope,
     });
   };
+
+  const voiceVisible = voiceState.active
+    || voiceState.status !== "idle"
+    || Boolean(voiceState.entries?.length)
+    || Boolean(voiceState.presenterPartial)
+    || Boolean(voiceState.assistantPartial)
+    || Boolean(voiceState.notice);
+  const voiceStatusClass = voiceState.status === "listening" ? "running" : voiceState.status;
 
   return (
     <Drawer.Root
@@ -260,6 +317,12 @@ export default function CatalogGlobalAssistant({
                             ))}
                           </HStack>
                         ) : null}
+                        {item.outcome ? (
+                          <Box className="catalog-assistant-outcome" mt={3}>
+                            <Badge className="workflow-status succeeded">{item.outcome.label}</Badge>
+                            <Text className="muted-mini" mt={1}>{item.outcome.detail}</Text>
+                          </Box>
+                        ) : null}
                       </Box>
                     )) : <Text className="muted-text">Ask about low stock, store coverage, assortment risk, or the selected product.</Text>}
                     {busy ? <Text className="chat-loading">Working...</Text> : null}
@@ -267,6 +330,26 @@ export default function CatalogGlobalAssistant({
                 </Box>
 
                 {error ? <Text className="catalog-action-hint" role="alert">{error}</Text> : null}
+
+                {voiceVisible ? (
+                  <Box className="catalog-assistant-voice-panel">
+                    <HStack justify="space-between" gap={3} flexWrap="wrap">
+                      <Box>
+                        <Text className="filter-label">Realtime voice agent</Text>
+                        <Text className="muted-text">{voiceState.displayCopy || "Speak naturally; transcript and outcomes appear in this drawer."}</Text>
+                      </Box>
+                      <Badge className={`workflow-status ${voiceStatusClass}`}>{voiceState.status}</Badge>
+                    </HStack>
+                    {voiceState.notice ? <Text className="catalog-action-hint" mt={3}>{voiceState.notice}</Text> : null}
+                    <Box mt={3}>
+                      <RealtimeTranscript
+                        entries={voiceState.entries}
+                        presenterPartial={voiceState.presenterPartial}
+                        assistantPartial={voiceState.assistantPartial}
+                      />
+                    </Box>
+                  </Box>
+                ) : null}
 
               </VStack>
             </Drawer.Body>
@@ -304,6 +387,7 @@ export default function CatalogGlobalAssistant({
                   sessionContext={voiceContext}
                   contextLabel={scopeLabel}
                   onToolResult={voiceToolResult}
+                  onVoiceStateChange={setVoiceState}
                   onWorkflowEvent={onWorkflowEvent}
                   onTranscriptEntry={voiceTranscript}
                   compact
@@ -312,7 +396,7 @@ export default function CatalogGlobalAssistant({
                   <FiSend />
                 </IconButton>
               </Box>
-              <Text className="muted-mini">Answers are read-only and cited.</Text>
+              <Text className="muted-mini">Catalog readouts are cited. Product voice outcomes stay reviewable before publish.</Text>
             </Drawer.Footer>
           </Drawer.Content>
         </Drawer.Positioner>
