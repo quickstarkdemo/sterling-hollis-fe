@@ -5,7 +5,7 @@ import useCatalogRealtimeSession from "./useCatalogRealtimeSession";
 
 const api = vi.hoisted(() => ({
   createCatalogRealtimeSession: vi.fn(),
-  submitCatalogRealtimeToolCall: vi.fn(),
+  submitCatalogRealtimeCompatibilityToolCall: vi.fn(),
   submitCatalogRealtimeV3ToolCall: vi.fn(),
 }));
 
@@ -13,7 +13,7 @@ vi.mock("../utils/apiClient", () => api);
 
 beforeEach(() => {
   api.createCatalogRealtimeSession.mockReset().mockResolvedValue({ session_id: "session_one" });
-  api.submitCatalogRealtimeToolCall.mockReset().mockResolvedValue({ status: "succeeded" });
+  api.submitCatalogRealtimeCompatibilityToolCall.mockReset().mockResolvedValue({ status: "succeeded" });
   api.submitCatalogRealtimeV3ToolCall.mockReset().mockResolvedValue({ mutation: false });
 });
 
@@ -40,7 +40,7 @@ it("routes active-product tools through the pinned v3 session", async () => {
     expect.objectContaining({ session_id: "session_one", name: "read_product_summary" }),
     "voice-call-one",
   );
-  expect(api.submitCatalogRealtimeToolCall).not.toHaveBeenCalled();
+  expect(api.submitCatalogRealtimeCompatibilityToolCall).not.toHaveBeenCalled();
 });
 
 it("keeps legacy new-draft tools on the compatibility endpoint", async () => {
@@ -53,6 +53,6 @@ it("keeps legacy new-draft tools on the compatibility endpoint", async () => {
     arguments: JSON.stringify({ instruction: "Create a coat", current_draft_id: null, expected_draft_version: 0 }),
   }, "voice-call-create"));
 
-  expect(api.submitCatalogRealtimeToolCall).toHaveBeenCalled();
+  expect(api.submitCatalogRealtimeCompatibilityToolCall).toHaveBeenCalled();
   expect(api.submitCatalogRealtimeV3ToolCall).not.toHaveBeenCalled();
 });

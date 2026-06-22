@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   createCatalogRealtimeSession,
-  submitCatalogRealtimeToolCall,
+  submitCatalogRealtimeCompatibilityToolCall,
   submitCatalogRealtimeV3ToolCall,
 } from "../utils/apiClient";
 
@@ -42,7 +42,7 @@ export default function useCatalogRealtimeSession(sessionContext) {
     const allowedTools = contextual ? WORKBENCH_TOOLS : LEGACY_TOOLS;
     if (!allowedTools.has(event.name)) throw new Error("unsupported_tool");
     const argumentsPayload = JSON.parse(event.arguments || "{}");
-    const submit = contextual ? submitCatalogRealtimeV3ToolCall : submitCatalogRealtimeToolCall;
+    const submit = contextual ? submitCatalogRealtimeV3ToolCall : submitCatalogRealtimeCompatibilityToolCall;
     return submit(workflowId, {
       ...(contextual ? { session_id: sessionIdRef.current } : {}),
       call_id: String(event.call_id || ""),

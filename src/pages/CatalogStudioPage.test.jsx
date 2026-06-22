@@ -19,9 +19,9 @@ const api = vi.hoisted(() => ({
   archiveAdminCatalogProduct: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   getAdminCatalogProduct: vi.fn(),
-  getAdminCatalogProducts: vi.fn(),
-  getAdminCatalogProductV2: vi.fn(),
-  getAdminCatalogProductsV2: vi.fn(),
+  getAdminCatalogProductsCompatibility: vi.fn(),
+  getAdminCatalogProductCompatibilityV2: vi.fn(),
+  getAdminCatalogProductV3: vi.fn(),
   getAdminCatalogReferences: vi.fn(),
   getCategories: vi.fn(),
   getCatalogStudioSession: vi.fn(),
@@ -76,11 +76,12 @@ describe("CatalogStudioPage", () => {
       getToken: vi.fn().mockResolvedValue("clerk-token"),
     };
     api.getCatalogStudioSession.mockReset().mockResolvedValue(session);
-    api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
-    api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
+    api.getAdminCatalogProductsCompatibility.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 12 });
     api.getAdminCatalogReferences.mockReset().mockResolvedValue({ brands: [], stores: [], categories: [], availability: [] });
     api.getCategories.mockReset().mockResolvedValue({ categories: [] });
     api.getAdminCatalogProduct.mockReset();
+    api.getAdminCatalogProductCompatibilityV2.mockReset();
+    api.getAdminCatalogProductV3.mockReset();
   });
 
   it("keeps Catalog Studio undiscoverable for anonymous storefront visitors", async () => {
@@ -124,7 +125,7 @@ describe("CatalogStudioPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Catalog assistant" })).not.toBeInTheDocument());
   });
 
-  it("loads v2 reference data once and uses the canonical product list when capability is advertised", async () => {
+  it("loads v2 reference data once and uses the explicit compatibility product list when capability is advertised", async () => {
     api.getCatalogStudioSession.mockResolvedValueOnce({
       authorized: true,
       capabilities: { catalog: { configured: true, authoring_schema_version: 2 } },
@@ -132,8 +133,7 @@ describe("CatalogStudioPage", () => {
     renderStudio();
 
     await waitFor(() => expect(api.getAdminCatalogReferences).toHaveBeenCalledTimes(1));
-    expect(api.getAdminCatalogProductsV2).toHaveBeenCalled();
-    expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
+    expect(api.getAdminCatalogProductsCompatibility).toHaveBeenCalled();
   });
 
   it("persists the developer tools user menu action for the browser session", async () => {
@@ -153,12 +153,16 @@ describe("CatalogStudioPage", () => {
   });
 
   it("warns before switching away from a dirty product", async () => {
+    api.getCatalogStudioSession.mockResolvedValueOnce({
+      authorized: true,
+      capabilities: { catalog: { configured: true, authoring_schema_version: 2 } },
+    });
     const products = [
       { product_id: "cat_one", lifecycle_status: "published", version: 1, title: "First Coat", brand: "Sterling Hollis", category: "womens_apparel", has_draft: true, current_draft_version: 1, updated_at: "2026-06-17T12:00:00Z" },
       { product_id: "cat_two", lifecycle_status: "published", version: 1, title: "Second Coat", brand: "Sterling Hollis", category: "womens_apparel", has_draft: false, updated_at: "2026-06-17T12:00:00Z" },
     ];
-    api.getAdminCatalogProducts.mockResolvedValue({ items: products, total: 2, page: 1, page_size: 12 });
-    api.getAdminCatalogProduct.mockResolvedValue({
+    api.getAdminCatalogProductsCompatibility.mockResolvedValue({ items: products, total: 2, page: 1, page_size: 12 });
+    api.getAdminCatalogProductCompatibilityV2.mockResolvedValue({
       product_id: "cat_one",
       lifecycle_status: "published",
       version: 1,
@@ -172,8 +176,24 @@ describe("CatalogStudioPage", () => {
         revision: { id: "draft_1", moderation_state: "approved" },
         draft_version: 1,
         product: {
-          product_id: "cat_one", seed_run_id: "run", title: "First Coat", description: "Description", brand: "Sterling Hollis", category: "womens_apparel", metadata: {}, variant_axes: [], primary_variant_index: 0,
-          variants: [{ variant_id: "var_1", color: "Black", material: "wool", price_min: 10, price_max: 10, image_set: {}, metadata: {}, inventory: [{ store_id: "1001", size: "M", availability: "in stock", inventory_qty: 1, objective_weight: 0, metadata: {} }] }],
+          schema_version: 2,
+          product_id: "cat_one",
+          seed_run_id: "run",
+          title: "First Coat",
+          description: "Description",
+          brand_id: "sterling-hollis",
+          brand: "Sterling Hollis",
+          category: "womens_apparel",
+          price_min: 10,
+          price_max: 10,
+          link: null,
+          color: "Black",
+          material: "wool",
+          gender: null,
+          season: null,
+          metadata: {},
+          media: [],
+          inventory: [{ store_id: "1001", size: "M", availability: "in stock", inventory_qty: 1, metadata: {} }],
         },
       },
       drafts: [],
@@ -185,6 +205,7 @@ describe("CatalogStudioPage", () => {
     const title = await screen.findByLabelText("Product title");
     await userEvent.clear(title);
     await userEvent.type(title, "Unsaved Coat");
+    await waitFor(() => expect(screen.getByRole("button", { name: /Save draft/i })).toBeEnabled());
     await userEvent.click(screen.getByRole("button", { name: /Second Coat/i }));
 
     expect(window.confirm).toHaveBeenCalledWith("Discard unsaved changes and open another product?");

@@ -5,10 +5,10 @@ import { Link as RouterLink } from "react-router-dom";
 
 import {
   archiveAdminCatalogProduct,
-  archiveAdminCatalogProductV2,
+  archiveAdminCatalogProductCurrentV2,
   createIdempotencyKey,
   publishAdminCatalogProduct,
-  publishAdminCatalogProductV2,
+  publishAdminCatalogProductCompatibilityV2,
   publishAdminCatalogProductV3,
 } from "../../utils/apiClient";
 import { useApiTrace } from "../ApiTraceContext";
@@ -19,7 +19,7 @@ function errorMessage(error, fallback) {
   return fallback;
 }
 
-export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 1, readiness }) {
+export default function ProductLifecycleActions({ product, dirty, onChanged, authoringSchemaVersion = 3, readiness }) {
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
   const { startAction } = useApiTrace();
@@ -27,7 +27,7 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
   const mutationKeys = useRef({});
   const draftId = product?.current_draft?.revision?.id;
   const draftApproved = product?.current_draft?.revision?.moderation_state === "approved";
-  const readinessBlocked = authoringSchemaVersion >= 3 && readiness?.ready !== true;
+  const readinessBlocked = authoringSchemaVersion >= 3 && readiness && readiness.ready !== true;
   const canPublish = Boolean(draftId) && draftApproved && !dirty && !readinessBlocked;
   const canArchive = product?.lifecycle_status === "published" && !dirty;
 
@@ -59,7 +59,7 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
       const publishProduct = authoringSchemaVersion >= 3
         ? publishAdminCatalogProductV3
         : authoringSchemaVersion >= 2
-          ? publishAdminCatalogProductV2
+          ? publishAdminCatalogProductCompatibilityV2
           : publishAdminCatalogProduct;
       await publishProduct(
         product.product_id,
@@ -101,7 +101,7 @@ export default function ProductLifecycleActions({ product, dirty, onChanged, aut
     try {
       const payload = { expected_version: product.version };
       const archiveProduct = authoringSchemaVersion >= 2
-        ? archiveAdminCatalogProductV2
+        ? archiveAdminCatalogProductCurrentV2
         : archiveAdminCatalogProduct;
       await archiveProduct(
         product.product_id,

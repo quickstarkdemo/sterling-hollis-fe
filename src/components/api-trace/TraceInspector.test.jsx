@@ -14,6 +14,7 @@ describe("TraceInspector", () => {
       payload_expired: true,
       truncation: { attributes: 2 },
       attributes: { safe: "visible", nested: { access_token: "do-not-render" } },
+      capability_id: "developer_trace.read",
       spans: [],
       events: [],
       artifacts: [],
@@ -25,5 +26,7 @@ describe("TraceInspector", () => {
     expect(screen.getByText(/visible/)).toBeInTheDocument();
     expect(screen.getByText(/do-not-render/)).toBeInTheDocument();
     expect(screen.getByText(/Full attributes/)).toBeInTheDocument();
+    expect(screen.getByText("Developer trace")).toBeInTheDocument();
+    expect(screen.getAllByText("catalog-studio").length).toBeGreaterThan(0);
   });
 });

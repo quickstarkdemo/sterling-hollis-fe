@@ -8,6 +8,7 @@ import { useChatContext } from "./ChatContext";
 import { useApiTrace } from "./ApiTraceContext";
 import { sendChat } from "../utils/apiClient";
 import { CLERK_ENABLED } from "../utils/clerkConfig";
+import { capabilityDiagnosticParts } from "../utils/capabilityDiagnostics";
 import { imageFor, money } from "../utils/format";
 
 const genericStarterPrompts = [
@@ -248,9 +249,9 @@ export default function ChatWidget({ title = "Storefront chat", showDiagnostics 
                           ) : null}
                           {showDiagnostics && message.toolTrace?.length ? (
                             <VStack align="stretch" gap={1} mt={3} className="chat-tool-trace">
-                              {message.toolTrace.map((trace) => (
-                                <Text key={`${trace.name}-${trace.decision}`} className="muted-mini">
-                                  {trace.name}: {trace.decision}
+                              {message.toolTrace.map((trace, traceIndex) => (
+                                <Text key={`${trace.name}-${trace.decision}-${traceIndex}`} className="muted-mini">
+                                  {capabilityDiagnosticParts(trace, { operation: trace.name, status: trace.decision }).join(" - ")}
                                 </Text>
                               ))}
                             </VStack>

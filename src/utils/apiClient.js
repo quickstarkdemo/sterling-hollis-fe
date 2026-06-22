@@ -303,14 +303,6 @@ export function createIdempotencyKey(scope = "catalog") {
   return `${scope}-${randomPart}`;
 }
 
-export function getAdminCatalogProducts(params = {}) {
-  return get("/api/admin/catalog/products", params);
-}
-
-export function getAdminCatalogProduct(productId) {
-  return get(catalogProductPath(productId));
-}
-
 export function getAdminCatalogReferences() {
   return get("/api/admin/catalog/v2/references");
 }
@@ -319,27 +311,27 @@ export function createAdminCatalogBrand(payload, idempotencyKey) {
   return post("/api/admin/catalog/v2/brands", payload, idempotencyConfig(idempotencyKey));
 }
 
-export function getAdminCatalogProductsV2(params = {}) {
+export function getAdminCatalogProductsCompatibility(params = {}) {
   return get("/api/admin/catalog/v2/products", params);
 }
 
-export function getAdminCatalogProductV2(productId) {
+export function getAdminCatalogProductCompatibilityV2(productId) {
   return get(catalogProductV2Path(productId));
 }
 
-export function startAdminCatalogProductRevisionV2(productId, payload, idempotencyKey) {
+export function startAdminCatalogProductRevisionCompatibilityV2(productId, payload, idempotencyKey) {
   return post(catalogProductV2Path(productId, "/revisions"), payload, idempotencyConfig(idempotencyKey));
 }
 
-export function saveAdminCatalogProductDraftV2(productId, payload, idempotencyKey) {
+export function saveAdminCatalogProductDraftCompatibilityV2(productId, payload, idempotencyKey) {
   return put(catalogProductV2Path(productId, "/draft"), payload, idempotencyConfig(idempotencyKey));
 }
 
-export function publishAdminCatalogProductV2(productId, payload, idempotencyKey) {
+export function publishAdminCatalogProductCompatibilityV2(productId, payload, idempotencyKey) {
   return post(catalogProductV2Path(productId, "/publish"), payload, idempotencyConfig(idempotencyKey));
 }
 
-export function archiveAdminCatalogProductV2(productId, payload, idempotencyKey) {
+export function archiveAdminCatalogProductCurrentV2(productId, payload, idempotencyKey) {
   return post(catalogProductV2Path(productId, "/archive"), payload, idempotencyConfig(idempotencyKey));
 }
 
@@ -367,20 +359,24 @@ export function getAdminCatalogProductPreviewV3(productId, draftId) {
   return get(catalogProductV3Path(productId, `/drafts/${encodeURIComponent(draftId)}/preview`));
 }
 
+export function getAdminCatalogProduct(productId) {
+  return getAdminCatalogProductV3(productId);
+}
+
 export function startAdminCatalogProductRevision(productId, payload, idempotencyKey) {
-  return post(catalogProductPath(productId, "/revisions"), payload, idempotencyConfig(idempotencyKey));
+  return startAdminCatalogProductRevisionV3(productId, payload, idempotencyKey);
 }
 
 export function saveAdminCatalogProductDraft(productId, payload, idempotencyKey) {
-  return put(catalogProductPath(productId, "/draft"), payload, idempotencyConfig(idempotencyKey));
+  return saveAdminCatalogProductDraftV3(productId, payload, idempotencyKey);
 }
 
 export function publishAdminCatalogProduct(productId, payload, idempotencyKey) {
-  return post(catalogProductPath(productId, "/publish"), payload, idempotencyConfig(idempotencyKey));
+  return publishAdminCatalogProductV3(productId, payload, idempotencyKey);
 }
 
 export function archiveAdminCatalogProduct(productId, payload, idempotencyKey) {
-  return post(catalogProductPath(productId, "/archive"), payload, idempotencyConfig(idempotencyKey));
+  return archiveAdminCatalogProductCurrentV2(productId, payload, idempotencyKey);
 }
 
 const catalogWorkflowPath = (workflowId, suffix = "") =>
@@ -406,7 +402,7 @@ export function createCatalogRealtimeSession(workflowId, context) {
   return post(catalogWorkflowPath(workflowId, "/realtime/sessions"), context);
 }
 
-export function submitCatalogRealtimeToolCall(workflowId, payload, idempotencyKey) {
+export function submitCatalogRealtimeCompatibilityToolCall(workflowId, payload, idempotencyKey) {
   return post(
     catalogWorkflowPath(workflowId, "/realtime/tool-calls"),
     payload,
@@ -421,6 +417,52 @@ export function submitCatalogRealtimeV3ToolCall(workflowId, payload, idempotency
     idempotencyConfig(idempotencyKey),
   );
 }
+
+export const API_HELPER_CONTRACTS = [
+  { helperName: "getCatalog", method: "GET", pathTemplate: "/api/catalog" },
+  { helperName: "getCategories", method: "GET", pathTemplate: "/api/categories" },
+  { helperName: "getProducts", method: "GET", pathTemplate: "/api/products" },
+  { helperName: "getCategoryProducts", method: "GET", pathTemplate: "/api/categories/{category}/products" },
+  { helperName: "getProduct", method: "GET", pathTemplate: "/api/products/{product_id}" },
+  { helperName: "getRelatedProducts", method: "GET", pathTemplate: "/api/products/{product_id}/related" },
+  { helperName: "searchProducts", method: "GET", pathTemplate: "/api/search/products" },
+  { helperName: "getProductRecommendations", method: "POST", pathTemplate: "/api/recommendations/products" },
+  { helperName: "sendChat", method: "POST", pathTemplate: "/api/chat" },
+  { helperName: "getDemoObservabilityState", method: "GET", pathTemplate: "/api/demo/observability", compatibilityShim: true, reason: "operator demo compatibility surface" },
+  { helperName: "updateDemoObservabilityState", method: "POST", pathTemplate: "/api/demo/observability", compatibilityShim: true, reason: "operator demo compatibility surface" },
+  { helperName: "resetDemoObservabilityState", method: "POST", pathTemplate: "/api/demo/observability/reset", compatibilityShim: true, reason: "operator demo compatibility surface" },
+  { helperName: "getCatalogStudioSession", method: "GET", pathTemplate: "/api/admin/session" },
+  { helperName: "getAdminCatalogProductsCompatibility", method: "GET", pathTemplate: "/api/admin/catalog/v2/products", compatibilityShim: true, reason: "no current v3 list route is available yet" },
+  { helperName: "getAdminCatalogReferences", method: "GET", pathTemplate: "/api/admin/catalog/v2/references" },
+  { helperName: "createAdminCatalogBrand", method: "POST", pathTemplate: "/api/admin/catalog/v2/brands" },
+  { helperName: "getAdminCatalogProduct", method: "GET", pathTemplate: "/api/admin/catalog/v3/products/{product_id}" },
+  { helperName: "getAdminCatalogProductCompatibilityV2", method: "GET", pathTemplate: "/api/admin/catalog/v2/products/{product_id}", compatibilityShim: true, reason: "legacy schema 2 product editor fallback" },
+  { helperName: "startAdminCatalogProductRevision", method: "POST", pathTemplate: "/api/admin/catalog/v3/products/{product_id}/revisions" },
+  { helperName: "startAdminCatalogProductRevisionCompatibilityV2", method: "POST", pathTemplate: "/api/admin/catalog/v2/products/{product_id}/revisions", compatibilityShim: true, reason: "legacy schema 2 product editor fallback" },
+  { helperName: "saveAdminCatalogProductDraft", method: "PUT", pathTemplate: "/api/admin/catalog/v3/products/{product_id}/draft" },
+  { helperName: "saveAdminCatalogProductDraftCompatibilityV2", method: "PUT", pathTemplate: "/api/admin/catalog/v2/products/{product_id}/draft", compatibilityShim: true, reason: "legacy schema 2 product editor fallback" },
+  { helperName: "publishAdminCatalogProduct", method: "POST", pathTemplate: "/api/admin/catalog/v3/products/{product_id}/publish" },
+  { helperName: "publishAdminCatalogProductCompatibilityV2", method: "POST", pathTemplate: "/api/admin/catalog/v2/products/{product_id}/publish", compatibilityShim: true, reason: "legacy schema 2 product editor fallback" },
+  { helperName: "archiveAdminCatalogProduct", method: "POST", pathTemplate: "/api/admin/catalog/v2/products/{product_id}/archive", reason: "current v2 archive exception" },
+  { helperName: "getAdminCatalogProductReadinessV3", method: "GET", pathTemplate: "/api/admin/catalog/v3/products/{product_id}/drafts/{draft_id}/readiness" },
+  { helperName: "getAdminCatalogProductPreviewV3", method: "GET", pathTemplate: "/api/admin/catalog/v3/products/{product_id}/drafts/{draft_id}/preview" },
+  { helperName: "startCatalogWorkflow", method: "POST", pathTemplate: "/api/admin/catalog/workflows" },
+  { helperName: "getCatalogWorkflow", method: "GET", pathTemplate: "/api/admin/catalog/workflows/{workflow_id}" },
+  { helperName: "submitCatalogDraftCommand", method: "POST", pathTemplate: "/api/admin/catalog/workflows/{workflow_id}/draft-commands" },
+  { helperName: "queryCatalogAssistant", method: "POST", pathTemplate: "/api/admin/catalog/assistant/query" },
+  { helperName: "createCatalogRealtimeSession", method: "POST", pathTemplate: "/api/admin/catalog/workflows/{workflow_id}/realtime/sessions" },
+  { helperName: "submitCatalogRealtimeCompatibilityToolCall", method: "POST", pathTemplate: "/api/admin/catalog/workflows/{workflow_id}/realtime/tool-calls", compatibilityShim: true, reason: "legacy create/refine draft voice tools" },
+  { helperName: "submitCatalogRealtimeV3ToolCall", method: "POST", pathTemplate: "/api/admin/catalog/workflows/{workflow_id}/realtime/v3/tool-calls" },
+  { helperName: "getAdminCatalogProductReviews", method: "GET", pathTemplate: "/api/admin/catalog/products/{product_id}/reviews" },
+  { helperName: "assistCatalogProductReview", method: "POST", pathTemplate: "/api/admin/catalog/products/{product_id}/reviews/{review_id}/assist" },
+  { helperName: "decideCatalogProductReview", method: "POST", pathTemplate: "/api/admin/catalog/products/{product_id}/reviews/{review_id}/decisions" },
+  { helperName: "getAdminApiTraces", method: "GET", pathTemplate: "/api/admin/traces" },
+  { helperName: "getAdminApiTrace", method: "GET", pathTemplate: "/api/admin/traces/{trace_id}" },
+  { helperName: "getAdminApiTraceEvents", method: "GET", pathTemplate: "/api/admin/traces/{trace_id}/events" },
+  { helperName: "postApiTraceEvent", method: "POST", pathTemplate: "/api/admin/traces/{trace_id}/events" },
+  { helperName: "downloadAdminApiTrace", method: "GET", pathTemplate: "/api/admin/traces/{trace_id}/export" },
+  { helperName: "subscribeAdminApiTraceEvents", method: "GET", pathTemplate: "/api/admin/traces/{trace_id}/stream" },
+];
 
 export function uploadCatalogSourceBundle(files, fields = {}, onUploadProgress) {
   const formData = new FormData();

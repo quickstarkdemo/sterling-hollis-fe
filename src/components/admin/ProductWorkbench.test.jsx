@@ -324,7 +324,7 @@ describe("ProductWorkbench", () => {
     api.getCatalogImageJob
       .mockResolvedValueOnce({ id: "job_1", status: "running" })
       .mockResolvedValueOnce({ id: "job_1", status: "succeeded" });
-    renderWorkspace();
+    renderWorkspace({ authoringSchemaVersion: 1 });
     await user.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
     await user.click(screen.getByRole("button", { name: "Create draft" }));
     await screen.findByTestId("product-editor");
@@ -337,7 +337,7 @@ describe("ProductWorkbench", () => {
   }, 10000);
 
   it("preserves the current draft and offers retry only for retryable failures", async () => {
-    renderWorkspace();
+    renderWorkspace({ authoringSchemaVersion: 1 });
     const input = screen.getByLabelText("Catalog product instruction");
     await userEvent.type(input, "Create a coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
@@ -355,7 +355,7 @@ describe("ProductWorkbench", () => {
 
   it("uses the latest draft version after manual Product Editor changes", async () => {
     api.submitCatalogImageCommand.mockResolvedValue({ id: "job_1", status: "succeeded", action: "generate" });
-    renderWorkspace();
+    renderWorkspace({ authoringSchemaVersion: 1 });
     await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await screen.findByTestId("product-editor");
@@ -376,7 +376,7 @@ describe("ProductWorkbench", () => {
     api.approveCatalogImageJob
       .mockRejectedValueOnce({ response: { status: 503 } })
       .mockResolvedValueOnce({ job_id: "job_1", approval_status: "approved" });
-    renderWorkspace();
+    renderWorkspace({ authoringSchemaVersion: 1 });
     await userEvent.type(screen.getByLabelText("Catalog product instruction"), "Create a coat");
     await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await screen.findByTestId("product-editor");

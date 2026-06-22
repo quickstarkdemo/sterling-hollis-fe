@@ -1,10 +1,24 @@
 # Sterling Hollis Chat, OpenAI, and Observability Map
 
-This is a presentation-oriented map of how the storefront chat request moves from the React UI, through the FastAPI backend, into OpenAI-backed routing and catalog tools, and out to Datadog observability. The labels on boxes use a short reference code so the diagrams can be discussed verbally in a slide deck.
+This is a presentation-oriented map of how the storefront chat request moves from the React UI, through the FastAPI backend capability registry, into OpenAI-backed routing and catalog tools, and out to Datadog/API trace observability. The labels on boxes use a short reference code so the diagrams can be discussed verbally in a slide deck.
 
-Backend repo assumed by this document: `/Users/dirk.nielsen/Documents/Github/personal/sterling-hollis-be`
+Authoritative backend contract sources:
 
-Frontend repo assumed by this document: `/Users/dirk.nielsen/Documents/Github/personal/sterling-hollis-fe`
+- `quickstarkdemo/sterling-hollis-be/docs/capability-map.md`
+- `quickstarkdemo/sterling-hollis-be/docs/openapi.json`
+- frontend manifest: `src/contracts/backendCapabilityManifest.json`
+
+The frontend manifest is refreshed with `npm run refresh:api-contract` and keeps the OpenAPI `x-sterling-*` capability metadata used by the API client drift tests.
+
+## Unified Capability Vocabulary
+
+| Surface | Frontend entry point | Backend capability surface | Notes |
+| --- | --- | --- | --- |
+| Storefront chat | `src/components/ChatWidget.jsx` | `public_shopper` / `shopper.chat.turn` | Capability diagnostics are hidden unless diagnostics mode is enabled. |
+| Catalog Studio assistant | `src/components/admin/CatalogGlobalAssistant.jsx` | `catalog_admin` | Text and read-only voice tools use current assistant/v3 capability routes. |
+| Developer trace UI | `src/components/api-trace/*` | `developer_trace` | Trace inspector projects capability id, surface, and status from unified metadata. |
+| Operator demo controls | `src/components/DemoObservabilityPanel.jsx` | `operator_compatibility` | Intentionally operator-scoped and not part of normal shopper/admin UI. |
+| MCP / ChatGPT clients | backend-hosted MCP bundles | persona-scoped bundles | Public/shopper/catalog-admin/associate/executive bundles share the same registry with persona policy boundaries. Send-capable bundles require explicit approval policy. |
 
 ## Diagram 1: End-To-End Chat Request
 
@@ -29,7 +43,7 @@ flowchart LR
 
   EXEC --> DATA["1O. Catalog, customer, order, store data<br/>SQL + optional Pinecone"]
   EXEC --> OPENAI["1P. OpenAI components<br/>chat completion, Strands model, embeddings"]
-  EXEC --> RESP["1Q. ChatResponse<br/>message, cards, actions, tool_trace"]
+  EXEC --> RESP["1Q. ChatResponse<br/>message, cards, actions, capability-aware tool_trace"]
   RESP --> PERSIST2[("1R. ChatMessage + ChatToolCall<br/>assistant response and tool outputs")]
   RESP --> FE3
 
@@ -37,7 +51,7 @@ flowchart LR
   FE3 -. RUM/logs/resource tracing .-> DDRUM["1T. Datadog Browser RUM + Logs"]
 ```
 
-**What is happening:** the UI gathers page context before the user sends a message, then `ChatWidget` posts to `/api/chat`. The backend resolves optional Clerk identity, persists or resumes a chat session, creates an idempotent chat turn, evaluates safety, chooses the routing path, executes one tool or agent path, persists the response and tool calls, and returns a `ChatResponse` containing the assistant message plus product cards/actions. Datadog is wired on both sides: frontend RUM/logs in `src/utils/datadog.js`, backend LLMObs/APM spans in `app/services/chat/orchestrator.py` and related service files.
+**What is happening:** the UI gathers page context before the user sends a message, then `ChatWidget` posts to `/api/chat`. The backend resolves optional Clerk identity, persists or resumes a chat session, creates an idempotent chat turn, evaluates safety, chooses the routing path through the shared capability model, executes one tool or agent path, persists the response and tool calls, and returns a `ChatResponse` containing the assistant message plus product cards/actions and capability-aware trace metadata. Datadog and API traces are wired on both sides: frontend RUM/logs in `src/utils/datadog.js`, frontend trace projection in `src/utils/apiTraceProjection.js`, and backend capability/LLMObs/APM spans in the backend services.
 
 ## Diagram 2: Backend Python Route Through A Chat Turn
 
@@ -67,7 +81,7 @@ flowchart TD
   Q --> R["2S. auth_gate<br/>block customer-only tools unless linked"]
   R --> S["2T. _execute_selected_tool_response()<br/>store_info, service_answer, order_status, product_detail, semantic search, etc."]
 
-  O --> U["2U. _apply_orchestration_trace()<br/>add tool_trace and turn metadata"]
+  O --> U["2U. Unified capability trace metadata<br/>capability id, operation, surface, side effect, persona"]
   S --> U
   K --> V["2V. Persist user + assistant messages<br/>complete ChatTurn and commit"]
   U --> V
@@ -75,7 +89,7 @@ flowchart TD
   W --> X["2X. Return ChatResponse to frontend"]
 ```
 
-**What is happening:** `handle_chat()` is the central Python function for a chat turn. It wraps the whole turn in Datadog LLMObs, then runs a structured sequence: normalize request context, load history, safety-check the message, choose an orchestration path, run the selected tool or agent, annotate the trace, persist the final state, and submit evaluation scores.
+**What is happening:** `handle_chat()` is the central Python function for a chat turn. It wraps the whole turn in Datadog LLMObs, then runs a structured sequence: normalize request context, load history, safety-check the message, choose an orchestration path, run the selected capability/tool or agent, annotate the trace with unified capability metadata, persist the final state, and submit evaluation scores.
 
 ## Diagram 3: Routing And Tool Selection
 

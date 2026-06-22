@@ -7,9 +7,7 @@ import CatalogProductList from "./CatalogProductList";
 
 const api = vi.hoisted(() => ({
   getAdminCatalogProduct: vi.fn(),
-  getAdminCatalogProductV2: vi.fn(),
-  getAdminCatalogProducts: vi.fn(),
-  getAdminCatalogProductsV2: vi.fn(),
+  getAdminCatalogProductsCompatibility: vi.fn(),
   getCategories: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
@@ -24,9 +22,7 @@ describe("CatalogProductList", () => {
   beforeEach(() => {
     localStorage.clear();
     api.getAdminCatalogProduct.mockReset().mockResolvedValue({ published_snapshot: { variants: [] } });
-    api.getAdminCatalogProductV2.mockReset().mockResolvedValue({ published_snapshot: { variants: [] } });
-    api.getAdminCatalogProducts.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
-    api.getAdminCatalogProductsV2.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
+    api.getAdminCatalogProductsCompatibility.mockReset().mockResolvedValue({ items: products, total: 3, page: 1, page_size: 12 });
     api.getCategories.mockReset().mockResolvedValue({
       categories: [
         { id: "womens_apparel", label: "Women's Apparel", product_count: 2 },
@@ -35,7 +31,7 @@ describe("CatalogProductList", () => {
     });
   });
 
-  it("switches to canonical product search only when schema v2 is advertised", async () => {
+  it("uses the explicit compatibility product list when schema v2 is advertised", async () => {
     renderWithProviders(<CatalogProductList
       selectedProductId=""
       onSelect={() => {}}
@@ -45,8 +41,8 @@ describe("CatalogProductList", () => {
 
     expect(await screen.findByText("Wool Coat")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Handbags" })).toHaveValue("handbags");
-    expect(api.getAdminCatalogProductsV2).toHaveBeenCalled();
-    expect(api.getAdminCatalogProducts).not.toHaveBeenCalled();
+    expect(api.getAdminCatalogProductsCompatibility).toHaveBeenCalledWith(expect.objectContaining({ page_size: 12 }));
+    expect(api.getAdminCatalogProduct).toHaveBeenCalled();
     expect(api.getCategories).not.toHaveBeenCalled();
   });
 
@@ -95,7 +91,7 @@ describe("CatalogProductList", () => {
     await userEvent.selectOptions(screen.getByLabelText("Lifecycle status"), "published");
 
     await waitFor(() => {
-      expect(api.getAdminCatalogProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+      expect(api.getAdminCatalogProductsCompatibility).toHaveBeenLastCalledWith(expect.objectContaining({
         q: "coat",
         lifecycle_status: "published",
         page: 1,
@@ -115,7 +111,7 @@ describe("CatalogProductList", () => {
     await userEvent.selectOptions(categoryFilter, "handbags");
 
     await waitFor(() => {
-      expect(api.getAdminCatalogProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+      expect(api.getAdminCatalogProductsCompatibility).toHaveBeenLastCalledWith(expect.objectContaining({
         category: "handbags",
         page: 1,
         page_size: 12,
@@ -133,7 +129,7 @@ describe("CatalogProductList", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
 
     expect(screen.getByLabelText("Search catalog products")).toHaveValue("");
-    await waitFor(() => expect(api.getAdminCatalogProducts).toHaveBeenLastCalledWith(expect.objectContaining({
+    await waitFor(() => expect(api.getAdminCatalogProductsCompatibility).toHaveBeenLastCalledWith(expect.objectContaining({
       q: "",
       page: 1,
     })));

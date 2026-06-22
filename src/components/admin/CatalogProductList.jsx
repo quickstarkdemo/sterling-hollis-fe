@@ -6,9 +6,7 @@ import ProductImage from "../ProductImage";
 import { EmptyState, ErrorState, LoadingState } from "../StatusState";
 import {
   getAdminCatalogProduct,
-  getAdminCatalogProductV2,
-  getAdminCatalogProducts,
-  getAdminCatalogProductsV2,
+  getAdminCatalogProductsCompatibility,
   getCategories,
 } from "../../utils/apiClient";
 import { imageFor, titleize } from "../../utils/format";
@@ -136,10 +134,7 @@ export default function CatalogProductList({
     setLoading(true);
     setError(null);
     try {
-      const listProducts = authoringSchemaVersion >= 2
-        ? getAdminCatalogProductsV2
-        : getAdminCatalogProducts;
-      const nextPayload = await listProducts({
+      const nextPayload = await getAdminCatalogProductsCompatibility({
         q: query,
         lifecycle_status: lifecycleStatus,
         category,
@@ -153,7 +148,7 @@ export default function CatalogProductList({
     } finally {
       if (requestId.current === currentRequestId) setLoading(false);
     }
-  }, [authoringSchemaVersion, brand, category, lifecycleStatus, page, query]);
+  }, [brand, category, lifecycleStatus, page, query]);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -175,10 +170,9 @@ export default function CatalogProductList({
     if (!missingItems.length) return undefined;
     let active = true;
     const loadThumbnails = async () => {
-      const readProduct = authoringSchemaVersion >= 2 ? getAdminCatalogProductV2 : getAdminCatalogProduct;
       const entries = await Promise.all(missingItems.map(async (item) => {
         try {
-          const detail = await readProduct(item.product_id);
+          const detail = await getAdminCatalogProduct(item.product_id);
           return [item.product_id, detailImage(detail)];
         } catch {
           return [item.product_id, ""];
@@ -196,7 +190,7 @@ export default function CatalogProductList({
     return () => {
       active = false;
     };
-  }, [authoringSchemaVersion, items, thumbnailById]);
+  }, [items, thumbnailById]);
 
   useEffect(() => {
     if (authoringSchemaVersion >= 2) {

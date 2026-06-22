@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiSend, FiX } from "react-icons/fi";
 
 import { useApiTrace } from "../ApiTraceContext";
+import { normalizeCapabilityDiagnostic } from "../../utils/capabilityDiagnostics";
 import {
   createCatalogRealtimeSession,
   createIdempotencyKey,
@@ -58,6 +59,14 @@ function voiceOutcome(result) {
     };
   }
   return null;
+}
+
+function diagnosticsForResult(result) {
+  if (!result) return [];
+  return [
+    normalizeCapabilityDiagnostic(result, { operation: "catalog_assistant" }),
+    ...(result.tool_trace || []).map((trace) => normalizeCapabilityDiagnostic(trace)),
+  ].filter((item) => item.capabilityId || item.surface || item.status);
 }
 
 function assistantQuestionFromTool(event) {
@@ -241,6 +250,7 @@ export default function CatalogGlobalAssistant({
         role: "assistant",
         message: result.message || "No answer was returned.",
         citations: result.citations || [],
+        diagnostics: diagnosticsForResult(result),
         scope,
       });
     } catch (requestError) {
@@ -261,6 +271,7 @@ export default function CatalogGlobalAssistant({
       role: "assistant",
       message: result?.message || "The voice answer finished.",
       citations: result?.citations || [],
+      diagnostics: diagnosticsForResult(result),
       outcome: voiceOutcome(result),
       scope,
     });
@@ -340,6 +351,15 @@ export default function CatalogGlobalAssistant({
                             {item.citations.slice(0, 6).map((citation) => (
                               <Badge key={`${citation.kind}-${citation.source_id}-${citation.label}`} className="workflow-status succeeded">
                                 {citation.kind}: {citationLabel(citation)}
+                              </Badge>
+                            ))}
+                          </HStack>
+                        ) : null}
+                        {item.diagnostics?.length ? (
+                          <HStack className="catalog-assistant-citations" gap={2} flexWrap="wrap" mt={2}>
+                            {item.diagnostics.map((diagnostic, diagnosticIndex) => (
+                              <Badge key={`${diagnostic.capabilityId}-${diagnosticIndex}`} className={`workflow-status ${diagnostic.status || "succeeded"}`}>
+                                {[diagnostic.label, diagnostic.surface, diagnostic.status].filter(Boolean).join(" - ")}
                               </Badge>
                             ))}
                           </HStack>

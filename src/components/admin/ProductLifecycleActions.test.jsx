@@ -12,10 +12,10 @@ import {
 
 const api = vi.hoisted(() => ({
   archiveAdminCatalogProduct: vi.fn(),
-  archiveAdminCatalogProductV2: vi.fn(),
+  archiveAdminCatalogProductCurrentV2: vi.fn(),
   createIdempotencyKey: vi.fn((scope) => `${scope}-key`),
   publishAdminCatalogProduct: vi.fn(),
-  publishAdminCatalogProductV2: vi.fn(),
+  publishAdminCatalogProductCompatibilityV2: vi.fn(),
   publishAdminCatalogProductV3: vi.fn(),
 }));
 vi.mock("../../utils/apiClient", () => api);
@@ -32,8 +32,8 @@ describe("ProductLifecycleActions", () => {
     resetApiTraceRuntimeForTests();
     api.publishAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     api.archiveAdminCatalogProduct.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
-    api.archiveAdminCatalogProductV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
-    api.publishAdminCatalogProductV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
+    api.archiveAdminCatalogProductCurrentV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "archived", version: 5 });
+    api.publishAdminCatalogProductCompatibilityV2.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     api.publishAdminCatalogProductV3.mockReset().mockResolvedValue({ product_id: "cat_coat", lifecycle_status: "published", version: 5 });
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
@@ -43,7 +43,7 @@ describe("ProductLifecycleActions", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Publish draft/i }));
 
-    expect(api.publishAdminCatalogProductV2).toHaveBeenCalledWith(
+    expect(api.publishAdminCatalogProductCompatibilityV2).toHaveBeenCalledWith(
       "cat_coat",
       { draft_id: "draft_1", expected_version: 4 },
       "publish-product-key",
@@ -90,7 +90,7 @@ describe("ProductLifecycleActions", () => {
     await userEvent.click(screen.getByRole("button", { name: /Publish draft/i }));
 
     expect(window.confirm).toHaveBeenCalled();
-    expect(api.publishAdminCatalogProduct).toHaveBeenCalledWith(
+    expect(api.publishAdminCatalogProductV3).toHaveBeenCalledWith(
       "cat_coat",
       { draft_id: "draft_1", expected_version: 4 },
       "publish-product-key",
@@ -112,7 +112,7 @@ describe("ProductLifecycleActions", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Archive$/i }));
 
     expect(window.confirm).toHaveBeenCalledWith("Archive this product and remove it from public catalog results?");
-    expect(api.archiveAdminCatalogProduct).toHaveBeenCalledWith(
+    expect(api.archiveAdminCatalogProductCurrentV2).toHaveBeenCalledWith(
       "cat_coat",
       { expected_version: 4 },
       "archive-product-key",

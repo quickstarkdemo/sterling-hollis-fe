@@ -8,14 +8,14 @@ import {
   approveCatalogImageJob,
   createAdminCatalogBrand,
   createIdempotencyKey,
-  getAdminCatalogProductV2,
+  getAdminCatalogProductCompatibilityV2,
   getAdminCatalogProductV3,
   getAdminCatalogProductPreviewV3,
   getAdminCatalogProductReadinessV3,
   getCatalogImageJob,
-  saveAdminCatalogProductDraftV2,
+  saveAdminCatalogProductDraftCompatibilityV2,
   saveAdminCatalogProductDraftV3,
-  startAdminCatalogProductRevisionV2,
+  startAdminCatalogProductRevisionCompatibilityV2,
   startAdminCatalogProductRevisionV3,
   startCatalogWorkflow,
   submitCatalogMediaCommand,
@@ -188,7 +188,7 @@ export default function CanonicalProductEditor({
   onRetryReferences,
   onBrandAdded,
   onDetailChange,
-  authoringSchemaVersion = 2,
+  authoringSchemaVersion = 3,
 }) {
   const schemaVersion = Number(authoringSchemaVersion) >= 3 ? 3 : 2;
   const references = providedReferences || emptyReferences;
@@ -239,7 +239,7 @@ export default function CanonicalProductEditor({
     setError(null);
     setNotice("");
     try {
-      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductCompatibilityV2;
       const nextDetail = await getProduct(productId);
       applyDetail(nextDetail);
       return nextDetail;
@@ -322,7 +322,7 @@ export default function CanonicalProductEditor({
       let currentDraft = detail.current_draft;
       if (!currentDraft) {
         const revisionPayload = { expected_version: detail.version };
-        const startRevision = schemaVersion >= 3 ? startAdminCatalogProductRevisionV3 : startAdminCatalogProductRevisionV2;
+        const startRevision = schemaVersion >= 3 ? startAdminCatalogProductRevisionV3 : startAdminCatalogProductRevisionCompatibilityV2;
         currentDraft = await startRevision(detail.product_id, revisionPayload, mutationKey(`start-v${schemaVersion}-revision`, revisionPayload));
         setDetail((current) => ({ ...current, current_draft: currentDraft }));
         delete idempotencyKeys.current[`start-v${schemaVersion}-revision`];
@@ -334,10 +334,10 @@ export default function CanonicalProductEditor({
         moderation_state: currentDraft.revision.moderation_state || "approved",
         product: normalizedPayload(product, schemaVersion),
       };
-      const saveDraft = schemaVersion >= 3 ? saveAdminCatalogProductDraftV3 : saveAdminCatalogProductDraftV2;
+      const saveDraft = schemaVersion >= 3 ? saveAdminCatalogProductDraftV3 : saveAdminCatalogProductDraftCompatibilityV2;
       await saveDraft(detail.product_id, draftPayload, mutationKey(`save-v${schemaVersion}-draft`, draftPayload));
       delete idempotencyKeys.current[`save-v${schemaVersion}-draft`];
-      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductCompatibilityV2;
       const nextDetail = await getProduct(detail.product_id);
       applyDetail(nextDetail);
       setNotice("Draft saved. The published catalog remains unchanged until publication.");
@@ -449,7 +449,7 @@ export default function CanonicalProductEditor({
         expected_draft_version: detail.current_draft.draft_version,
         ...approval,
       }, createIdempotencyKey("approve-media"));
-      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductV2;
+      const getProduct = schemaVersion >= 3 ? getAdminCatalogProductV3 : getAdminCatalogProductCompatibilityV2;
       const nextDetail = await getProduct(detail.product_id);
       setMediaJob(null);
       if (preserveLocalEdits) {

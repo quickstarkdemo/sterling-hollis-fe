@@ -616,7 +616,7 @@ export function CompatibilityProductEditor({ productId, refreshKey = 0, onDirtyC
 }
 
 export default function ProductEditor(props) {
-  if (Number(props.authoringSchemaVersion || 1) >= 2) {
+  if (Number(props.authoringSchemaVersion || 3) >= 2) {
     return <CanonicalProductEditor {...props} />;
   }
   return <CompatibilityProductEditor {...props} />;

@@ -33,6 +33,11 @@ vi.mock("./VoiceControls", () => ({
         onToolResult?.({
           mutation: false,
           message: "Dallas is low on stock.",
+          capability_metadata: {
+            capability_id: "catalog_admin.product.draft",
+            surface: "catalog_admin",
+            status: "succeeded",
+          },
           citations: [{ kind: "inventory", source_id: "store_dallas", label: "Dallas", value: { inventory_qty: 3 } }],
         });
         await onResolveToolCall?.({
@@ -55,6 +60,11 @@ describe("CatalogGlobalAssistant", () => {
     queryCatalogAssistant.mockReset().mockResolvedValue({
       message: "Oak Brook has 7 units from the backend assistant.",
       citations: [{ kind: "inventory", source_id: "store_oak_brook", label: "Oak Brook", value: { inventory_qty: 7 } }],
+      capability_metadata: {
+        capability_id: "catalog_admin.assistant.query",
+        surface: "catalog_admin",
+        status: "succeeded",
+      },
       mutation: false,
     });
   });
@@ -82,5 +92,24 @@ describe("CatalogGlobalAssistant", () => {
       question: "Which store needs replenishment?",
       query_scopes: ["catalog", "inventory"],
     });
+  });
+
+  it("renders shared capability diagnostics for text assistant responses", async () => {
+    renderWithProviders(
+      <CatalogGlobalAssistant
+        open
+        onOpenChange={() => {}}
+        ensureWorkflow={vi.fn().mockResolvedValue("workflow_1")}
+        onWorkflowEvent={() => {}}
+        realtimeCapability={{ configured: true }}
+      />,
+      { route: "/catalog-studio" },
+    );
+
+    await userEvent.type(screen.getByLabelText("Catalog assistant question"), "Which stores have inventory?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask catalog assistant" }));
+
+    expect(await screen.findByText("Oak Brook has 7 units from the backend assistant.")).toBeInTheDocument();
+    expect(screen.getByText("Catalog assistant query - catalog_admin - succeeded")).toBeInTheDocument();
   });
 });
