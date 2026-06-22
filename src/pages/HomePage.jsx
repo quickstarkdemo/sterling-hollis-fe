@@ -18,7 +18,7 @@ import { usePageChatContext } from "../components/ChatContext";
 import ProductCard from "../components/ProductCard";
 import ProductGrid from "../components/ProductGrid";
 import { EmptyState, ErrorState, LoadingState } from "../components/StatusState";
-import { DEFAULT_STORE_ID, getCatalog, getProductRecommendations, searchProducts } from "../utils/apiClient";
+import { getCatalog, getProductRecommendations, searchProducts } from "../utils/apiClient";
 import { trackAction } from "../utils/datadog";
 import { filterPlannedSearchResults, planProductSearch } from "../utils/searchQuery";
 
@@ -38,7 +38,6 @@ export default function HomePage() {
   const chatContext = useMemo(
     () => ({
       page_type: "home",
-      store_id: DEFAULT_STORE_ID || undefined,
     }),
     [],
   );

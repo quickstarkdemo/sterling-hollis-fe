@@ -44,12 +44,14 @@ const product = {
 };
 
 function renderPage() {
-  return renderWithProviders(
-    <ChatContext.Provider value={{ chatContext: {}, setChatContext: vi.fn() }}>
+  const setChatContext = vi.fn();
+  const view = renderWithProviders(
+    <ChatContext.Provider value={{ chatContext: {}, setChatContext }}>
       <Routes><Route path="/product/:productId" element={<ProductPage />} /></Routes>
     </ChatContext.Provider>,
     { route: "/product/cat_pillow" },
   );
+  return { ...view, setChatContext };
 }
 
 describe("ProductPage media gallery", () => {
@@ -79,6 +81,18 @@ describe("ProductPage media gallery", () => {
 
     expect(await screen.findByText("Product unavailable")).toBeInTheDocument();
     expect(screen.queryByText(product.title)).not.toBeInTheDocument();
+  });
+
+  it("does not constrain storefront chat to the default store", async () => {
+    const { setChatContext } = renderPage();
+
+    await screen.findByText(product.title);
+    expect(setChatContext.mock.calls.map(([context]) => context.store_id).filter(Boolean)).toEqual([]);
+    expect(setChatContext).toHaveBeenLastCalledWith(expect.objectContaining({
+      page_type: "product",
+      product_id: "cat_pillow",
+      current_product: expect.objectContaining({ id: "cat_pillow", title: product.title }),
+    }));
   });
 
   it("renders approved customer reviews and published merchant responses without private moderation fields", async () => {
