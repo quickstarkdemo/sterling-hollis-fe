@@ -378,7 +378,35 @@ describe("VoiceControls", () => {
       expect.objectContaining({ session_id: "realtime_session_one", name: "read_inventory_status" }),
       "voice-tool-call_inventory",
     ));
+    expect(channel.send).toHaveBeenCalledWith(expect.stringContaining('\\"status\\":\\"succeeded\\"'));
     expect(api.submitCatalogRealtimeToolCall).not.toHaveBeenCalled();
+  });
+
+  it("lets read-mode assistant surfaces resolve Realtime tools through their own API path", async () => {
+    const onResolveToolCall = vi.fn().mockResolvedValue({
+      mutation: false,
+      message: "Oak Brook has 7 units from the assistant API.",
+      citations: [{ kind: "inventory", source_id: "store_oak_brook", label: "Oak Brook", value: { inventory_qty: 7 } }],
+    });
+    const { channel } = renderVoice({ props: { assistantMode: "read", onResolveToolCall } });
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    act(() => channel.message({
+      type: "response.function_call_arguments.done",
+      call_id: "call_catalog_read",
+      name: "read_inventory_status",
+      arguments: JSON.stringify({ question: "Which stores need replenishment?" }),
+    }));
+
+    await waitFor(() => expect(onResolveToolCall).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({ name: "read_inventory_status" }),
+      idempotencyKey: "voice-tool-call_catalog_read",
+      workflowId: "workflow_1",
+    })));
+    expect(api.submitCatalogRealtimeV3ToolCall).not.toHaveBeenCalled();
+    expect(channel.send).toHaveBeenCalledWith(expect.stringContaining("Oak Brook has 7 units"));
+    expect(channel.send).toHaveBeenCalledWith(expect.stringContaining('\\"status\\":\\"succeeded\\"'));
   });
 
   it("uses current workflow callbacks for events arriving after a parent rerender", async () => {

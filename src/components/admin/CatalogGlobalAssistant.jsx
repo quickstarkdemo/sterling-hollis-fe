@@ -7,77 +7,12 @@ import RealtimeTranscript from "./RealtimeTranscript";
 import VoiceControls from "./VoiceControls";
 
 const MAX_MESSAGES = 12;
-
-function productSnapshot(detail) {
-  return detail?.current_draft?.product || detail?.published_snapshot || null;
-}
-
-function productInventoryRows(product) {
-  return (product?.variants || []).flatMap((variant) =>
-    (variant.inventory || []).map((row) => ({
-      ...row,
-      variant_id: variant.variant_id,
-      color: variant.color,
-      size: row.size || variant.size || "",
-    })),
-  );
-}
-
-function productAnswer(detail, question) {
-  const product = productSnapshot(detail);
-  if (!product) {
-    return {
-      message: "Select a product with a loaded draft before asking for current-product drill-down.",
-      citations: [],
-    };
-  }
-  const inventory = productInventoryRows(product);
-  const lowStock = inventory.filter((row) =>
-    String(row.availability || "").toLowerCase() === "low stock" || Number(row.inventory_qty || 0) <= 5,
-  );
-  const inventoryFocus = /stock|inventory|store|unit|available|availability/i.test(question);
-  const citations = [
-    {
-      kind: "product",
-      source_id: product.product_id || detail.product_id,
-      label: product.title || detail.title || "Current product",
-      value: {
-        product_id: product.product_id || detail.product_id,
-        title: product.title || detail.title,
-        brand: product.brand,
-        category: product.category,
-      },
-    },
-    ...inventory.slice(0, 5).map((row) => ({
-      kind: "inventory",
-      source_id: `${product.product_id || detail.product_id}:${row.store_id}:${row.variant_id || row.size || "inventory"}`,
-      label: `${row.store_id || "Store"}${row.size ? ` ${row.size}` : ""}`,
-      value: {
-        store_id: row.store_id,
-        size: row.size,
-        color: row.color,
-        availability: row.availability,
-        inventory_qty: row.inventory_qty,
-      },
-    })),
-  ];
-  if (inventoryFocus) {
-    const rows = lowStock.length ? lowStock : inventory;
-    const preview = rows.slice(0, 3).map((row) =>
-      `${row.store_id || "store"} has ${Number(row.inventory_qty || 0)} unit(s)${row.size ? ` in ${row.size}` : ""}`,
-    ).join("; ");
-    return {
-      message: preview
-        ? `${product.title || detail.title} inventory: ${preview}.`
-        : `${product.title || detail.title} has no inventory rows in the loaded draft.`,
-      citations,
-    };
-  }
-  return {
-    message: `${product.title || detail.title} is ${product.brand || "an unbranded item"} in ${product.category || "the catalog"}. ${product.description || "No description is available in the loaded draft."}`,
-    citations,
-  };
-}
+const READ_ASSISTANT_TOOLS = new Set([
+  "read_catalog_summary",
+  "read_inventory_status",
+  "read_product_summary",
+  "read_publish_readiness",
+]);
 
 function citationLabel(citation) {
   const value = citation.value || {};
@@ -119,6 +54,17 @@ function voiceOutcome(result) {
   return null;
 }
 
+function assistantQuestionFromTool(event) {
+  const args = JSON.parse(event.arguments || "{}");
+  const fallback = {
+    read_catalog_summary: "Summarize catalog inventory risk.",
+    read_inventory_status: "Which stores have low stock?",
+    read_product_summary: "What should I know about this product?",
+    read_publish_readiness: "Summarize publish readiness for this product.",
+  };
+  return String(args.question || args.query || args.prompt || fallback[event.name] || "Summarize the current catalog context.").trim();
+}
+
 export default function CatalogGlobalAssistant({
   activeDetail,
   ensureWorkflow,
@@ -147,7 +93,7 @@ export default function CatalogGlobalAssistant({
   const [error, setError] = useState("");
   const threadRef = useRef(null);
   const previousProductId = useRef(activeDetail?.product_id || "");
-  const hasProductScope = Boolean(productSnapshot(activeDetail));
+  const hasProductScope = Boolean(activeDetail?.product_id);
   const scopeLabel = scope === "product" && hasProductScope
     ? activeDetail?.title || activeDetail?.product_id || "current product"
     : "entire catalog and inventory";
@@ -183,6 +129,20 @@ export default function CatalogGlobalAssistant({
     ...(hasProductScope ? ["What should I know about this product?"] : []),
   ], [hasProductScope]);
 
+  const assistantPayload = (nextQuestion, requestedScope = scope) => {
+    const productScope = requestedScope === "product" && activeDetail?.product_id;
+    const currentDraft = activeDetail?.current_draft;
+    return {
+      question: nextQuestion,
+      query_scopes: productScope ? ["product", "inventory", "readiness"] : ["catalog", "inventory"],
+      ...(productScope ? {
+        product_id: activeDetail.product_id,
+        draft_id: currentDraft?.revision?.id,
+        expected_draft_version: currentDraft?.draft_version,
+      } : {}),
+    };
+  };
+
   const addMessage = (message) => {
     setMessages((current) => {
       const previous = current[current.length - 1];
@@ -207,12 +167,7 @@ export default function CatalogGlobalAssistant({
     setError("");
     addMessage({ role: "user", message: nextQuestion, citations: [], scope });
     try {
-      const result = scope === "product"
-        ? productAnswer(activeDetail, nextQuestion)
-        : await queryCatalogAssistant({
-          question: nextQuestion,
-          query_scopes: ["catalog", "inventory"],
-        });
+      const result = await queryCatalogAssistant(assistantPayload(nextQuestion));
       addMessage({
         role: "assistant",
         message: result.message || "No answer was returned.",
@@ -238,6 +193,14 @@ export default function CatalogGlobalAssistant({
       outcome: voiceOutcome(result),
       scope,
     });
+  };
+
+  const resolveVoiceToolCall = async ({ event }) => {
+    if (!READ_ASSISTANT_TOOLS.has(event.name)) throw new Error("unsupported_read_tool");
+    const requestedScope = event.name === "read_product_summary" || event.name === "read_publish_readiness"
+      ? "product"
+      : scope;
+    return queryCatalogAssistant(assistantPayload(assistantQuestionFromTool(event), requestedScope));
   };
 
   const voiceTranscript = (entry) => {
@@ -387,6 +350,7 @@ export default function CatalogGlobalAssistant({
                   sessionContext={voiceContext}
                   contextLabel={scopeLabel}
                   onToolResult={voiceToolResult}
+                  onResolveToolCall={resolveVoiceToolCall}
                   onVoiceStateChange={setVoiceState}
                   onWorkflowEvent={onWorkflowEvent}
                   onTranscriptEntry={voiceTranscript}
