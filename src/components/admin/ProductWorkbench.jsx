@@ -12,6 +12,7 @@ import {
   getAdminCatalogProduct,
   getCatalogImageJob,
   getCatalogWorkflow,
+  startAdminCatalogProductRevision,
   startCatalogWorkflow,
   submitCatalogDraftCommand,
   submitCatalogImageCommand,
@@ -207,10 +208,11 @@ export default function ProductWorkbench({
   const ensureWorkflow = async (options = {}) => {
     if (workflowId) return workflowId;
     if (workflowStartPromise.current) return workflowStartPromise.current;
-    const activeDraft = activeDetail?.current_draft;
+    const workflowDetail = options?.detail || activeDetail;
+    const activeDraft = options?.draft || workflowDetail?.current_draft;
     const assistantOnly = options?.purpose === "assistant";
     const workflowPayload = activeProductId && activeDraft ? {
-      title: `Product Catalog workbench for ${activeDetail.title || activeProductId}`,
+      title: `Product Catalog workbench for ${workflowDetail?.title || activeProductId}`,
       business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
       draft_id: activeDraft.revision.id,
     } : assistantOnly ? {
@@ -237,40 +239,58 @@ export default function ProductWorkbench({
     return startPromise;
   };
 
+  const ensureActiveProductDraft = async () => {
+    if (!activeProductId) return { detail: activeDetail, draft: null };
+    let detail = activeDetail;
+    if (!detail) {
+      setProductDetailStatus("loading");
+      detail = await getAdminCatalogProduct(activeProductId);
+      setActiveDetail(detail || null);
+      setProductDetailStatus(detail ? "ready" : "error");
+    }
+    if (!detail) throw new Error("Product details are unavailable.");
+    if (detail.current_draft) return { detail, draft: detail.current_draft };
+
+    const revisionPayload = { expected_version: detail.version };
+    const nextDraft = await startAdminCatalogProductRevision(
+      activeProductId,
+      revisionPayload,
+      mutationKey("start-product-revision", revisionPayload),
+    );
+    delete mutationKeys.current["start-product-revision"];
+    const nextDetail = { ...detail, current_draft: nextDraft };
+    setActiveDetail(nextDetail);
+    setEditorRefreshKey((current) => current + 1);
+    return { detail: nextDetail, draft: nextDraft };
+  };
+
   const submitInstruction = async (overrideInstruction) => {
     const nextInstruction = String(overrideInstruction ?? instruction).trim();
     if (!nextInstruction || commandInFlight.current) return;
-    const activeDraft = activeDetail?.current_draft;
-    const commandDraft = activeProductId && activeDraft ? {
-      id: activeDraft.revision.id,
-      product_id: activeDetail?.product_id || activeProductId,
-      draft_version: activeDraft.draft_version,
-    } : draft;
-    if (activeProductId && !commandDraft) {
-      setActionError({
-        kind: "draft",
-        retryable: false,
-        instruction: nextInstruction,
-        message: "Product context is still loading. Open Product details, then try again.",
-      });
-      return;
-    }
     commandInFlight.current = true;
     setSubmitting(true);
     setActionError(null);
     setMessage("");
-    const traceAction = startAction(commandDraft ? "Refine catalog product draft" : "Create catalog product draft", {
-      surface: "catalog-studio",
-      attributes: {
-        action: commandDraft ? "draft_refine" : "draft_create",
-        draft_id: commandDraft?.id || "",
-        product_id: commandDraft?.product_id || activeProductId || "",
-        workflow_id: workflowId,
-      },
-    });
+    let traceAction = null;
 
     try {
-      const activeWorkflowId = await ensureWorkflow();
+      const ensured = activeProductId ? await ensureActiveProductDraft() : { detail: activeDetail, draft: null };
+      const productDraft = ensured.draft;
+      const commandDraft = activeProductId && productDraft ? {
+        id: productDraft.revision.id,
+        product_id: ensured.detail?.product_id || activeProductId,
+        draft_version: productDraft.draft_version,
+      } : draft;
+      traceAction = startAction(commandDraft ? "Refine catalog product draft" : "Create catalog product draft", {
+        surface: "catalog-studio",
+        attributes: {
+          action: commandDraft ? "draft_refine" : "draft_create",
+          draft_id: commandDraft?.id || "",
+          product_id: commandDraft?.product_id || activeProductId || "",
+          workflow_id: workflowId,
+        },
+      });
+      const activeWorkflowId = await ensureWorkflow({ detail: ensured.detail, draft: productDraft });
 
       const commandPayload = {
         instruction: nextInstruction,
@@ -323,7 +343,7 @@ export default function ProductWorkbench({
         status: error?.response?.status || "error",
         workflow_id: workflowId,
       });
-      traceAction.end("failed", {
+      traceAction?.end("failed", {
         error_code: error?.response?.status || error?.code || error?.name || "draft_command_error",
         workflow_id: workflowId,
       });
@@ -674,7 +694,7 @@ export default function ProductWorkbench({
   ], [contextualDraft, draft, editorProductId, publishedProductId, usesCanonicalEditor, usesStructuredSuggestions]);
   const activeTabIsAvailable = availableTabs.some((tab) => tab.id === activeWorkbenchTab);
   const chatDraftVersion = activeProductId ? contextualDraft?.draft_version : draft?.draft_version;
-  const chatReady = !activeProductId || Boolean(contextualDraft);
+  const chatReady = !activeProductId || productDetailStatus === "ready" || Boolean(activeDetail);
   const chatPlaceholder = activeProductId
     ? "Ask for reviewable product changes across copy, SEO, images, inventory, or publish readiness..."
     : draft ? "Refine the current draft..." : "Create a tailored rose silk occasion dress for the Dallas assortment...";
@@ -683,7 +703,9 @@ export default function ProductWorkbench({
       ? `Draft version ${chatDraftVersion}`
       : productDetailStatus === "loading"
         ? "Loading product details..."
-        : "Load product details first"
+        : productDetailStatus === "error"
+          ? "Product details unavailable"
+          : "Draft will start on first refinement"
     : chatDraftVersion ? `Draft version ${chatDraftVersion}` : "No draft yet";
   const chatActionLabel = activeProductId || draft ? "Refine draft" : "Create draft";
 

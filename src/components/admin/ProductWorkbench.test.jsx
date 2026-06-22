@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   getCatalogImageJob: vi.fn(),
   getCatalogWorkflow: vi.fn(),
   queryCatalogAssistant: vi.fn(),
+  startAdminCatalogProductRevision: vi.fn(),
   startCatalogWorkflow: vi.fn(),
   submitCatalogRealtimeV3ToolCall: vi.fn(),
   submitCatalogDraftCommand: vi.fn(),
@@ -133,6 +134,7 @@ describe("ProductWorkbench", () => {
       citations: [{ kind: "inventory", source_id: "cat_coat:1002:M", label: "Oak Brook: Studio Coat", value: { store_name: "Oak Brook", inventory_qty: 7 } }],
       mutation: false,
     });
+    api.startAdminCatalogProductRevision.mockReset().mockResolvedValue({ revision: { id: "draft_started" }, draft_version: 1 });
     api.submitCatalogDraftCommand.mockReset().mockResolvedValue({ status: "succeeded", message: "Draft created.", retryable: false, replayed: false, draft, workflow: baseWorkflow });
     api.submitCatalogImageCommand.mockReset();
     api.getCatalogImageJob.mockReset();
@@ -301,6 +303,41 @@ describe("ProductWorkbench", () => {
       current_draft_id: "draft_1",
       expected_draft_version: 2,
     }, "draft-command-key"));
+  });
+
+  it("starts a private draft before refining a published product without an active draft", async () => {
+    api.getAdminCatalogProduct.mockResolvedValueOnce({
+      product_id: "cat_coat",
+      title: "Studio Coat",
+      version: 7,
+      current_draft: null,
+      published_snapshot: { title: "Studio Coat" },
+    });
+    renderWorkspace({ authoringSchemaVersion: 3, activeProductId: "cat_coat" });
+
+    await userEvent.click(screen.getByRole("tab", { name: "Product chat" }));
+    expect(await screen.findByText("Draft will start on first refinement")).toBeInTheDocument();
+
+    const instruction = screen.getByLabelText("Catalog product instruction");
+    expect(instruction).toBeEnabled();
+    await userEvent.type(instruction, "Tighten the product copy for launch.");
+    await userEvent.click(screen.getByRole("button", { name: "Refine draft" }));
+
+    await waitFor(() => expect(api.startAdminCatalogProductRevision).toHaveBeenCalledWith(
+      "cat_coat",
+      { expected_version: 7 },
+      "start-product-revision-key",
+    ));
+    expect(api.startCatalogWorkflow).toHaveBeenCalledWith({
+      title: "Product Catalog workbench for Studio Coat",
+      business_summary: "Contextual product, inventory, catalog, and readiness assistance.",
+      draft_id: "draft_started",
+    }, "start-workflow-key");
+    expect(api.submitCatalogDraftCommand).toHaveBeenCalledWith("workflow_1", {
+      instruction: "Tighten the product copy for launch.",
+      current_draft_id: "draft_started",
+      expected_draft_version: 1,
+    }, "draft-command-key");
   });
 
   it("uses one product chat for product-wide voice context", async () => {
