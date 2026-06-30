@@ -105,6 +105,41 @@ export async function getAdminApiTraceEvents(traceId, afterSequence = -1) {
   return response.data;
 }
 
+function traceStreamNow() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function traceStreamDuration(startedAt) {
+  return Math.max(0, Math.round(traceStreamNow() - startedAt));
+}
+
+function traceStreamResult({
+  closeReason,
+  durationMs,
+  expected = false,
+  httpStatus = 0,
+  lastEventSequence,
+}) {
+  return {
+    closeReason,
+    durationMs,
+    expected,
+    httpStatus,
+    lastEventSequence,
+  };
+}
+
+function isAbortLike(error, signal) {
+  return Boolean(signal?.aborted || error?.name === "AbortError" || error?.code === "ABORT_ERR");
+}
+
+function traceStreamError(message, details = {}) {
+  const error = new Error(message);
+  error.name = "ApiTraceStreamError";
+  Object.assign(error, details);
+  return error;
+}
+
 export async function downloadAdminApiTrace(traceId) {
   const response = await apiClient.get(
     `/api/admin/traces/${encodeURIComponent(traceId)}/export`,
@@ -117,25 +152,59 @@ export async function subscribeAdminApiTraceEvents(
   traceId,
   { afterSequence = -1, signal, onEvent = () => {}, onStatus = () => {} } = {},
 ) {
+  const startedAt = traceStreamNow();
+  let lastEventSequence = Number(afterSequence);
+  const finish = (closeReason, values = {}) => traceStreamResult({
+    closeReason,
+    durationMs: traceStreamDuration(startedAt),
+    httpStatus: values.httpStatus || 0,
+    lastEventSequence,
+    expected: Boolean(values.expected),
+  });
+  if (signal?.aborted) return finish("client_abort", { expected: true });
+
   const token = authTokenGetter ? await authTokenGetter() : "";
   const query = new URLSearchParams({ after_sequence: String(afterSequence) });
-  const response = await fetch(
-    `${API_BASE_URL}/api/admin/traces/${encodeURIComponent(traceId)}/stream?${query}`,
-    {
-      cache: "no-store",
-      headers: {
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  let response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/api/admin/traces/${encodeURIComponent(traceId)}/stream?${query}`,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "text/event-stream",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal,
       },
-      signal,
-    },
-  );
-  if (!response.ok) {
-    const error = new Error(`Trace stream failed with status ${response.status}.`);
-    error.status = response.status;
-    throw error;
+    );
+  } catch (error) {
+    if (isAbortLike(error, signal)) return finish("client_abort", { expected: true });
+    throw traceStreamError("Trace stream network failure.", {
+      closeReason: "network_error",
+      durationMs: traceStreamDuration(startedAt),
+      lastEventSequence,
+      originalError: error,
+    });
   }
-  if (!response.body?.getReader) throw new Error("Trace streaming is unavailable in this browser.");
+  if (!response.ok) {
+    throw traceStreamError(`Trace stream failed with status ${response.status}.`, {
+      closeReason: response.status >= 500 ? "server_error" : "http_error",
+      durationMs: traceStreamDuration(startedAt),
+      httpStatus: response.status,
+      lastEventSequence,
+      status: response.status,
+    });
+  }
+  if (!response.body?.getReader) {
+    throw traceStreamError("Trace streaming is unavailable in this browser.", {
+      closeReason: "stream_unavailable",
+      durationMs: traceStreamDuration(startedAt),
+      httpStatus: response.status,
+      lastEventSequence,
+      status: response.status,
+    });
+  }
 
   onStatus("live");
   const reader = response.body.getReader();
@@ -151,13 +220,42 @@ export async function subscribeAdminApiTraceEvents(
       if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
     });
     if (!dataLines.length) return;
-    const data = JSON.parse(dataLines.join("\n"));
+    let data;
+    try {
+      data = JSON.parse(dataLines.join("\n"));
+    } catch (error) {
+      throw traceStreamError("Trace stream event could not be parsed.", {
+        closeReason: "parse_error",
+        durationMs: traceStreamDuration(startedAt),
+        httpStatus: response.status,
+        lastEventSequence,
+        status: response.status,
+        originalError: error,
+      });
+    }
+    if (eventType === "trace_event" && Number.isFinite(Number(data.sequence))) {
+      lastEventSequence = Math.max(lastEventSequence, Number(data.sequence));
+    }
     onEvent({ type: eventType, data });
   };
 
   try {
     while (!signal?.aborted) {
-      const { done, value } = await reader.read();
+      let next;
+      try {
+        next = await reader.read();
+      } catch (error) {
+        if (isAbortLike(error, signal)) return finish("client_abort", { expected: true, httpStatus: response.status });
+        throw traceStreamError("Trace stream read failed.", {
+          closeReason: "read_error",
+          durationMs: traceStreamDuration(startedAt),
+          httpStatus: response.status,
+          lastEventSequence,
+          status: response.status,
+          originalError: error,
+        });
+      }
+      const { done, value } = next;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const blocks = buffer.split(/\r?\n\r?\n/);
@@ -167,6 +265,8 @@ export async function subscribeAdminApiTraceEvents(
   } finally {
     reader.releaseLock();
   }
+  if (signal?.aborted) return finish("client_abort", { expected: true, httpStatus: response.status });
+  return finish("stream_closed", { httpStatus: response.status });
 }
 
 setApiTraceEventTransport(postApiTraceEvent);

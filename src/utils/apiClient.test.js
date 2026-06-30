@@ -464,6 +464,7 @@ it("streams authenticated trace events without putting credentials in the URL", 
   const releaseLock = vi.fn();
   const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
     ok: true,
+    status: 200,
     body: { getReader: () => ({ read, releaseLock }) },
   });
   const onEvent = vi.fn();
@@ -471,7 +472,7 @@ it("streams authenticated trace events without putting credentials in the URL", 
   setAuthTokenGetter(() => Promise.resolve("clerk-token"));
 
   try {
-    await subscribeAdminApiTraceEvents("trace/one", { afterSequence: 3, onEvent, onStatus });
+    const result = await subscribeAdminApiTraceEvents("trace/one", { afterSequence: 3, onEvent, onStatus });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/admin/traces/trace%2Fone/stream?after_sequence=3",
       expect.objectContaining({
@@ -481,9 +482,79 @@ it("streams authenticated trace events without putting credentials in the URL", 
     expect(fetchMock.mock.calls[0][0]).not.toContain("clerk-token");
     expect(onStatus).toHaveBeenCalledWith("live");
     expect(onEvent).toHaveBeenCalledWith({ type: "trace_event", data: event });
+    expect(result).toMatchObject({
+      closeReason: "stream_closed",
+      expected: false,
+      httpStatus: 200,
+      lastEventSequence: 4,
+    });
     expect(releaseLock).toHaveBeenCalled();
   } finally {
     setAuthTokenGetter(null);
+    fetchMock.mockRestore();
+  }
+});
+
+it("classifies intentional trace stream aborts without reporting a fetch failure", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch");
+  const controller = new AbortController();
+  controller.abort();
+
+  try {
+    const result = await subscribeAdminApiTraceEvents("trace/one", {
+      afterSequence: 7,
+      signal: controller.signal,
+    });
+
+    expect(result).toMatchObject({
+      closeReason: "client_abort",
+      expected: true,
+      lastEventSequence: 7,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
+it("reports non-abort trace stream failures with close metadata", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("network down"));
+
+  try {
+    await expect(subscribeAdminApiTraceEvents("trace/one", { afterSequence: 3 }))
+      .rejects.toMatchObject({
+        name: "ApiTraceStreamError",
+        closeReason: "network_error",
+        lastEventSequence: 3,
+      });
+  } finally {
+    fetchMock.mockRestore();
+  }
+});
+
+it("classifies malformed trace stream payloads as parser failures", async () => {
+  const read = vi.fn()
+    .mockResolvedValueOnce({
+      done: false,
+      value: new TextEncoder().encode("event: trace_event\ndata: {not-json}\n\n"),
+    });
+  const releaseLock = vi.fn();
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+    ok: true,
+    status: 200,
+    body: { getReader: () => ({ read, releaseLock }) },
+  });
+
+  try {
+    await expect(subscribeAdminApiTraceEvents("trace/one", { afterSequence: 2 }))
+      .rejects.toMatchObject({
+        name: "ApiTraceStreamError",
+        closeReason: "parse_error",
+        httpStatus: 200,
+        lastEventSequence: 2,
+      });
+    expect(releaseLock).toHaveBeenCalled();
+  } finally {
     fetchMock.mockRestore();
   }
 });

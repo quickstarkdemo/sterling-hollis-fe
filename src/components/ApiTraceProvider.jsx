@@ -17,6 +17,7 @@ import {
 } from "../utils/apiTraceClient";
 import {
   getAdminApiTrace,
+  getAdminApiTraceEvents,
   getAdminApiTraces,
   subscribeAdminApiTraceEvents,
 } from "../utils/apiClient";
@@ -47,6 +48,10 @@ export function ApiTraceCapabilityBridge() {
 }
 
 const HIDDEN_TRACES_KEY = "sterling-hollis:api-trace-hidden:v1";
+const STREAM_FALLBACK_FAILURES = 3;
+const STREAM_RECONNECT_BASE_MS = 500;
+const STREAM_RECONNECT_MAX_MS = 8000;
+const STREAM_RECONNECT_JITTER_MS = 250;
 
 function initialHiddenTraces() {
   try {
@@ -62,6 +67,14 @@ function persistHiddenTraces(traceIds) {
   } catch {
     // Hidden trace preferences are session-only UI state.
   }
+}
+
+function reconnectDelay(attempt) {
+  const base = Math.min(
+    STREAM_RECONNECT_MAX_MS,
+    STREAM_RECONNECT_BASE_MS * (2 ** Math.max(0, Number(attempt) || 0)),
+  );
+  return base + Math.floor(Math.random() * STREAM_RECONNECT_JITTER_MS);
 }
 
 export default function ApiTraceProvider({ children }) {
@@ -175,7 +188,10 @@ export default function ApiTraceProvider({ children }) {
         const projection = await getAdminApiTrace(selectedTraceId);
         if (!active) return null;
         setSelectedTrace(projection);
-        cursor = Math.max(cursor, ...(projection.events || []).map((event) => Number(event.sequence)));
+        const sequences = (projection.events || [])
+          .map((event) => Number(event.sequence))
+          .filter(Number.isFinite);
+        if (sequences.length) cursor = Math.max(cursor, ...sequences);
         setTraceStatus("ready");
         setTraceError("");
         return projection;
@@ -187,15 +203,56 @@ export default function ApiTraceProvider({ children }) {
       }
     };
 
-    const reconnect = (attempt) => {
-      if (!active || controller.signal.aborted) return;
-      setConnectionStatus("reconnecting");
-      reconnectTimer = window.setTimeout(() => connect(attempt + 1), Math.min(8000, 500 * (2 ** attempt)));
+    const mergeStreamEvents = (items = []) => {
+      if (!items.length) return;
+      const sequences = items
+        .map((event) => Number(event.sequence))
+        .filter(Number.isFinite);
+      if (sequences.length) cursor = Math.max(cursor, ...sequences);
+      setSelectedTrace((current) => current ? {
+        ...current,
+        events: mergeTraceEvents(current.events, items),
+      } : current);
     };
 
-    const connect = async (attempt = 0) => {
+    const catchUpEvents = async () => {
       try {
-        await subscribeAdminApiTraceEvents(selectedTraceId, {
+        const page = await getAdminApiTraceEvents(selectedTraceId, cursor);
+        if (!active) return false;
+        mergeStreamEvents(page?.items || []);
+        if (Number.isFinite(Number(page?.next_cursor))) {
+          cursor = Math.max(cursor, Number(page.next_cursor));
+        }
+        setTraceStatus("ready");
+        return "ok";
+      } catch (error) {
+        if (!active || controller.signal.aborted || error?.name === "AbortError") return "terminal";
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          setConnectionStatus("offline");
+          setTraceError("The trace stream is not authorized for this session.");
+          return "terminal";
+        }
+        if (error?.response?.status === 404) {
+          setConnectionStatus("expired");
+          setTraceStatus("expired");
+          return "terminal";
+        }
+        return "failed";
+      }
+    };
+
+    const reconnect = (attempt, failureCount = 0, status = "reconnecting") => {
+      if (!active || controller.signal.aborted) return;
+      setConnectionStatus(status);
+      reconnectTimer = window.setTimeout(
+        () => connect(attempt + 1, failureCount),
+        reconnectDelay(attempt),
+      );
+    };
+
+    const connect = async (attempt = 0, failureCount = 0) => {
+      try {
+        const result = await subscribeAdminApiTraceEvents(selectedTraceId, {
           afterSequence: cursor,
           signal: controller.signal,
           onStatus: (status) => {
@@ -209,18 +266,23 @@ export default function ApiTraceProvider({ children }) {
               return;
             }
             if (type !== "trace_event") return;
-            cursor = Math.max(cursor, Number(data.sequence));
-            setSelectedTrace((current) => current ? {
-              ...current,
-              events: mergeTraceEvents(current.events, [data]),
-            } : current);
+            mergeStreamEvents([data]);
             window.clearTimeout(projectionTimer);
             projectionTimer = window.setTimeout(() => loadProjection({ quiet: true }), 120);
           },
         });
-        reconnect(attempt);
+        const lastEventSequence = Number(result?.lastEventSequence);
+        if (Number.isFinite(lastEventSequence)) cursor = Math.max(cursor, lastEventSequence);
+        if (result?.expected || result?.closeReason === "client_abort") return;
+        setTraceError("");
+        reconnect(attempt, 0);
       } catch (error) {
-        if (!active || controller.signal.aborted || error?.name === "AbortError") return;
+        if (
+          !active
+          || controller.signal.aborted
+          || error?.name === "AbortError"
+          || error?.closeReason === "client_abort"
+        ) return;
         if (error?.status === 401 || error?.status === 403) {
           setConnectionStatus("offline");
           setTraceError("The trace stream is not authorized for this session.");
@@ -229,8 +291,17 @@ export default function ApiTraceProvider({ children }) {
         if (error?.status === 404) {
           setConnectionStatus("partial");
           await loadProjection({ quiet: true });
+          return;
         }
-        reconnect(attempt);
+        const nextFailureCount = failureCount + 1;
+        setTraceError("Trace stream interrupted. Reconnecting.");
+        if (nextFailureCount >= STREAM_FALLBACK_FAILURES) {
+          setConnectionStatus("partial");
+          if (await catchUpEvents() === "terminal") return;
+          reconnect(attempt, nextFailureCount, "partial");
+          return;
+        }
+        reconnect(attempt, nextFailureCount);
       }
     };
 
