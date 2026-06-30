@@ -5,6 +5,7 @@ import { FiMic, FiMicOff, FiRefreshCw } from "react-icons/fi";
 import useCatalogRealtimeSession from "../../hooks/useCatalogRealtimeSession";
 import { useApiTrace } from "../ApiTraceContext";
 import { recordApiTraceEvent } from "../../utils/apiTraceClient";
+import { recordVisibleConversationTurn } from "../../utils/apiTraceConversation";
 import RealtimeTranscript from "./RealtimeTranscript";
 
 const ACTIVE_STATES = new Set(["requesting", "connecting", "listening"]);
@@ -85,6 +86,11 @@ function voiceIdempotencyKey(callId) {
   return `voice-tool-${prefix}-${(hash >>> 0).toString(16)}`;
 }
 
+function traceToken(value, fallback) {
+  const normalized = String(value || fallback || "turn").replace(/[^A-Za-z0-9._:-]/g, "_");
+  return normalized.slice(0, 96) || fallback || "turn";
+}
+
 export default function VoiceControls({
   workflowId,
   disabled = false,
@@ -123,6 +129,9 @@ export default function VoiceControls({
   const presenterPartialRef = useRef("");
   const assistantPartialRef = useRef("");
   const entrySequenceRef = useRef(0);
+  const turnSequenceRef = useRef(0);
+  const activeTurnIdRef = useRef("");
+  const lastSelectedToolRef = useRef("");
   const resetSignalRef = useRef(resetSignal);
   const startSignalRef = useRef(startSignal);
   const startSessionRef = useRef(null);
@@ -218,43 +227,38 @@ export default function VoiceControls({
     if (!normalized) return;
     const clippedText = normalized.slice(-MAX_TRANSCRIPT_CHARS);
     entrySequenceRef.current += 1;
+    if (role === "presenter" || !activeTurnIdRef.current) {
+      turnSequenceRef.current += 1;
+      activeTurnIdRef.current = `voice-${traceToken(activeWorkflowId, "workflow")}-${turnSequenceRef.current}`;
+    }
+    const turnId = activeTurnIdRef.current;
+    const messageId = `${turnId}:${role === "presenter" ? "presenter" : "assistant"}`;
     setEntries((current) => [
       ...current,
-      { id: `${role}-${entrySequenceRef.current}`, role, text: clippedText },
+      { id: messageId, role, text: clippedText },
     ].slice(-MAX_TRANSCRIPT_ENTRIES));
     const traceAction = traceActionRef.current;
-    if (traceAction?.enabled) {
-      recordApiTraceEvent(
-        "conversation.turn",
-        {
-          route: "catalog_realtime_voice",
-          workflow_id: activeWorkflowId,
-          visible_messages: [
-            {
-              visible_message_id: `${role}-${entrySequenceRef.current}`,
-              visible_role: role === "presenter" ? "presenter" : "assistant",
-              visible_text: clippedText,
-              visible_source: "realtime_transcript",
-              visible_created_at: new Date().toISOString(),
-            },
-          ],
-        },
-        {
-          action: traceAction,
-          name: role === "presenter" ? "Visible presenter transcript" : "Visible assistant transcript",
-          status: "recorded",
-        },
-      );
-    }
+    recordVisibleConversationTurn({
+      action: traceAction,
+      createdAt: new Date(now()).toISOString(),
+      messageId,
+      role,
+      selectedTool: role === "assistant" ? lastSelectedToolRef.current : "",
+      text: clippedText,
+      turnId,
+      workflowId: activeWorkflowId,
+    });
     callbacksRef.current.onTranscriptEntry?.({
       role,
       text: clippedText,
       workflowId: activeWorkflowId,
     });
     if (role === "presenter") {
+      lastSelectedToolRef.current = "";
       presenterPartialRef.current = "";
       setPresenterPartial("");
     } else {
+      activeTurnIdRef.current = "";
       assistantPartialRef.current = "";
       setAssistantPartial("");
     }
@@ -268,6 +272,7 @@ export default function VoiceControls({
     const callId = String(event.call_id || "");
     if (!callId || handledCallsRef.current.has(callId)) return;
     handledCallsRef.current.add(callId);
+    lastSelectedToolRef.current = String(event.name || "");
 
     try {
       const idempotencyKey = voiceIdempotencyKey(callId);
@@ -352,6 +357,9 @@ export default function VoiceControls({
     generationRef.current = generation;
     clearResources();
     handledCallsRef.current = new Set();
+    turnSequenceRef.current = 0;
+    activeTurnIdRef.current = "";
+    lastSelectedToolRef.current = "";
     sessionConnectedRef.current = false;
     setNotice("");
     setEntries([]);
