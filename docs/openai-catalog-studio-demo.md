@@ -83,9 +83,12 @@ Use this path when the shared API trace capability is configured. Turn on
 
 For each action, expand **Dev Tools**, select the most recent trace, and confirm
 the root span name matches the user action, with child HTTP spans for the
-backend calls. The selected trace should show only bounded IDs, endpoints,
-statuses, and operational metadata. It must not show prompts, credentials, raw
-review text, supplier file contents, audio, or private provider payloads.
+backend calls. For storefront chat traces, open **Chat** and confirm the
+customer-visible user input, assistant answer, product card summary, action
+summary, and tool path are readable without inspecting JSON. The selected trace
+may show visible chat transcript text for customer education, but it must not
+show system prompts, credentials, raw provider payloads, raw review text,
+supplier file contents, audio, SDP, or private transport data.
 
 For an offline walkthrough, load the sanitized scripted projection in
 `docs/fixtures/catalog-chat-trace-replay.json` into the trace replay tooling or
@@ -237,6 +240,10 @@ Catalog draft, supplier source, suggestion, media, lifecycle, Realtime voice, an
 storefront chat turns register explicit UI root spans so live and replay demos
 can correlate the action, HTTP calls, events, and sanitized artifacts without
 turning every background refresh into a primary trace.
+Storefront chat traces can include a bounded visible transcript artifact so a
+customer can understand the API request and assistant response. That artifact is
+separate from raw prompts, provider payloads, audio, credentials, and hidden
+implementation context, which remain excluded from the customer trace view.
 
 Capture these items in meeting notes:
 

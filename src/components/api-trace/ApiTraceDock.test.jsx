@@ -78,6 +78,7 @@ describe("ApiTraceDock", () => {
 
     await userEvent.click(tray);
     expect(screen.getByRole("tab", { name: "Graph" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Chat" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Waterfall" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Events" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Artifacts" })).toBeInTheDocument();
@@ -101,6 +102,52 @@ describe("ApiTraceDock", () => {
     const collapsed = screen.getByRole("button", { name: /Dev Tools/ });
     expect(collapsed).toHaveAttribute("aria-expanded", "false");
     await waitFor(() => expect(collapsed).toHaveFocus());
+  });
+
+  it("shows chat transcript artifacts as a customer-readable conversation", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true, view: "chat" }));
+    const trace = {
+      ...projection,
+      artifacts: [{
+        artifact_id: "artifact-chat",
+        span_id: "root",
+        artifact_type: "chat_transcript",
+        name: "Visible storefront chat transcript",
+        media_type: "application/vnd.sterling.chat-transcript+json",
+        size_bytes: 512,
+        attributes: {
+          conversation_id: "conv_demo",
+          turn_id: "turn_demo",
+          route: "simple_tool",
+          selected_tool: "product_detail",
+          card_count: 1,
+          action_count: 1,
+          tool_count: 1,
+          visible_messages: [
+            { visible_role: "user", visible_text: "Can I wear this in the rain?" },
+            { visible_role: "assistant", visible_text: "Yes. It is designed for wet commutes." },
+          ],
+          card_summaries: [{ product_id: "cat_rain", title: "Commuter Shell" }],
+          action_summaries: [{ action_type: "view_product", action_label: "View product" }],
+          tool_trace_summary: [{ tool_name: "product_detail", decision: "answered product question" }],
+        },
+      }],
+    };
+    useApiTrace.mockReturnValue(traceState({
+      recentTraces: [trace],
+      selectedTrace: trace,
+      selectedTraceId: trace.trace_id,
+    }));
+
+    renderWithProviders(<ApiTraceDock />);
+
+    expect(screen.getByText("Can I wear this in the rain?")).toBeInTheDocument();
+    expect(screen.getByText("Yes. It is designed for wet commutes.")).toBeInTheDocument();
+    expect(screen.getByText("Commuter Shell")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Customer Can I wear/ }));
+    expect(screen.getByText("Artifact inspector")).toBeInTheDocument();
+    expect(screen.getAllByText("Visible storefront chat transcript").length).toBeGreaterThan(1);
   });
 
   it("supports keyboard tab navigation and dock resizing", () => {
