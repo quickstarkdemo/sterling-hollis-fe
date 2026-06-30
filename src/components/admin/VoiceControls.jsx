@@ -222,6 +222,30 @@ export default function VoiceControls({
       ...current,
       { id: `${role}-${entrySequenceRef.current}`, role, text: clippedText },
     ].slice(-MAX_TRANSCRIPT_ENTRIES));
+    const traceAction = traceActionRef.current;
+    if (traceAction?.enabled) {
+      recordApiTraceEvent(
+        "conversation.turn",
+        {
+          route: "catalog_realtime_voice",
+          workflow_id: activeWorkflowId,
+          visible_messages: [
+            {
+              visible_message_id: `${role}-${entrySequenceRef.current}`,
+              visible_role: role === "presenter" ? "presenter" : "assistant",
+              visible_text: clippedText,
+              visible_source: "realtime_transcript",
+              visible_created_at: new Date().toISOString(),
+            },
+          ],
+        },
+        {
+          action: traceAction,
+          name: role === "presenter" ? "Visible presenter transcript" : "Visible assistant transcript",
+          status: "recorded",
+        },
+      );
+    }
     callbacksRef.current.onTranscriptEntry?.({
       role,
       text: clippedText,

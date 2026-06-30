@@ -139,7 +139,7 @@ describe("VoiceControls", () => {
     play.mockRestore();
   });
 
-  it("records bounded Realtime lifecycle events without audio, credentials, SDP, or transcript text", async () => {
+  it("records lifecycle events without audio credentials and publishes visible transcript turns", async () => {
     const events = [];
     const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
     const { channel } = renderVoice();
@@ -157,11 +157,21 @@ describe("VoiceControls", () => {
     expect(events.map((event) => event.event_type)).toEqual(expect.arrayContaining([
       "ui.started",
       "realtime.connected",
+      "conversation.turn",
       "realtime.disconnected",
       "ui.completed",
     ]));
+    const transcriptTurn = events.find((event) => event.event_type === "conversation.turn");
+    expect(transcriptTurn.attributes.visible_messages[0]).toEqual(expect.objectContaining({
+      visible_role: "presenter",
+      visible_text: "private spoken product instruction",
+      visible_source: "realtime_transcript",
+    }));
+    const lifecycleEncoded = JSON.stringify(
+      events.filter((event) => event.event_type !== "conversation.turn"),
+    );
+    expect(lifecycleEncoded).not.toContain("private spoken product instruction");
     const encoded = JSON.stringify(events);
-    expect(encoded).not.toContain("private spoken product instruction");
     expect(encoded).not.toContain("private-audio");
     expect(encoded).not.toContain("ephemeral-secret");
     expect(encoded).not.toContain("offer-sdp");

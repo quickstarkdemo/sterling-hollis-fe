@@ -98,6 +98,41 @@ describe("buildTraceGraph", () => {
     ]));
     expect(new Set(first.edges.map((edge) => edge.id)).size).toBe(first.edges.length);
   });
+
+  it("adds visible transcript nodes and deduplicates event-backed artifacts", () => {
+    const conversationEvent = {
+      event_id: "turn-1",
+      span_id: "openai",
+      sequence: 2,
+      name: "Visible assistant transcript",
+      event_type: "conversation.turn",
+      attributes: {
+        visible_messages: [
+          { visible_role: "assistant", visible_text: "Dallas is low on stock." },
+        ],
+      },
+    };
+    const liveGraph = buildTraceGraph({ ...trace, events: [...trace.events, conversationEvent] });
+
+    expect(liveGraph.nodes.find((node) => node.id === "event:turn-1")?.data.kind).toBe("conversation");
+    expect(liveGraph.nodes.find((node) => node.id === "event:turn-1")?.data.label).toBe("Dallas is low on stock.");
+    expect(liveGraph.edges.map((edge) => edge.id)).toContain("transcript:openai->event:turn-1");
+
+    const reloadedGraph = buildTraceGraph({
+      ...trace,
+      events: [...trace.events, conversationEvent],
+      artifacts: [{
+        artifact_id: "transcript_turn-1",
+        span_id: "openai",
+        artifact_type: "chat_transcript",
+        name: "Visible assistant transcript artifact",
+        media_type: "application/vnd.sterling.chat-transcript+json",
+        attributes: conversationEvent.attributes,
+      }],
+    });
+    expect(reloadedGraph.nodes.some((node) => node.id === "event:turn-1")).toBe(false);
+    expect(reloadedGraph.nodes.some((node) => node.id === "artifact:transcript_turn-1")).toBe(true);
+  });
 });
 
 describe("TraceGraph", () => {
@@ -114,6 +149,34 @@ describe("TraceGraph", () => {
     expect(screen.getByTestId("graph-background")).toHaveAttribute("data-color", "rgba(246, 237, 220, 0.12)");
     expect(screen.getByTestId("graph-minimap")).toHaveAttribute("data-mask-color", "rgba(10, 15, 20, 0.66)");
     expect(screen.getByTestId("graph-minimap")).toHaveAttribute("data-node-color", "#263746");
+  });
+
+  it("selects conversation transcript graph nodes as events", () => {
+    const onSelect = vi.fn();
+    const conversationTrace = {
+      ...trace,
+      events: [
+        ...trace.events,
+        {
+          event_id: "turn-1",
+          span_id: "openai",
+          sequence: 2,
+          name: "Visible assistant transcript",
+          event_type: "conversation.turn",
+          attributes: {
+            visible_messages: [
+              { visible_role: "assistant", visible_text: "Dallas is low on stock." },
+            ],
+          },
+        },
+      ],
+    };
+    renderWithProviders(<TraceGraph trace={conversationTrace} selection={{ kind: "event", id: "turn-1" }} onSelect={onSelect} />);
+
+    const transcriptNode = screen.getByRole("button", { name: /Visible assistant transcript/ });
+    expect(transcriptNode).toHaveAttribute("data-selected", "true");
+    fireEvent.click(transcriptNode);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "event", id: "turn-1" });
   });
 
   it("keeps existing positions stable across incremental updates and exposes compact density", () => {

@@ -14,6 +14,7 @@ const CLIENT_EVENT_TYPES = new Set([
   "realtime.connected",
   "realtime.disconnected",
   "realtime.error",
+  "conversation.turn",
 ]);
 
 const subscribers = new Set();
