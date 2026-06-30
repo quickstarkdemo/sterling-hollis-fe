@@ -2,7 +2,8 @@
 
 Use this after deploy when validating the unified backend capability contract
 from the frontend. Record product IDs and releases in meeting notes; never copy
-credentials, private drafts, provider payloads, or customer-private text.
+credentials, private drafts, provider payloads, or unapproved customer-private
+text.
 
 ## Storefront Chat
 
@@ -30,6 +31,11 @@ credentials, private drafts, provider payloads, or customer-private text.
 - Open the trace tray and inspect each trace.
 - Confirm capability id, surface, and status appear for both shopper and admin
   actions.
+- For the storefront chat trace, open **Chat** and confirm the visible customer
+  input and assistant response match the screen conversation.
+- Confirm trace JSON and inspector views do not expose system prompts, raw
+  provider payloads, credentials, audio, SDP, hidden reasoning, or private draft
+  data.
 - Confirm trace controls remain unavailable without an authorized session and
   `api_traces.configured`.
 

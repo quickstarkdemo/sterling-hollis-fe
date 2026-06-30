@@ -24,6 +24,7 @@ import {
   traceJson,
 } from "../../utils/apiTraceProjection";
 import TraceArtifactViewer from "./TraceArtifactViewer";
+import TraceConversationView from "./TraceConversationView";
 import TraceEventLog from "./TraceEventLog";
 import TraceInspector from "./TraceInspector";
 import TraceReplayControls from "./TraceReplayControls";
@@ -34,6 +35,7 @@ const TraceGraph = lazy(() => import("./TraceGraph"));
 const STORAGE_KEY = "sterling-hollis:api-trace-dock:v1";
 const VIEWS = [
   { id: "graph", label: "Graph" },
+  { id: "chat", label: "Chat" },
   { id: "waterfall", label: "Waterfall" },
   { id: "events", label: "Events" },
   { id: "artifacts", label: "Artifacts" },
@@ -402,6 +404,7 @@ export default function ApiTraceDock() {
                 <TraceGraph trace={visibleTrace} selection={selection} onSelect={setSelection} />
               </Suspense>
             ) : null}
+            {preference.view === "chat" ? <TraceConversationView trace={visibleTrace} selection={selection} onSelect={setSelection} /> : null}
             {preference.view === "waterfall" ? <TraceWaterfall trace={visibleTrace} selection={selection} onSelect={setSelection} /> : null}
             {preference.view === "events" ? <TraceEventLog trace={visibleTrace} selection={selection} onSelect={setSelection} /> : null}
             {preference.view === "artifacts" ? <TraceArtifactViewer artifacts={visibleTrace?.artifacts} selection={selection} onSelect={setSelection} /> : null}

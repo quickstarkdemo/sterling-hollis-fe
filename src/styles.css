@@ -914,7 +914,8 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-list-item,
 .trace-event-row,
 .trace-waterfall-row,
-.trace-artifact-card {
+.trace-artifact-card,
+.trace-message {
   width: 100%;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -970,7 +971,9 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .trace-waterfall-row:hover,
 .trace-waterfall-row.selected,
 .trace-artifact-card:hover,
-.trace-artifact-card.selected {
+.trace-artifact-card.selected,
+.trace-message:hover,
+.trace-message.selected {
   border-color: rgba(23, 19, 15, 0.16);
   background: var(--paper-deep);
 }
@@ -979,6 +982,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .trace-event-row:focus-visible,
 .trace-waterfall-row:focus-visible,
 .trace-artifact-card:focus-visible,
+.trace-message:focus-visible,
 .api-trace-view-tabs button:focus,
 .api-trace-view-tabs button:focus-visible,
 .api-trace-resize-handle:focus-visible {
@@ -1107,6 +1111,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-event-row,
 .api-trace-dock.expanded .trace-waterfall-row,
 .api-trace-dock.expanded .trace-artifact-card,
+.api-trace-dock.expanded .trace-message,
 .api-trace-dock.expanded .api-trace-view-tabs button,
 .api-trace-dock.expanded .trace-icon-button,
 .api-trace-dock.expanded .trace-list-action,
@@ -1121,6 +1126,9 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-event-copy small,
 .api-trace-dock.expanded .trace-waterfall-label small,
 .api-trace-dock.expanded .trace-artifact-card small,
+.api-trace-dock.expanded .trace-message-role,
+.api-trace-dock.expanded .trace-conversation-meta span,
+.api-trace-dock.expanded .trace-summary-list span,
 .api-trace-dock.expanded .api-trace-strip-name,
 .api-trace-dock.expanded .trace-replay-copy,
 .api-trace-dock.expanded .trace-replay-time,
@@ -1140,9 +1148,28 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-waterfall-row:hover,
 .api-trace-dock.expanded .trace-waterfall-row.selected,
 .api-trace-dock.expanded .trace-artifact-card:hover,
-.api-trace-dock.expanded .trace-artifact-card.selected {
+.api-trace-dock.expanded .trace-artifact-card.selected,
+.api-trace-dock.expanded .trace-message:hover,
+.api-trace-dock.expanded .trace-message.selected {
   border-color: var(--trace-border-strong);
   background: var(--trace-panel-soft);
+}
+
+.api-trace-dock.expanded .trace-conversation-card,
+.api-trace-dock.expanded .trace-conversation-summary-section {
+  border-color: var(--trace-border);
+  background: var(--trace-panel);
+}
+
+.api-trace-dock.expanded .trace-conversation-card.selected {
+  border-color: var(--trace-border-strong);
+  background: var(--trace-panel-soft);
+}
+
+.api-trace-dock.expanded .trace-conversation-meta span,
+.api-trace-dock.expanded .trace-summary-list span,
+.api-trace-dock.expanded .trace-summary-count {
+  border-color: var(--trace-border);
 }
 
 .api-trace-dock.expanded .api-trace-view-tabs button[aria-selected="true"] {
@@ -1696,6 +1723,102 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 
 .trace-artifact-card .api-trace-artifact-type {
   justify-self: start;
+}
+
+.trace-conversation-list {
+  display: grid;
+  gap: 10px;
+}
+
+.trace-conversation-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.trace-conversation-card.selected {
+  border-color: rgba(23, 19, 15, 0.18);
+  background: var(--paper-deep);
+}
+
+.trace-conversation-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.trace-conversation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trace-conversation-meta span,
+.trace-summary-list span,
+.trace-summary-count {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(23, 19, 15, 0.12);
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.trace-message-list {
+  display: grid;
+  gap: 8px;
+}
+
+.trace-message {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+}
+
+.trace-message.user {
+  border-left: 3px solid var(--sage);
+}
+
+.trace-message.assistant {
+  border-left: 3px solid var(--saffron);
+}
+
+.trace-message-role {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.trace-message-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.trace-conversation-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.trace-conversation-summary-section {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.trace-summary-list {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .trace-inspector {
