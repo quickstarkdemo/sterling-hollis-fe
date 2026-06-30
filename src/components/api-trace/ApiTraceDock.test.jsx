@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../test/render";
+import { downloadAdminApiTrace } from "../../utils/apiClient";
 import { useApiTrace } from "../ApiTraceContext";
 import ApiTraceDock from "./ApiTraceDock";
 
@@ -34,6 +35,24 @@ const projection = {
   ],
   artifacts: [],
 };
+const visibleTranscriptArtifact = {
+  artifact_id: "artifact-chat",
+  span_id: "root",
+  artifact_type: "chat_transcript",
+  name: "Visible storefront chat transcript",
+  media_type: "application/vnd.sterling.chat-transcript+json",
+  size_bytes: 512,
+  attributes: {
+    conversation_id: "conv_demo",
+    turn_id: "turn_demo",
+    route: "simple_tool",
+    selected_tool: "product_detail",
+    visible_messages: [
+      { visible_role: "user", visible_text: "Can I wear this in the rain?" },
+      { visible_role: "assistant", visible_text: "Yes. It is designed for wet commutes." },
+    ],
+  },
+};
 
 function traceState(overrides = {}) {
   return {
@@ -56,6 +75,7 @@ function traceState(overrides = {}) {
 
 describe("ApiTraceDock", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     sessionStorage.clear();
     useApiTrace.mockReturnValue(traceState());
   });
@@ -109,24 +129,12 @@ describe("ApiTraceDock", () => {
     const trace = {
       ...projection,
       artifacts: [{
-        artifact_id: "artifact-chat",
-        span_id: "root",
-        artifact_type: "chat_transcript",
-        name: "Visible storefront chat transcript",
-        media_type: "application/vnd.sterling.chat-transcript+json",
-        size_bytes: 512,
+        ...visibleTranscriptArtifact,
         attributes: {
-          conversation_id: "conv_demo",
-          turn_id: "turn_demo",
-          route: "simple_tool",
-          selected_tool: "product_detail",
+          ...visibleTranscriptArtifact.attributes,
           card_count: 1,
           action_count: 1,
           tool_count: 1,
-          visible_messages: [
-            { visible_role: "user", visible_text: "Can I wear this in the rain?" },
-            { visible_role: "assistant", visible_text: "Yes. It is designed for wet commutes." },
-          ],
           card_summaries: [{ product_id: "cat_rain", title: "Commuter Shell" }],
           action_summaries: [{ action_type: "view_product", action_label: "View product" }],
           tool_trace_summary: [{ tool_name: "product_detail", decision: "answered product question" }],
@@ -226,6 +234,12 @@ describe("ApiTraceDock", () => {
     sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const trace = { ...projection, artifacts: [visibleTranscriptArtifact] };
+    useApiTrace.mockReturnValue(traceState({
+      recentTraces: [trace],
+      selectedTrace: trace,
+      selectedTraceId: trace.trace_id,
+    }));
     renderWithProviders(<ApiTraceDock />);
 
     await userEvent.click(screen.getAllByRole("button", { name: /^Copy$/ })[0]);
@@ -233,6 +247,51 @@ describe("ApiTraceDock", () => {
     const copied = writeText.mock.calls[0][0];
     expect(copied).toContain("Bearer secret");
     expect(copied).toContain("Generate product draft");
+    expect(copied).toContain('"visible_conversation"');
+    expect(copied).toContain("Can I wear this in the rain?");
+  });
+
+  it("downloads trace JSON with the visible conversation projection", async () => {
+    sessionStorage.setItem("sterling-hollis:api-trace-dock:v1", JSON.stringify({ expanded: true }));
+    const trace = { ...projection, artifacts: [visibleTranscriptArtifact] };
+    useApiTrace.mockReturnValue(traceState({
+      recentTraces: [trace],
+      selectedTrace: trace,
+      selectedTraceId: trace.trace_id,
+    }));
+    downloadAdminApiTrace.mockResolvedValue({
+      data: new Blob([JSON.stringify(trace)], { type: "application/json" }),
+    });
+    let exportedBlob = null;
+    const createObjectURL = vi.fn((blob) => {
+      exportedBlob = blob;
+      return "blob:trace-export";
+    });
+    const revokeObjectURL = vi.fn();
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
+    renderWithProviders(<ApiTraceDock />);
+
+    await userEvent.click(screen.getByRole("button", { name: /^JSON$/ }));
+    await waitFor(() => expect(downloadAdminApiTrace).toHaveBeenCalledWith("trace-1"));
+    await waitFor(() => expect(exportedBlob).toBeTruthy());
+    const exportedText = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(exportedBlob);
+    });
+    const exported = JSON.parse(exportedText);
+
+    expect(exported.visible_conversation.records[0].messages).toEqual([
+      { id: "message-1", role: "user", text: "Can I wear this in the rain?" },
+      { id: "message-2", role: "assistant", text: "Yes. It is designed for wet commutes." },
+    ]);
+    expect(exported.artifacts[0].attributes.visible_messages[0].visible_text).toBe("Can I wear this in the rain?");
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:trace-export");
+    anchorClick.mockRestore();
   });
 
   it("supports deleting the current trace and batch selecting recent traces", async () => {

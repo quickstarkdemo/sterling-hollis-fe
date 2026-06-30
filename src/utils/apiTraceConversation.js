@@ -92,7 +92,7 @@ export function conversationMessages(attributes = {}) {
     .filter((message) => message.text);
 }
 
-function conversationTurnId(attributes = {}) {
+export function conversationTurnId(attributes = {}) {
   if (attributes.turn_id) return String(attributes.turn_id);
   if (attributes.visible_turn_id) return String(attributes.visible_turn_id);
   const messages = attributes.visible_messages || attributes.messages || [];
@@ -217,4 +217,95 @@ export function buildTraceConversationRecords(trace) {
       if (leftTime === null && rightTime !== null) return 1;
       return left.order - right.order;
     });
+}
+
+function compactSummaryItems(items = []) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => dropEmptyValues({
+      action_label: item.action_label,
+      action_type: item.action_type,
+      capability_id: item.capability_id,
+      decision: item.decision,
+      product_id: item.product_id,
+      status: item.status,
+      title: item.title,
+      tool_name: item.tool_name,
+    }))
+    .filter((item) => Object.keys(item).length);
+}
+
+function visibleConversationRecord(record) {
+  const attributes = record.attributes || {};
+  const expired = Boolean(record.expired);
+  const messages = expired
+    ? []
+    : conversationMessages(attributes).map((message) => dropEmptyValues({
+      id: message.id,
+      role: message.role,
+      text: message.text,
+      source: message.source,
+      created_at: message.createdAt,
+    }));
+  const projection = dropEmptyValues({
+    id: record.id,
+    kind: record.kind,
+    name: record.name,
+    type: record.type,
+    media_type: record.mediaType,
+    span_id: record.spanId,
+    payload_state: expired ? "metadata_only" : "available",
+    conversation_id: attributes.conversation_id,
+    turn_id: conversationTurnId(attributes),
+    workflow_id: attributes.workflow_id,
+    route: attributes.route,
+    selected_tool: attributes.selected_tool,
+    duplicate_replay: attributes.duplicate_replay ? true : undefined,
+    card_count: attributes.card_count,
+    action_count: attributes.action_count,
+    tool_count: attributes.tool_count,
+  });
+  projection.expired = expired;
+  projection.message_count = messages.length;
+  projection.messages = messages;
+  if (!expired) {
+    const cardSummaries = compactSummaryItems(attributes.card_summaries);
+    const actionSummaries = compactSummaryItems(attributes.action_summaries);
+    const toolTraceSummary = compactSummaryItems(attributes.tool_trace_summary);
+    if (cardSummaries.length) projection.card_summaries = cardSummaries;
+    if (actionSummaries.length) projection.action_summaries = actionSummaries;
+    if (toolTraceSummary.length) projection.tool_trace_summary = toolTraceSummary;
+  }
+  return projection;
+}
+
+export function buildVisibleConversationProjection(trace) {
+  const records = buildTraceConversationRecords(trace).map(visibleConversationRecord);
+  const metadataOnlyCount = records.filter((record) => record.payload_state === "metadata_only").length;
+  return {
+    schema_version: "sterling.visible_conversation.v1",
+    trace_id: trace?.trace_id || "",
+    payload_state: trace?.payload_expired
+      ? "metadata_only"
+      : records.length
+        ? "available"
+        : "empty",
+    record_count: records.length,
+    message_count: records.reduce((total, record) => total + record.message_count, 0),
+    metadata_only_count: metadataOnlyCount,
+    records,
+  };
+}
+
+export function traceConversationRecordForSelection(trace, selection) {
+  if (!trace || !selection || (selection.kind !== "artifact" && selection.kind !== "event")) return null;
+  const records = buildTraceConversationRecords(trace);
+  const exact = records.find((record) => record.kind === selection.kind && record.id === selection.id);
+  if (exact) return exact;
+  const source = selection.kind === "artifact"
+    ? trace.artifacts?.find((item) => item.artifact_id === selection.id)
+    : trace.events?.find((item) => item.event_id === selection.id);
+  const turnId = conversationTurnId(source?.attributes || {});
+  if (!turnId) return null;
+  return records.find((record) => conversationTurnId(record.attributes) === turnId) || null;
 }
