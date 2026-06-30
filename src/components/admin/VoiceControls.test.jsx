@@ -162,10 +162,13 @@ describe("VoiceControls", () => {
       "ui.completed",
     ]));
     const transcriptTurn = events.find((event) => event.event_type === "conversation.turn");
+    expect(transcriptTurn.attributes.turn_id).toBe("voice-workflow_1-1");
     expect(transcriptTurn.attributes.visible_messages[0]).toEqual(expect.objectContaining({
+      visible_message_id: "voice-workflow_1-1:presenter",
       visible_role: "presenter",
       visible_text: "private spoken product instruction",
       visible_source: "realtime_transcript",
+      visible_created_at: "1970-01-01T00:00:00.000Z",
     }));
     const lifecycleEncoded = JSON.stringify(
       events.filter((event) => event.event_type !== "conversation.turn"),
@@ -175,6 +178,54 @@ describe("VoiceControls", () => {
     expect(encoded).not.toContain("private-audio");
     expect(encoded).not.toContain("ephemeral-secret");
     expect(encoded).not.toContain("offer-sdp");
+  });
+
+  it("groups finalized presenter and assistant transcript events with stable turn metadata", async () => {
+    const events = [];
+    const unsubscribe = subscribeApiTraceEvents((event) => events.push(event));
+    const { channel } = renderVoice();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start voice" }));
+    act(() => channel.open());
+    act(() => channel.message({
+      type: "conversation.item.input_audio_transcription.completed",
+      transcript: "Which store is low on stock?",
+    }));
+    act(() => channel.message({
+      type: "response.function_call_arguments.done",
+      call_id: "call_refine",
+      name: "refine_catalog_draft",
+      arguments: JSON.stringify({
+        instruction: "Highlight low stock in Dallas.",
+        current_draft_id: "draft_1",
+        expected_draft_version: 1,
+      }),
+    }));
+    await waitFor(() => expect(api.submitCatalogRealtimeCompatibilityToolCall).toHaveBeenCalledTimes(1));
+    act(() => channel.message({
+      type: "response.output_audio_transcript.done",
+      transcript: "Dallas Downtown is low on stock.",
+    }));
+    const turnCountBeforeStop = events.filter((event) => event.event_type === "conversation.turn").length;
+    await userEvent.click(await screen.findByRole("button", { name: "Stop voice" }));
+    unsubscribe();
+
+    const turns = events.filter((event) => event.event_type === "conversation.turn");
+    expect(turns).toHaveLength(turnCountBeforeStop);
+    expect(turns).toHaveLength(2);
+    expect(turns[0].attributes.turn_id).toBe("voice-workflow_1-1");
+    expect(turns[1].attributes.turn_id).toBe("voice-workflow_1-1");
+    expect(turns[0].attributes.visible_messages[0]).toEqual(expect.objectContaining({
+      visible_message_id: "voice-workflow_1-1:presenter",
+      visible_role: "presenter",
+      visible_text: "Which store is low on stock?",
+    }));
+    expect(turns[1].attributes.selected_tool).toBe("refine_catalog_draft");
+    expect(turns[1].attributes.visible_messages[0]).toEqual(expect.objectContaining({
+      visible_message_id: "voice-workflow_1-1:assistant",
+      visible_role: "assistant",
+      visible_text: "Dallas Downtown is low on stock.",
+    }));
   });
 
   it("keeps the SDP exchange out of API trace capture", async () => {

@@ -51,6 +51,7 @@ const transcriptEvent = {
   occurred_at: "2026-06-20T00:00:04Z",
   attributes: {
     route: "catalog_realtime_voice",
+    turn_id: "voice-turn-1",
     workflow_id: "workflow_1",
     visible_messages: [
       {
@@ -124,6 +125,38 @@ describe("TraceConversationView", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "event", id: "voice-turn-1" });
   });
 
+  it("merges live presenter and assistant fragments with the same turn id", () => {
+    const presenterEvent = {
+      ...transcriptEvent,
+      event_id: "voice-turn-presenter",
+      name: "Visible presenter transcript",
+      attributes: {
+        ...transcriptEvent.attributes,
+        visible_messages: [transcriptEvent.attributes.visible_messages[0]],
+      },
+    };
+    const assistantEvent = {
+      ...transcriptEvent,
+      event_id: "voice-turn-assistant",
+      name: "Visible assistant transcript",
+      attributes: {
+        ...transcriptEvent.attributes,
+        selected_tool: "read_inventory_status",
+        visible_messages: [transcriptEvent.attributes.visible_messages[1]],
+      },
+    };
+
+    renderWithProviders(
+      <TraceConversationView
+        trace={{ artifacts: [], events: [presenterEvent, assistantEvent] }}
+      />,
+    );
+
+    expect(screen.getAllByText("Which stores are low?")).toHaveLength(1);
+    expect(screen.getAllByText("Dallas Downtown is low on stock.")).toHaveLength(1);
+    expect(screen.getByText("read_inventory_status")).toBeInTheDocument();
+  });
+
   it("deduplicates event turns once their derived transcript artifact arrives", () => {
     renderWithProviders(
       <TraceConversationView
@@ -140,6 +173,25 @@ describe("TraceConversationView", () => {
     );
 
     expect(screen.getAllByText("Which stores are low?")).toHaveLength(1);
+  });
+
+  it("deduplicates live turns once a durable artifact carries the same turn id", () => {
+    renderWithProviders(
+      <TraceConversationView
+        trace={{
+          events: [transcriptEvent],
+          artifacts: [{
+            ...transcriptArtifact,
+            artifact_id: "artifact-server-realtime-turn",
+            name: "Visible realtime transcript artifact",
+            attributes: transcriptEvent.attributes,
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("Which stores are low?")).toHaveLength(1);
+    expect(screen.getAllByText("Dallas Downtown is low on stock.")).toHaveLength(1);
   });
 
   it("can render transcript messages without a selection handler", () => {
