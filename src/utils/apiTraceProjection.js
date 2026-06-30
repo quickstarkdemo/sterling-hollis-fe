@@ -1,4 +1,27 @@
+import { buildVisibleConversationProjection } from "./apiTraceConversation";
+
 const SENSITIVE_KEY = /(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password|credential|cookie|session|reasoning|chain[_-]?of[_-]?thought|raw[_-]?prompt)/i;
+
+function looksLikeTraceProjection(value) {
+  return Boolean(
+    value?.trace_id
+    && (
+      Array.isArray(value.spans)
+      || Array.isArray(value.events)
+      || Array.isArray(value.artifacts)
+    ),
+  );
+}
+
+function attachVisibleConversation(source, projection, projector) {
+  if (!looksLikeTraceProjection(source) || Object.prototype.hasOwnProperty.call(projection, "visible_conversation")) {
+    return projection;
+  }
+  return {
+    ...projection,
+    visible_conversation: projector(buildVisibleConversationProjection(source)),
+  };
+}
 
 export function sanitizeTraceValue(value, seen = new WeakSet(), depth = 0) {
   if (depth > 8) return "[TRUNCATED_DEPTH]";
@@ -8,12 +31,13 @@ export function sanitizeTraceValue(value, seen = new WeakSet(), depth = 0) {
   if (Array.isArray(value)) {
     return value.slice(0, 100).map((item) => sanitizeTraceValue(item, seen, depth + 1));
   }
-  return Object.fromEntries(
+  const projection = Object.fromEntries(
     Object.entries(value).slice(0, 100).map(([key, item]) => [
       key,
       SENSITIVE_KEY.test(key) ? "[REDACTED]" : sanitizeTraceValue(item, seen, depth + 1),
     ]),
   );
+  return attachVisibleConversation(value, projection, (item) => sanitizeTraceValue(item, seen, depth + 1));
 }
 
 export function fullTraceValue(value, seen = new WeakSet()) {
@@ -21,9 +45,10 @@ export function fullTraceValue(value, seen = new WeakSet()) {
   if (seen.has(value)) return "[CIRCULAR]";
   seen.add(value);
   if (Array.isArray(value)) return value.map((item) => fullTraceValue(item, seen));
-  return Object.fromEntries(
+  const projection = Object.fromEntries(
     Object.entries(value).map(([key, item]) => [key, fullTraceValue(item, seen)]),
   );
+  return attachVisibleConversation(value, projection, (item) => fullTraceValue(item, seen));
 }
 
 export function traceJson(value, { sanitize = true, maxChars = 60_000 } = {}) {

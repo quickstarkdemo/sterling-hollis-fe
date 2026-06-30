@@ -125,6 +125,50 @@ describe("TraceConversationView", () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: "event", id: "voice-turn-1" });
   });
 
+  it("renders artifact and live event turns chronologically", () => {
+    const laterArtifact = {
+      ...transcriptArtifact,
+      created_at: "2026-06-20T00:00:05Z",
+      attributes: {
+        ...transcriptArtifact.attributes,
+        turn_id: "turn-later",
+        visible_messages: [
+          {
+            visible_role: "assistant",
+            visible_text: "Later durable answer.",
+            visible_created_at: "2026-06-20T00:00:05Z",
+          },
+        ],
+      },
+    };
+    const earlyEvent = {
+      ...transcriptEvent,
+      event_id: "voice-turn-early",
+      occurred_at: "2026-06-20T00:00:01Z",
+      attributes: {
+        ...transcriptEvent.attributes,
+        turn_id: "turn-early",
+        visible_messages: [
+          {
+            visible_role: "presenter",
+            visible_text: "Earlier live question.",
+            visible_created_at: "2026-06-20T00:00:01Z",
+          },
+        ],
+      },
+    };
+
+    renderWithProviders(
+      <TraceConversationView
+        trace={{ artifacts: [laterArtifact], events: [earlyEvent] }}
+      />,
+    );
+
+    const messages = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(messages[0]).toContain("Earlier live question.");
+    expect(messages[1]).toContain("Later durable answer.");
+  });
+
   it("merges live presenter and assistant fragments with the same turn id", () => {
     const presenterEvent = {
       ...transcriptEvent,

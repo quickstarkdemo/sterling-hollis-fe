@@ -132,6 +132,30 @@ describe("buildTraceGraph", () => {
     });
     expect(reloadedGraph.nodes.some((node) => node.id === "event:turn-1")).toBe(false);
     expect(reloadedGraph.nodes.some((node) => node.id === "artifact:transcript_turn-1")).toBe(true);
+
+    const durableTurnGraph = buildTraceGraph({
+      ...trace,
+      events: [...trace.events, {
+        ...conversationEvent,
+        attributes: {
+          ...conversationEvent.attributes,
+          turn_id: "voice-turn-1",
+        },
+      }],
+      artifacts: [{
+        artifact_id: "artifact-server-realtime-turn",
+        span_id: "openai",
+        artifact_type: "chat_transcript",
+        name: "Visible realtime transcript artifact",
+        media_type: "application/vnd.sterling.chat-transcript+json",
+        attributes: {
+          ...conversationEvent.attributes,
+          turn_id: "voice-turn-1",
+        },
+      }],
+    });
+    expect(durableTurnGraph.nodes.some((node) => node.id === "event:turn-1")).toBe(false);
+    expect(durableTurnGraph.nodes.some((node) => node.id === "artifact:artifact-server-realtime-turn")).toBe(true);
   });
 });
 
@@ -177,6 +201,41 @@ describe("TraceGraph", () => {
     expect(transcriptNode).toHaveAttribute("data-selected", "true");
     fireEvent.click(transcriptNode);
     expect(onSelect).toHaveBeenCalledWith({ kind: "event", id: "turn-1" });
+  });
+
+  it("selects the durable transcript artifact after live turns are deduped", () => {
+    const onSelect = vi.fn();
+    const conversationEvent = {
+      event_id: "turn-1",
+      span_id: "openai",
+      sequence: 2,
+      name: "Visible assistant transcript",
+      event_type: "conversation.turn",
+      attributes: {
+        turn_id: "voice-turn-1",
+        visible_messages: [
+          { visible_role: "assistant", visible_text: "Dallas is low on stock." },
+        ],
+      },
+    };
+    const conversationTrace = {
+      ...trace,
+      events: [...trace.events, conversationEvent],
+      artifacts: [{
+        artifact_id: "artifact-server-realtime-turn",
+        span_id: "openai",
+        artifact_type: "chat_transcript",
+        name: "Visible realtime transcript artifact",
+        media_type: "application/vnd.sterling.chat-transcript+json",
+        attributes: conversationEvent.attributes,
+      }],
+    };
+    renderWithProviders(<TraceGraph trace={conversationTrace} selection={{ kind: "event", id: "turn-1" }} onSelect={onSelect} />);
+
+    const transcriptNode = screen.getByRole("button", { name: /Visible realtime transcript artifact/ });
+    expect(transcriptNode).toHaveAttribute("data-selected", "true");
+    fireEvent.click(transcriptNode);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "artifact", id: "artifact-server-realtime-turn" });
   });
 
   it("keeps existing positions stable across incremental updates and exposes compact density", () => {

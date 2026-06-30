@@ -33,6 +33,19 @@ text.
   actions.
 - For the storefront chat trace, open **Chat** and confirm the visible customer
   input and assistant response match the screen conversation.
+- In Catalog Studio, ask the text assistant a product or inventory question,
+  then open **Chat** and confirm the presenter/user request and assistant answer
+  appear as visible conversation messages.
+- In Catalog Studio, run a bounded realtime voice readout or draft command, then
+  confirm **Chat** groups the presenter input and assistant/tool response into a
+  single turn when the trace contains a stable turn id.
+- Open **Graph**, select the visible conversation node, and confirm the inspector
+  opens the same backing event or transcript artifact shown by **Chat**.
+- Copy or export the trace JSON and confirm the top-level
+  `visible_conversation` section lists the readable input/output messages while
+  the original spans, events, and artifacts remain present.
+- For expired traces, confirm `visible_conversation` reports metadata-only
+  records and does not invent or expose transcript text.
 - Confirm trace JSON and inspector views do not expose system prompts, raw
   provider payloads, credentials, audio, SDP, hidden reasoning, or private draft
   data.

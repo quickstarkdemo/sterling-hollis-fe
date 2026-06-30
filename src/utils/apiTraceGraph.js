@@ -2,9 +2,8 @@ import { formatTraceDuration, orderTraceSpans } from "./apiTraceProjection";
 import {
   buildTraceConversationRecords,
   conversationMessages,
-  isTranscriptArtifact,
   readableConversationRole,
-  transcriptArtifactIdForEvent,
+  traceConversationRecordForSelection,
 } from "./apiTraceConversation";
 
 const NODE_WIDTH = 202;
@@ -202,17 +201,7 @@ export function buildTraceGraph(trace, { density = "comfortable" } = {}) {
 }
 
 export function traceSelectionNodeId(trace, selection) {
-  if (selection?.kind === "artifact") {
-    const artifact = trace?.artifacts?.find((item) => item.artifact_id === selection.id);
-    if (isTranscriptArtifact(artifact)) return `artifact:${selection.id}`;
-  }
-  if (selection?.kind === "event") {
-    const event = trace?.events?.find((item) => item.event_id === selection.id);
-    if (event?.event_type === "conversation.turn") {
-      const derivedArtifactId = transcriptArtifactIdForEvent(event);
-      const derivedArtifact = trace?.artifacts?.find((item) => item.artifact_id === derivedArtifactId);
-      if (!isTranscriptArtifact(derivedArtifact)) return `event:${selection.id}`;
-    }
-  }
+  const record = traceConversationRecordForSelection(trace, selection);
+  if (record) return `${record.kind}:${record.id}`;
   return null;
 }
