@@ -345,6 +345,41 @@ describe("apiTraceClient", () => {
     });
   });
 
+  it("allowlists visible conversation turns for backend event transport", async () => {
+    enableRuntime();
+    const transport = vi.fn().mockResolvedValue(undefined);
+    setApiTraceEventTransport(transport);
+    const action = startApiTraceAction("Voice transcript");
+
+    recordApiTraceEvent(
+      "conversation.turn",
+      {
+        route: "catalog_realtime_voice",
+        visible_messages: [
+          {
+            visible_role: "assistant",
+            visible_text: "Dallas is low on stock.",
+            visible_source: "realtime_transcript",
+          },
+        ],
+      },
+      { action, status: "recorded" },
+    );
+    action.accept({ "x-trace-capture": "active", "x-trace-id": action.traceId });
+    await action.transportChain;
+
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(transport.mock.calls[1][1]).toEqual(expect.objectContaining({
+      event_type: "conversation.turn",
+      attributes: expect.objectContaining({
+        visible_messages: [expect.objectContaining({
+          visible_role: "assistant",
+          visible_text: "Dallas is low on stock.",
+        })],
+      }),
+    }));
+  });
+
   it("preserves recognizable secrets, customer identifiers, and query values in trace display text", () => {
     enableRuntime();
     const events = [];

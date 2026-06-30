@@ -1430,6 +1430,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .trace-graph-node.http { border-left-color: #60788f; }
 .trace-graph-node.openai { border-left-color: var(--saffron); }
 .trace-graph-node.realtime { border-left-color: #8b6847; }
+.trace-graph-node.conversation { border-left-color: #b66a50; }
 .trace-graph-node.worker { border-left-color: #7a6755; border-style: dashed; }
 .trace-graph-node.data { border-left-color: var(--sage); }
 .trace-graph-node.failed { border-color: var(--oxblood); }
@@ -1549,6 +1550,7 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 .api-trace-dock.expanded .trace-graph-node.http { border-left-color: var(--trace-link); }
 .api-trace-dock.expanded .trace-graph-node.openai { border-left-color: var(--trace-accent); }
 .api-trace-dock.expanded .trace-graph-node.realtime { border-left-color: #d59c68; }
+.api-trace-dock.expanded .trace-graph-node.conversation { border-left-color: #f29c7e; }
 .api-trace-dock.expanded .trace-graph-node.worker { border-left-color: #ad9b89; }
 .api-trace-dock.expanded .trace-graph-node.data { border-left-color: var(--trace-success); }
 .api-trace-dock.expanded .trace-graph-node.failed { border-color: var(--trace-danger); }
@@ -1781,6 +1783,10 @@ body:has(.api-trace-dock.collapsed) .chat-widget {
 
 .trace-message.user {
   border-left: 3px solid var(--sage);
+}
+
+.trace-message.presenter {
+  border-left: 3px solid #b66a50;
 }
 
 .trace-message.assistant {

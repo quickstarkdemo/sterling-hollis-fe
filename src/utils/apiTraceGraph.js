@@ -1,4 +1,11 @@
 import { formatTraceDuration, orderTraceSpans } from "./apiTraceProjection";
+import {
+  buildTraceConversationRecords,
+  conversationMessages,
+  isTranscriptArtifact,
+  readableConversationRole,
+  transcriptArtifactIdForEvent,
+} from "./apiTraceConversation";
 
 const NODE_WIDTH = 202;
 export const TRACE_GRAPH_LAYOUT = {
@@ -37,6 +44,18 @@ function externalNodeId(link) {
 
 function edgeKey(source, target, relationship) {
   return `${relationship}:${source}->${target}`;
+}
+
+function conversationPreview(record) {
+  const messages = conversationMessages(record.attributes);
+  const message = messages.find((item) => item.role === "assistant") || messages[0];
+  if (!message?.text) return { label: record.name, messageCount: messages.length, service: "Visible transcript" };
+  const text = message.text.length > 82 ? `${message.text.slice(0, 79)}...` : message.text;
+  return {
+    label: text,
+    messageCount: messages.length,
+    service: readableConversationRole(message.role),
+  };
 }
 
 export function buildTraceGraph(trace, { density = "comfortable" } = {}) {
@@ -134,5 +153,66 @@ export function buildTraceGraph(trace, { density = "comfortable" } = {}) {
     });
   });
 
+  buildTraceConversationRecords(trace).forEach((record) => {
+    if (!record.spanId || !spansById.has(record.spanId)) return;
+    const source = spansById.get(record.spanId);
+    const sourceDepth = spanDepth(source, spansById);
+    const depth = sourceDepth + 1;
+    const row = layerRows.get(depth) || 0;
+    layerRows.set(depth, row + 1);
+    const nodeId = `${record.kind}:${record.id}`;
+    const preview = conversationPreview(record);
+    nodes.push({
+      id: nodeId,
+      type: "traceOperation",
+      position: { x: depth * layout.columnGap, y: row * layout.rowGap },
+      data: {
+        attempt: null,
+        duration: `${preview.messageCount || 1} msg`,
+        kind: "conversation",
+        label: preview.label,
+        operation: record.type,
+        selectionId: record.id,
+        selectionKind: record.kind,
+        service: preview.service,
+        status: record.expired ? "metadata-only" : "recorded",
+      },
+      ariaLabel: `${record.name}, visible conversation, ${preview.messageCount || 1} messages`,
+      draggable: false,
+      connectable: false,
+      selectable: true,
+      style: { width: NODE_WIDTH },
+    });
+    const relationship = "transcript";
+    const id = edgeKey(record.spanId, nodeId, relationship);
+    edgeMap.set(id, {
+      id,
+      source: record.spanId,
+      target: nodeId,
+      type: "smoothstep",
+      markerEnd: "arrowclosed",
+      className: "trace-graph-transcript-edge",
+      data: { relationship },
+      label: relationship,
+      ariaLabel: `Visible transcript from ${record.spanId} to ${nodeId}`,
+    });
+  });
+
   return { nodes, edges: [...edgeMap.values()] };
+}
+
+export function traceSelectionNodeId(trace, selection) {
+  if (selection?.kind === "artifact") {
+    const artifact = trace?.artifacts?.find((item) => item.artifact_id === selection.id);
+    if (isTranscriptArtifact(artifact)) return `artifact:${selection.id}`;
+  }
+  if (selection?.kind === "event") {
+    const event = trace?.events?.find((item) => item.event_id === selection.id);
+    if (event?.event_type === "conversation.turn") {
+      const derivedArtifactId = transcriptArtifactIdForEvent(event);
+      const derivedArtifact = trace?.artifacts?.find((item) => item.artifact_id === derivedArtifactId);
+      if (!isTranscriptArtifact(derivedArtifact)) return `event:${selection.id}`;
+    }
+  }
+  return null;
 }

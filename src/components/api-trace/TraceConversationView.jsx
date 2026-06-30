@@ -1,52 +1,10 @@
 import { Badge, Box, Text } from "@chakra-ui/react";
 
-const CHAT_TRANSCRIPT_TYPES = new Set([
-  "chat_transcript",
-  "conversation",
-  "visible_chat",
-]);
-
-function transcriptArtifacts(trace) {
-  return (trace?.artifacts || []).filter((artifact) => (
-    CHAT_TRANSCRIPT_TYPES.has(artifact.artifact_type)
-    || artifact.media_type === "application/vnd.sterling.chat-transcript+json"
-  ));
-}
-
-function messageRole(message) {
-  return message.visible_role || message.role || "message";
-}
-
-function messageText(message) {
-  return message.visible_text || message.content || message.text || "";
-}
-
-function messageId(message, index) {
-  return message.visible_message_id || message.message_id || `message-${index + 1}`;
-}
-
-function conversationMessages(attributes = {}) {
-  const messages = attributes.visible_messages || attributes.messages || [];
-  return messages
-    .map((message, index) => ({
-      id: messageId(message, index),
-      role: messageRole(message),
-      text: messageText(message),
-      source: message.visible_source || message.source || "",
-      createdAt: message.visible_created_at || message.created_at || "",
-    }))
-    .filter((message) => message.text);
-}
-
-function artifactExpired(trace, artifact) {
-  return trace?.payload_expired || artifact?.attributes?._retention === "expired";
-}
-
-function readableRole(role) {
-  if (role === "user") return "Customer";
-  if (role === "assistant") return "Assistant";
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
+import {
+  buildTraceConversationRecords,
+  conversationMessages,
+  readableConversationRole,
+} from "../../utils/apiTraceConversation";
 
 function SummarySection({ title, count, items = [], renderItem }) {
   if (!count && !items.length) return null;
@@ -66,37 +24,36 @@ function SummarySection({ title, count, items = [], renderItem }) {
 }
 
 export default function TraceConversationView({ trace, selection, onSelect }) {
-  if (trace?.payload_expired && !(trace?.artifacts || []).length) {
+  const records = buildTraceConversationRecords(trace);
+  if (trace?.payload_expired && !records.length) {
     return (
       <Box className="api-trace-notice metadata-only">
-        Transcript details have expired. Timing and artifact metadata remain available.
+        Transcript details have expired. Timing and metadata remain available.
       </Box>
     );
   }
 
-  const artifacts = transcriptArtifacts(trace);
-  if (!artifacts.length) {
-    return <Text className="api-trace-empty">No customer-visible chat transcript is attached to this trace.</Text>;
+  if (!records.length) {
+    return <Text className="api-trace-empty">No visible chat transcript is attached to this trace yet.</Text>;
   }
 
   return (
     <Box className="trace-conversation-list" aria-label="Trace chat transcripts">
-      {artifacts.map((artifact) => {
-        const selected = selection?.kind === "artifact" && selection.id === artifact.artifact_id;
-        const attributes = artifact.attributes || {};
+      {records.map((record) => {
+        const selected = selection?.kind === record.kind && selection.id === record.id;
+        const attributes = record.attributes || {};
         const messages = conversationMessages(attributes);
-        const expired = artifactExpired(trace, artifact);
         return (
           <Box
-            key={artifact.artifact_id}
+            key={`${record.kind}-${record.id}`}
             className={`trace-conversation-card${selected ? " selected" : ""}`}
           >
             <Box className="trace-conversation-heading">
               <Box minW={0}>
-                <Text className="section-kicker">Customer conversation</Text>
-                <Text className="panel-title">{artifact.name || "Visible chat transcript"}</Text>
+                <Text className="section-kicker">Visible conversation</Text>
+                <Text className="panel-title">{record.name}</Text>
               </Box>
-              <Badge className="api-trace-artifact-type">{artifact.artifact_type}</Badge>
+              <Badge className="api-trace-artifact-type">{record.type}</Badge>
             </Box>
 
             <Box className="trace-conversation-meta">
@@ -107,9 +64,9 @@ export default function TraceConversationView({ trace, selection, onSelect }) {
               {attributes.duplicate_replay ? <span>Replay</span> : null}
             </Box>
 
-            {expired ? (
+            {record.expired ? (
               <Box className="api-trace-notice metadata-only">
-                Transcript payload has expired. Metadata for this artifact is still available in the inspector.
+                Transcript payload has expired. Metadata for this item is still available in the inspector.
               </Box>
             ) : (
               <>
@@ -117,11 +74,11 @@ export default function TraceConversationView({ trace, selection, onSelect }) {
                   {messages.map((message) => (
                     <button
                       type="button"
-                      key={`${artifact.artifact_id}-${message.id}-${message.role}`}
+                      key={`${record.kind}-${record.id}-${message.id}-${message.role}`}
                       className={`trace-message ${message.role}${selected ? " selected" : ""}`}
-                      onClick={() => onSelect?.({ kind: "artifact", id: artifact.artifact_id })}
+                      onClick={() => onSelect?.({ kind: record.kind, id: record.id })}
                     >
-                      <span className="trace-message-role">{readableRole(message.role)}</span>
+                      <span className="trace-message-role">{readableConversationRole(message.role)}</span>
                       <span className="trace-message-text">{message.text}</span>
                     </button>
                   ))}

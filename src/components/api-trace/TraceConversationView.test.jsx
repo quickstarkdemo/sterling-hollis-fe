@@ -41,10 +41,36 @@ const transcriptArtifact = {
   },
 };
 
+const transcriptEvent = {
+  event_id: "voice-turn-1",
+  span_id: "span-chat",
+  sequence: 4,
+  name: "Visible assistant transcript",
+  event_type: "conversation.turn",
+  status: "recorded",
+  occurred_at: "2026-06-20T00:00:04Z",
+  attributes: {
+    route: "catalog_realtime_voice",
+    workflow_id: "workflow_1",
+    visible_messages: [
+      {
+        visible_role: "presenter",
+        visible_text: "Which stores are low?",
+        visible_message_id: "voice_user",
+      },
+      {
+        visible_role: "assistant",
+        visible_text: "Dallas Downtown is low on stock.",
+        visible_message_id: "voice_assistant",
+      },
+    ],
+  },
+};
+
 describe("TraceConversationView", () => {
   it("renders a helpful empty state when no transcript artifact exists", () => {
-    renderWithProviders(<TraceConversationView trace={{ artifacts: [] }} />);
-    expect(screen.getByText(/No customer-visible chat transcript/)).toBeInTheDocument();
+    renderWithProviders(<TraceConversationView trace={{ artifacts: [], events: [] }} />);
+    expect(screen.getByText(/No visible chat transcript/)).toBeInTheDocument();
   });
 
   it("renders metadata-only state when transcript payloads have expired", () => {
@@ -78,6 +104,42 @@ describe("TraceConversationView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Customer Does this jacket/ }));
     expect(onSelect).toHaveBeenCalledWith({ kind: "artifact", id: "artifact-chat" });
+  });
+
+  it("renders live conversation events and selects the backing event", () => {
+    const onSelect = vi.fn();
+    renderWithProviders(
+      <TraceConversationView
+        trace={{ artifacts: [], events: [transcriptEvent] }}
+        selection={{ kind: "event", id: "voice-turn-1" }}
+        onSelect={onSelect}
+      />,
+    );
+
+    expect(screen.getByText("catalog_realtime_voice")).toBeInTheDocument();
+    expect(screen.getByText("Which stores are low?")).toBeInTheDocument();
+    expect(screen.getByText("Dallas Downtown is low on stock.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Presenter Which stores/ }));
+    expect(onSelect).toHaveBeenCalledWith({ kind: "event", id: "voice-turn-1" });
+  });
+
+  it("deduplicates event turns once their derived transcript artifact arrives", () => {
+    renderWithProviders(
+      <TraceConversationView
+        trace={{
+          events: [transcriptEvent],
+          artifacts: [{
+            ...transcriptArtifact,
+            artifact_id: "transcript_voice-turn-1",
+            name: "Visible realtime transcript artifact",
+            attributes: transcriptEvent.attributes,
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("Which stores are low?")).toHaveLength(1);
   });
 
   it("can render transcript messages without a selection handler", () => {

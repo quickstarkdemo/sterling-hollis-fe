@@ -13,7 +13,7 @@ import "@xyflow/react/dist/style.css";
 import {
   traceSelectionSpanId,
 } from "../../utils/apiTraceProjection";
-import { buildTraceGraph, TRACE_GRAPH_LAYOUT } from "../../utils/apiTraceGraph";
+import { buildTraceGraph, TRACE_GRAPH_LAYOUT, traceSelectionNodeId } from "../../utils/apiTraceGraph";
 
 function TraceOperationNode({ data, selected }) {
   return (
@@ -45,7 +45,7 @@ export default function TraceGraph({ trace, selection, onSelect }) {
   const traceId = useRef(trace?.trace_id);
   const density = densityOverride || ((trace?.spans?.length || 0) > 24 ? "compact" : "comfortable");
   const layoutDensity = useRef(density);
-  const selectedSpanId = traceSelectionSpanId(trace, selection);
+  const selectedNodeId = traceSelectionNodeId(trace, selection) || traceSelectionSpanId(trace, selection);
   if (traceId.current !== trace?.trace_id) {
     traceId.current = trace?.trace_id;
     positionCache.current.clear();
@@ -72,7 +72,7 @@ export default function TraceGraph({ trace, selection, onSelect }) {
       return {
         ...node,
         position,
-        selected: node.id === selectedSpanId,
+        selected: node.id === selectedNodeId,
         data: {
           ...node.data,
           changed: hasPrevious && signatureCache.current.get(node.id) !== signature,
@@ -80,7 +80,7 @@ export default function TraceGraph({ trace, selection, onSelect }) {
       };
     });
     return { nodes, edges: graph.edges };
-  }, [density, graph, selectedSpanId]);
+  }, [density, graph, selectedNodeId]);
 
   useEffect(() => {
     signatureCache.current = new Map(graph.nodes.map((node) => [node.id, changeSignature(node)]));
@@ -106,7 +106,12 @@ export default function TraceGraph({ trace, selection, onSelect }) {
           edges={renderedGraph.edges}
           nodeTypes={NODE_TYPES}
           onNodeClick={(_, node) => {
-            if (!node.data.external) onSelect({ kind: "span", id: node.id });
+            if (!node.data.external) {
+              onSelect({
+                kind: node.data.selectionKind || "span",
+                id: node.data.selectionId || node.id,
+              });
+            }
           }}
           onPaneClick={() => onSelect({ kind: "trace", id: trace.trace_id })}
           nodesDraggable={false}
