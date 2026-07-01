@@ -6,10 +6,16 @@ import useCatalogRealtimeSession from "../../hooks/useCatalogRealtimeSession";
 import { useApiTrace } from "../ApiTraceContext";
 import { recordApiTraceEvent } from "../../utils/apiTraceClient";
 import { recordVisibleConversationTurn } from "../../utils/apiTraceConversation";
+import {
+  defaultMicrophoneRequest,
+  defaultPeerConnection,
+  defaultSdpExchange,
+  realtimeErrorCode,
+  realtimeFailureStatus,
+} from "../../utils/realtimeVoice";
 import RealtimeTranscript from "./RealtimeTranscript";
 
 const ACTIVE_STATES = new Set(["requesting", "connecting", "listening"]);
-const REALTIME_WEBRTC_URL = "https://api.openai.com/v1/realtime/calls";
 const MAX_TRANSCRIPT_ENTRIES = 24;
 const MAX_TRANSCRIPT_CHARS = 4000;
 const DISCONNECT_GRACE_MS = 8000;
@@ -35,36 +41,6 @@ const configurationCopy = {
   missing_api_key: "Voice is not configured with an OpenAI API key. Ask an operator to update the backend environment.",
   missing_safety_secret: "Voice is missing its safety identifier secret. Ask an operator to update the backend environment.",
 };
-
-function realtimeErrorCode(error) {
-  return error?.response?.data?.detail?.code || error?.message || "";
-}
-
-function defaultPeerConnection() {
-  if (typeof RTCPeerConnection === "undefined") throw new Error("realtime_unsupported");
-  return new RTCPeerConnection();
-}
-
-function defaultMicrophoneRequest() {
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error("realtime_unsupported");
-  return navigator.mediaDevices.getUserMedia({ audio: true });
-}
-
-async function defaultSdpExchange(session, offerSdp, signal) {
-  if (session.webrtc_url !== REALTIME_WEBRTC_URL) throw new Error("realtime_invalid_url");
-  if (typeof fetch !== "function") throw new Error("realtime_unsupported");
-  const response = await fetch(session.webrtc_url, {
-    method: "POST",
-    body: offerSdp,
-    signal,
-    headers: {
-      Authorization: `Bearer ${session.client_secret}`,
-      "Content-Type": "application/sdp",
-    },
-  });
-  if (!response.ok) throw new Error("realtime_connection_failed");
-  return response.text();
-}
 
 function toolOutput(result) {
   const status = result?.status || (result?.mutation === false ? "succeeded" : "failed");
@@ -485,20 +461,7 @@ export default function VoiceControls({
         { error_code: code || "connection_failed", transport: "webrtc" },
         { action: traceActionRef.current, status: "failed" },
       );
-      const unsupported = code === "realtime_unsupported";
-      const denied = error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError";
-      const nextStatus = unsupported
-        ? "unavailable"
-        : denied
-          ? "denied"
-          : code === "realtime_timeout"
-            ? "timeout"
-            : ["realtime_unavailable", "realtime_failed"].includes(code)
-              ? "provider"
-              : ["realtime_invalid_url", "realtime_connection_failed"].includes(code)
-                ? "transport"
-                : "error";
-      endSession(nextStatus);
+      endSession(realtimeFailureStatus(error));
     }
   };
   startSessionRef.current = startSession;

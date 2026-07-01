@@ -17,6 +17,9 @@ describe("capability parity contract", () => {
       "searchProducts",
       "getProductRecommendations",
       "sendChat",
+      "getShopperRealtimeCapability",
+      "createShopperRealtimeSession",
+      "submitShopperRealtimeToolCall",
     ].forEach((helperName) => {
       expect(routeFor(helperName)?.pathTemplate, helperName).not.toMatch(/^\/api\/admin\//);
     });

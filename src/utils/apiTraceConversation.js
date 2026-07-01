@@ -28,6 +28,9 @@ export function isTranscriptArtifact(artifact = {}) {
 
 export function recordVisibleConversationTurn({
   action,
+  actionCount,
+  cardCount,
+  conversationId,
   createdAt,
   messageId,
   name,
@@ -36,17 +39,31 @@ export function recordVisibleConversationTurn({
   selectedTool = "",
   source = "realtime_transcript",
   text,
+  toolCount,
   turnId,
   workflowId,
 } = {}) {
   const visibleText = String(text || "").trim();
   if (!action?.enabled || !visibleText || !turnId || !messageId) return null;
-  const visibleRole = role === "presenter" ? "presenter" : "assistant";
+  const visibleRole = role === "presenter"
+    ? "presenter"
+    : ["customer", "shopper", "user"].includes(role)
+      ? "user"
+      : "assistant";
+  const defaultName = visibleRole === "presenter"
+    ? "Visible presenter transcript"
+    : visibleRole === "user"
+      ? "Visible customer transcript"
+      : "Visible assistant transcript";
   return recordApiTraceEvent(
     "conversation.turn",
     dropEmptyValues({
+      action_count: actionCount,
+      card_count: cardCount,
+      conversation_id: conversationId,
       route,
       selected_tool: selectedTool,
+      tool_count: toolCount,
       turn_id: turnId,
       workflow_id: workflowId,
       visible_messages: [
@@ -61,7 +78,7 @@ export function recordVisibleConversationTurn({
     }),
     {
       action,
-      name: name || (visibleRole === "presenter" ? "Visible presenter transcript" : "Visible assistant transcript"),
+      name: name || defaultName,
       status: "recorded",
     },
   );

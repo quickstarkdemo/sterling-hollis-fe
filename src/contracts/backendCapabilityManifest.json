@@ -1,7 +1,7 @@
 {
   "source": "https://raw.githubusercontent.com/quickstarkdemo/sterling-hollis-be/main/docs/openapi.json",
   "generatedFrom": "quickstarkdemo/sterling-hollis-be docs/openapi.json",
-  "refreshedAt": "2026-06-22T17:38:52.285Z",
+  "refreshedAt": "2026-07-01T16:54:34.076Z",
   "operations": [
     {
       "method": "GET",
@@ -114,6 +114,18 @@
     {
       "method": "POST",
       "pathTemplate": "/admin/seed/run/{seed_run_id}/finalize",
+      "capabilityId": "operator_compatibility.admin",
+      "surface": "operator_compatibility",
+      "contractStatus": "current",
+      "currentFrontendContract": false,
+      "legacyCompatibility": true,
+      "migrationTarget": null,
+      "adminGeneration": null,
+      "authPosture": "local_or_protected_operator"
+    },
+    {
+      "method": "POST",
+      "pathTemplate": "/admin/synthetic/daily-orders",
       "capabilityId": "operator_compatibility.admin",
       "surface": "operator_compatibility",
       "contractStatus": "current",
@@ -942,6 +954,42 @@
     {
       "method": "POST",
       "pathTemplate": "/api/chat",
+      "capabilityId": "shopper.chat.turn",
+      "surface": "public_shopper",
+      "contractStatus": "current",
+      "currentFrontendContract": true,
+      "legacyCompatibility": false,
+      "migrationTarget": null,
+      "adminGeneration": null,
+      "authPosture": "optional_clerk"
+    },
+    {
+      "method": "GET",
+      "pathTemplate": "/api/chat/realtime/capability",
+      "capabilityId": "shopper.chat.turn",
+      "surface": "public_shopper",
+      "contractStatus": "current",
+      "currentFrontendContract": true,
+      "legacyCompatibility": false,
+      "migrationTarget": null,
+      "adminGeneration": null,
+      "authPosture": "optional_clerk"
+    },
+    {
+      "method": "POST",
+      "pathTemplate": "/api/chat/realtime/sessions",
+      "capabilityId": "shopper.chat.turn",
+      "surface": "public_shopper",
+      "contractStatus": "current",
+      "currentFrontendContract": true,
+      "legacyCompatibility": false,
+      "migrationTarget": null,
+      "adminGeneration": null,
+      "authPosture": "optional_clerk"
+    },
+    {
+      "method": "POST",
+      "pathTemplate": "/api/chat/realtime/tool-calls",
       "capabilityId": "shopper.chat.turn",
       "surface": "public_shopper",
       "contractStatus": "current",

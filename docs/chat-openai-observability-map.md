@@ -10,11 +10,13 @@ Authoritative backend contract sources:
 
 The frontend manifest is refreshed with `npm run refresh:api-contract` and keeps the OpenAPI `x-sterling-*` capability metadata used by the API client drift tests.
 
+Storefront voice uses `GET /api/chat/realtime/capability`, `POST /api/chat/realtime/sessions`, and `POST /api/chat/realtime/tool-calls`. The browser only exposes compact lifecycle events plus bounded visible user and assistant transcript turns to the trace projection. It does not place raw audio, SDP offers or answers, provider payloads, or ephemeral Realtime credentials into the trace UI.
+
 ## Unified Capability Vocabulary
 
 | Surface | Frontend entry point | Backend capability surface | Notes |
 | --- | --- | --- | --- |
-| Storefront chat | `src/components/ChatWidget.jsx` | `public_shopper` / `shopper.chat.turn` | Capability diagnostics are hidden unless diagnostics mode is enabled. |
+| Storefront chat | `src/components/ChatWidget.jsx` | `public_shopper` / `shopper.chat.turn` | Text and consumer voice turns share the shopper chat response renderer. Capability diagnostics are hidden unless diagnostics mode is enabled. |
 | Catalog Studio assistant | `src/components/admin/CatalogGlobalAssistant.jsx` | `catalog_admin` | Text and read-only voice tools use current assistant/v3 capability routes. |
 | Developer trace UI | `src/components/api-trace/*` | `developer_trace` | Trace inspector projects capability id, surface, and status from unified metadata. |
 | Operator demo controls | `src/components/DemoObservabilityPanel.jsx` | `operator_compatibility` | Intentionally operator-scoped and not part of normal shopper/admin UI. |
