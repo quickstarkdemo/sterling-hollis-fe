@@ -23,6 +23,7 @@ import {
   approveCatalogImageJob,
   createAdminCatalogBrand,
   createCatalogRealtimeSession,
+  createShopperRealtimeSession,
   decideCatalogSuggestionSet,
   decideCatalogProductReview,
   deleteCatalogSourceAsset,
@@ -46,6 +47,7 @@ import {
   getCatalogWorkflow,
   getDemoObservabilityState,
   getProduct,
+  getShopperRealtimeCapability,
   publishAdminCatalogProduct,
   publishAdminCatalogProductCompatibilityV2,
   publishAdminCatalogProductV3,
@@ -65,6 +67,7 @@ import {
   submitCatalogMediaCommand,
   submitCatalogRealtimeCompatibilityToolCall,
   submitCatalogRealtimeV3ToolCall,
+  submitShopperRealtimeToolCall,
   subscribeAdminApiTraceEvents,
   updateDemoObservabilityState,
   uploadCatalogSourceBundle,
@@ -427,6 +430,37 @@ it("uses workflow-bound Realtime routes without exposing provider credentials", 
     "/api/admin/catalog/workflows/workflow%2Fone/realtime/tool-calls",
     expect.objectContaining({ call_id: "call_1", name: "refine_catalog_draft" }),
     { headers: { "Idempotency-Key": "voice-call-key" } },
+  );
+  expect(JSON.stringify(client.post.mock.calls)).not.toContain("client_secret");
+  expect(JSON.stringify(client.post.mock.calls)).not.toContain("api.openai.com");
+});
+
+it("uses shopper Realtime routes without exposing provider credentials", async () => {
+  await getShopperRealtimeCapability();
+  await createShopperRealtimeSession({ context: { route: "/", store_id: "1001" } });
+  await submitShopperRealtimeToolCall({
+    session_id: "shopper_realtime_1",
+    call_id: "call_voice_1",
+    name: "shopper_chat_turn",
+    arguments: { message: "Is this in stock?" },
+    context: { route: "/", store_id: "1001" },
+  });
+
+  expect(client.get).toHaveBeenNthCalledWith(1, "/api/chat/realtime/capability", { params: {} });
+  expect(client.post).toHaveBeenNthCalledWith(
+    1,
+    "/api/chat/realtime/sessions",
+    { context: { route: "/", store_id: "1001" } },
+    { timeout: 30000 },
+  );
+  expect(client.post).toHaveBeenNthCalledWith(
+    2,
+    "/api/chat/realtime/tool-calls",
+    expect.objectContaining({
+      session_id: "shopper_realtime_1",
+      name: "shopper_chat_turn",
+    }),
+    { timeout: 90000 },
   );
   expect(JSON.stringify(client.post.mock.calls)).not.toContain("client_secret");
   expect(JSON.stringify(client.post.mock.calls)).not.toContain("api.openai.com");

@@ -366,6 +366,18 @@ export function sendChat(payload = {}) {
   return post("/api/chat", payload, { timeout: 90000 });
 }
 
+export function getShopperRealtimeCapability() {
+  return get("/api/chat/realtime/capability");
+}
+
+export function createShopperRealtimeSession(payload = {}) {
+  return post("/api/chat/realtime/sessions", payload, { timeout: 30000 });
+}
+
+export function submitShopperRealtimeToolCall(payload = {}) {
+  return post("/api/chat/realtime/tool-calls", payload, { timeout: 90000 });
+}
+
 export function getDemoObservabilityState() {
   return get("/api/demo/observability");
 }
@@ -528,6 +540,9 @@ export const API_HELPER_CONTRACTS = [
   { helperName: "searchProducts", method: "GET", pathTemplate: "/api/search/products" },
   { helperName: "getProductRecommendations", method: "POST", pathTemplate: "/api/recommendations/products" },
   { helperName: "sendChat", method: "POST", pathTemplate: "/api/chat" },
+  { helperName: "getShopperRealtimeCapability", method: "GET", pathTemplate: "/api/chat/realtime/capability" },
+  { helperName: "createShopperRealtimeSession", method: "POST", pathTemplate: "/api/chat/realtime/sessions" },
+  { helperName: "submitShopperRealtimeToolCall", method: "POST", pathTemplate: "/api/chat/realtime/tool-calls" },
   { helperName: "getDemoObservabilityState", method: "GET", pathTemplate: "/api/demo/observability", compatibilityShim: true, reason: "operator demo compatibility surface" },
   { helperName: "updateDemoObservabilityState", method: "POST", pathTemplate: "/api/demo/observability", compatibilityShim: true, reason: "operator demo compatibility surface" },
   { helperName: "resetDemoObservabilityState", method: "POST", pathTemplate: "/api/demo/observability/reset", compatibilityShim: true, reason: "operator demo compatibility surface" },
